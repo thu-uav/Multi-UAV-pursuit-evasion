@@ -41,8 +41,8 @@ class IsaacEnv(EnvBase):
         self.max_episode_length = self.cfg.env.max_episode_length
         self.min_episode_length = self.cfg.env.min_episode_length
 
-        # torch.backends.cudnn.benchmark = True
-        # torch.backends.cudnn.deterministic = False
+        torch.backends.cudnn.benchmark = True
+        torch.backends.cudnn.deterministic = False
 
         # check that simulation is running
         if stage_utils.get_current_stage() is None:
@@ -71,7 +71,6 @@ class IsaacEnv(EnvBase):
         # add flag for checking closing status
         self._is_closed = False
         # set camera view
-        set_camera_view(eye=self.cfg.viewer.eye, target=self.cfg.viewer.lookat)
         # create cloner for duplicating the scenes
         cloner = GridCloner(spacing=self.cfg.env.env_spacing)
         cloner.define_base_env("/World/envs")
@@ -99,6 +98,11 @@ class IsaacEnv(EnvBase):
         )
         # find the environment closest to the origin for visualization
         self.central_env_idx = self.envs_positions.norm(dim=-1).argmin()
+        central_env_pos = self.envs_positions[self.central_env_idx].cpu().numpy()
+        set_camera_view(
+            eye=central_env_pos + np.asarray(self.cfg.viewer.eye), 
+            target=central_env_pos + np.asarray(self.cfg.viewer.lookat)
+        )
         
         RobotBase._envs_positions = self.envs_positions.unsqueeze(1)
 

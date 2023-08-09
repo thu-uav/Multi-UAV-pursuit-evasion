@@ -18,6 +18,7 @@ from omni_drones.utils.torchrl.transforms import (
     FromDiscreteAction,
     flatten_composite,
     VelController,
+    AttitudeController,
 )
 from omni_drones.utils.wandb import init_wandb
 from omni_drones.learning import (
@@ -28,7 +29,6 @@ from omni_drones.learning import (
     SACPolicy,
     TD3Policy,
     MATD3Policy,
-    DreamerPolicy,
     TDMPCPolicy
 )
 
@@ -73,7 +73,6 @@ def main(cfg):
         "sac": SACPolicy,
         "td3": TD3Policy,
         "matd3": MATD3Policy,
-        "dreamer": DreamerPolicy,
         "tdmpc": TDMPCPolicy
     }
 
@@ -122,15 +121,15 @@ def main(cfg):
             nbins = int(action_transform.split(":")[1])
             transform = FromDiscreteAction(nbins=nbins)
             transforms.append(transform)
-        elif action_transform == "controller":
-            controller_cls = base_env.drone.DEFAULT_CONTROLLER
-            print(f"Use controller {controller_cls}")
-            controller = controller_cls(
-                base_env.dt, 
-                9.81, 
-                base_env.drone.params
-            ).to(base_env.device)
-            transform = VelController(vmap(vmap(controller)), ("action", "drone.action"))
+        elif action_transform == "velocity":
+            from omni_drones.controllers import LeePositionController
+            controller = LeePositionController(9.81, base_env.drone.params).to(base_env.device)
+            transform = VelController(vmap(controller))
+            transforms.append(transform)
+        elif action_transform == "attitude":
+            from omni_drones.controllers import AttitudeController as _AttitudeController
+            controller = _AttitudeController(9.81, base_env.drone.params).to(base_env.device)
+            transform = AttitudeController(vmap(vmap(controller)))
             transforms.append(transform)
         elif not action_transform.lower() == "none":
             raise NotImplementedError(f"Unknown action transform: {action_transform}")
@@ -139,9 +138,7 @@ def main(cfg):
     env.set_seed(cfg.seed)
 
     agent_spec: AgentSpec = env.agent_spec["drone"]
-    policy = algos[cfg.algo.name.lower()](
-        cfg.algo, agent_spec=agent_spec, device="cuda"
-    )
+    policy = algos[cfg.algo.name.lower()](cfg.algo, agent_spec=agent_spec, device="cuda")
 
     frames_per_batch = env.num_envs * int(cfg.algo.train_every)
     total_frames = cfg.get("total_frames", -1) // frames_per_batch * frames_per_batch
@@ -218,7 +215,7 @@ def main(cfg):
     
     logging.info(f"Final Eval at {collector._frames} steps.")
     info = {"env_frames": collector._frames}
-    # info.update(evaluate())
+    info.update(evaluate())
     run.log(info)
 
     if hasattr(policy, "state_dict"):

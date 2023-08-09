@@ -1,2 +1,0 @@
-UAV Models and Usage
-====================
