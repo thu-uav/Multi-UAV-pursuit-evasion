@@ -1,3 +1,26 @@
+# MIT License
+# 
+# Copyright (c) 2023 Botian Xu, Tsinghua University
+# 
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+# 
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+
 import functorch
 import torch
 import torch.distributions as D
@@ -56,10 +79,10 @@ class InvPendulumHover(IsaacEnv):
 
     """
     def __init__(self, cfg, headless):
-        self.reward_effort_weight = self.cfg.task.reward_effort_weight
-        self.reward_action_smoothness_weight = self.cfg.task.reward_action_smoothness_weight
-        self.reward_distance_scale = self.cfg.task.reward_distance_scale
-        self.time_encoding = self.cfg.task.time_encoding
+        self.reward_effort_weight = cfg.task.reward_effort_weight
+        self.reward_action_smoothness_weight = cfg.task.reward_action_smoothness_weight
+        self.reward_distance_scale = cfg.task.reward_distance_scale
+        self.time_encoding = cfg.task.time_encoding
 
         self.bar_length = 1.
         super().__init__(cfg, headless)
@@ -160,7 +183,6 @@ class InvPendulumHover(IsaacEnv):
             "episode_len": UnboundedContinuousTensorSpec(1),
             "pos_error": UnboundedContinuousTensorSpec(1),
             "action_smoothness": UnboundedContinuousTensorSpec(1),
-            "motion_smoothness": UnboundedContinuousTensorSpec(1)
         }).expand(self.num_envs).to(self.device)
         info_spec = CompositeSpec({
             "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13)),
@@ -220,11 +242,6 @@ class InvPendulumHover(IsaacEnv):
 
         self.stats["pos_error"].lerp_(self.pos_error, (1-self.alpha))
         self.stats["action_smoothness"].lerp_(-self.drone.throttle_difference, (1-self.alpha))
-        smoothness = (
-            self.drone.get_linear_smoothness()
-            + self.drone.get_angular_smoothness()
-        )
-        self.stats["motion_smoothness"].lerp_(smoothness, (1-self.alpha))
 
         return TensorDict({
             "agents":{

@@ -1,3 +1,26 @@
+# MIT License
+# 
+# Copyright (c) 2023 Botian Xu, Tsinghua University
+# 
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+# 
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+
 import abc
 
 from typing import Dict, List, Optional, Tuple, Type, Union, Callable
@@ -40,6 +63,7 @@ class IsaacEnv(EnvBase):
         self.num_envs = self.cfg.env.num_envs
         self.max_episode_length = self.cfg.env.max_episode_length
         self.min_episode_length = self.cfg.env.min_episode_length
+        self.substeps = self.cfg.sim.substeps
 
         torch.backends.cudnn.benchmark = True
         torch.backends.cudnn.deterministic = False
@@ -60,7 +84,7 @@ class IsaacEnv(EnvBase):
         self.sim = SimulationContext(
             stage_units_in_meters=1.0,
             physics_dt=self.cfg.sim.dt,
-            rendering_dt=self.cfg.sim.dt * self.cfg.sim.substeps,
+            rendering_dt=self.cfg.sim.dt, # * self.cfg.sim.substeps,
             backend="torch",
             sim_params=sim_params,
             physics_prim_path="/physicsScene",
@@ -186,7 +210,7 @@ class IsaacEnv(EnvBase):
 
     def _reset(self, tensordict: TensorDictBase, **kwargs) -> TensorDictBase:
         if tensordict is not None:
-            env_mask = tensordict.get("_reset").squeeze()
+            env_mask = tensordict.get("_reset").reshape(self.num_envs)
         else:
             env_mask = torch.ones(self.num_envs, dtype=bool, device=self.device)
         env_ids = env_mask.nonzero().squeeze(-1)
@@ -194,21 +218,24 @@ class IsaacEnv(EnvBase):
         # self.sim.step(render=False)
         self.sim._physics_sim_view.flush()
         self.progress_buf[env_ids] = 0.
-        return self._tensordict.update(self._compute_state_and_obs())
+        tensordict = TensorDict({}, self.batch_size, device=self.device)
+        tensordict.update(self._compute_state_and_obs())
+        tensordict.set("truncated", (self.progress_buf > self.max_episode_length).unsqueeze(1))
+        return tensordict
 
     @abc.abstractmethod
     def _reset_idx(self, env_ids: torch.Tensor):
         raise NotImplementedError
 
     def _step(self, tensordict: TensorDictBase) -> TensorDictBase:
-        self._pre_sim_step(tensordict)
-        for substep in range(1):
+        for substep in range(self.substeps):
+            self._pre_sim_step(tensordict)
             self.sim.step(self._should_render(substep))
         self._post_sim_step(tensordict)
         self.progress_buf += 1
-        tensordict = TensorDict({"next": {}}, self.batch_size)
-        tensordict["next"].update(self._compute_state_and_obs())
-        tensordict["next"].update(self._compute_reward_and_done())
+        tensordict = TensorDict({}, self.batch_size, device=self.device)
+        tensordict.update(self._compute_state_and_obs())
+        tensordict.update(self._compute_reward_and_done())
         return tensordict
 
     def _pre_sim_step(self, tensordict: TensorDictBase):
@@ -272,7 +299,7 @@ class IsaacEnv(EnvBase):
     def to(self, device) -> EnvBase:
         if torch.device(device) != self.device:
             raise RuntimeError(
-                "Cannot move IsaacEnv to a different device once it's initialized."
+                f"Cannot move IsaacEnv on {self.device} to a different device {device} once it's initialized."
             )
         return self
 

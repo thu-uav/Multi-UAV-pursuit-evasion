@@ -1,3 +1,26 @@
+# MIT License
+# 
+# Copyright (c) 2023 Botian Xu, Tsinghua University
+# 
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+# 
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+
 from collections import Callable, defaultdict
 from typing import Any, Dict, Optional, Sequence, Union, Tuple
 
@@ -72,7 +95,7 @@ class LogOnEpisode(Transform):
     def _step(self, tensordict: TensorDictBase) -> TensorDictBase:
         _reset = tensordict.get(("next", "done"), None)
         if _reset is None:
-            _reset = torch.ones(
+            _reset = torch.zeros(
                 tensordict.batch_size, dtype=torch.bool, device=tensordict.device
             )
         if _reset.any():
@@ -121,7 +144,7 @@ class FromDiscreteAction(Transform):
         self.action_key = action_key
 
     def transform_input_spec(self, input_spec: CompositeSpec) -> CompositeSpec:
-        action_spec = input_spec[("_action_spec", *self.action_key)]
+        action_spec = input_spec[("full_action_spec", *self.action_key)]
         if isinstance(action_spec, BoundedTensorSpec):
             if isinstance(self.nbins, int):
                 nbins = [self.nbins] * action_spec.shape[-1]
@@ -142,7 +165,7 @@ class FromDiscreteAction(Transform):
             )
         else:
             NotImplementedError("Only BoundedTensorSpec is supported.")
-        input_spec[("_action_spec", *self.action_key)] = spec
+        input_spec[("full_action_spec", *self.action_key)] = spec
         return input_spec
 
     def _inv_apply_transform(self, action: torch.Tensor) -> torch.Tensor:
@@ -167,7 +190,7 @@ class FromMultiDiscreteAction(Transform):
         self.action_key = action_key
 
     def transform_input_spec(self, input_spec: CompositeSpec) -> CompositeSpec:
-        action_spec = input_spec[("_action_spec", *self.action_key)]
+        action_spec = input_spec[("full_action_spec", *self.action_key)]
         if isinstance(action_spec, BoundedTensorSpec):
             if isinstance(self.nbins, int):
                 nbins = [self.nbins] * action_spec.shape[-1]
@@ -185,7 +208,7 @@ class FromMultiDiscreteAction(Transform):
             self.maximum = action_spec.space.maximum
         else:
             NotImplementedError("Only BoundedTensorSpec is supported.")
-        input_spec[("_action_spec", *self.action_key)] = spec
+        input_spec[("full_action_spec", *self.action_key)] = spec
         return input_spec
 
     def _inv_apply_transform(self, action: torch.Tensor) -> torch.Tensor:
@@ -219,14 +242,31 @@ class DepthImageNorm(Transform):
         return obs
 
 
-def flatten_composite(spec: CompositeSpec, key: str):
+def ravel_composite(
+    spec: CompositeSpec, key: str, start_dim: int=-2, end_dim: int=-1
+):
+    r"""
+    
+    Examples:
+    >>> obs_spec = CompositeSpec({
+    ...     "obs_self": UnboundedContinuousTensorSpec((1, 19)),
+    ...     "obs_others": UnboundedContinuousTensorSpec((3, 13)),
+    ... })
+    >>> spec = CompositeSpec({
+            "agents": {
+                "observation": obs_spec
+            }
+    ... })
+    >>> t = ravel_composite(spec, ("agents", "observation"))
+
+    """
     composite_spec = spec[key]
     if not isinstance(key, tuple):
         key = (key,)
     if isinstance(composite_spec, CompositeSpec):
         in_keys = [k for k in spec.keys(True, True) if k[:len(key)] == key]
         return Compose(
-            FlattenObservation(-2, -1, in_keys),
+            FlattenObservation(start_dim, end_dim, in_keys),
             CatTensors(in_keys, out_key=key)
         )
     else:
@@ -244,21 +284,52 @@ class VelController(Transform):
         self.action_key = action_key
     
     def transform_input_spec(self, input_spec: TensorSpec) -> TensorSpec:
-        action_spec = input_spec[("_action_spec", *self.action_key)]
+        action_spec = input_spec[("full_action_spec", *self.action_key)]
         spec = UnboundedContinuousTensorSpec(action_spec.shape[:-1]+(4,), device=action_spec.device)
-        input_spec[("_action_spec", *self.action_key)] = spec
+        input_spec[("full_action_spec", *self.action_key)] = spec
         return input_spec
     
     def _inv_call(self, tensordict: TensorDictBase) -> TensorDictBase:
         drone_state = tensordict[("info", "drone_state")][..., :13]
         action = tensordict[self.action_key]
         target_vel, target_yaw = action.split([3, 1], -1)
-        control_target = torch.cat([
-            drone_state[..., :3],
-            target_vel * 1.6,
-            target_yaw * torch.pi,
-        ], dim=-1)
-        cmds = self.controller(drone_state, control_target)
+        cmds = self.controller(
+            drone_state, 
+            target_vel=target_vel, 
+            target_yaw=target_yaw*torch.pi
+        )
+        torch.nan_to_num_(cmds, 0.)
+        tensordict.set(self.action_key, cmds)
+        return tensordict
+
+
+class RateController(Transform):
+    def __init__(
+        self,
+        controller,
+        action_key: str = ("agents", "action"),
+    ):
+        super().__init__([], in_keys_inv=[("info", "drone_state")])
+        self.controller = controller
+        self.action_key = action_key
+        self.max_thrust = self.controller.max_thrusts.sum(-1)
+    
+    def transform_input_spec(self, input_spec: TensorSpec) -> TensorSpec:
+        action_spec = input_spec[("full_action_spec", *self.action_key)]
+        spec = UnboundedContinuousTensorSpec(action_spec.shape[:-1]+(4,), device=action_spec.device)
+        input_spec[("full_action_spec", *self.action_key)] = spec
+        return input_spec
+    
+    def _inv_call(self, tensordict: TensorDictBase) -> TensorDictBase:
+        drone_state = tensordict[("info", "drone_state")][..., :13]
+        action = tensordict[self.action_key]
+        target_rate, target_thrust = action.split([3, 1], -1)
+        target_thrust = ((target_thrust + 1) / 2).clip(0.) * self.max_thrust
+        cmds = self.controller(
+            drone_state, 
+            target_rate=target_rate * torch.pi, 
+            target_thrust=target_thrust
+        )
         torch.nan_to_num_(cmds, 0.)
         tensordict.set(self.action_key, cmds)
         return tensordict
@@ -273,152 +344,89 @@ class AttitudeController(Transform):
         super().__init__([], in_keys_inv=[("info", "drone_state")])
         self.controller = controller
         self.action_key = action_key
+        self.max_thrust = self.controller.max_thrusts.sum(-1)
     
     def transform_input_spec(self, input_spec: TensorSpec) -> TensorSpec:
-        action_spec = input_spec[("_action_spec", *self.action_key)]
+        action_spec = input_spec[("full_action_spec", *self.action_key)]
         spec = UnboundedContinuousTensorSpec(action_spec.shape[:-1]+(4,), device=action_spec.device)
-        input_spec[("_action_spec", *self.action_key)] = spec
+        input_spec[("full_action_spec", *self.action_key)] = spec
         return input_spec
     
     def _inv_call(self, tensordict: TensorDictBase) -> TensorDictBase:
         drone_state = tensordict[("info", "drone_state")][..., :13]
         action = tensordict[self.action_key]
-        control_target = action.clone()
-        control_target[..., :3] *= torch.pi
-        control_target[..., 3] = (control_target[..., 3].clamp(-1., 1.)+ 1.)
-        cmds = self.controller(drone_state, control_target)
+        target_thrust, target_yaw_rate, target_roll, target_pitch = action.split(1, dim=-1)
+        cmds = self.controller(
+            drone_state,
+            target_thrust=((target_thrust+1)/2).clip(0.) * self.max_thrust,
+            target_yaw_rate=target_yaw_rate * torch.pi,
+            target_roll=target_roll * torch.pi,
+            target_pitch=target_pitch * torch.pi
+        )
         torch.nan_to_num_(cmds, 0.)
         tensordict.set(self.action_key, cmds)
         return tensordict
 
 
-
-from collections import defaultdict
 class History(Transform):
     def __init__(
         self,
         in_keys: Sequence[str],
         out_keys: Sequence[str]=None,
-        steps: int = 5,
+        steps: int = 32,
     ):
+        if out_keys is None:
+            out_keys = [
+                f"{key}_h" if isinstance(key, str) else key[:-1] + (f"{key[-1]}_h",)
+                for key in in_keys
+            ]
+        if any(key in in_keys for key in out_keys):
+            raise ValueError
         super().__init__(in_keys=in_keys, out_keys=out_keys)
         self.steps = steps
     
     def transform_observation_spec(self, observation_spec: TensorSpec) -> TensorSpec:
-        history_dict = {}
         for in_key, out_key in zip(self.in_keys, self.out_keys):
             is_tuple = isinstance(in_key, tuple)
             if in_key in observation_spec.keys(include_nested=is_tuple):
                 spec = observation_spec[in_key]
-                spec = spec.unsqueeze(spec.ndim-1).expand(*spec.shape[:-1], self.steps, spec.shape[-1])
+                spec = spec.unsqueeze(-1).expand(*spec.shape, self.steps)
                 observation_spec[out_key] = spec
-            elif in_key in self.parent.input_spec.keys(include_nested=is_tuple):
-                spec = self.parent.input_spec[in_key]
-                spec = spec.unsqueeze(spec.ndim-1).expand(*spec.shape[:-1], self.steps, spec.shape[-1])
-                observation_spec[out_key] = spec
-            history_dict[out_key] = list(spec.zero().unbind(-2))
-        self.history_dict = history_dict
-        self.arange = torch.arange(self.steps, device=observation_spec.device).flip(0)
         return observation_spec
-    
-    def _inv_call(self, tensordict: TensorDictBase) -> TensorDictBase:
+
+    def _call(self, tensordict: TensorDictBase) -> TensorDictBase:
         for in_key, out_key in zip(self.in_keys, self.out_keys):
-            is_tuple = isinstance(in_key, tuple)
-            if in_key in tensordict.keys(include_nested=is_tuple):
+            item = tensordict.get(in_key)
+            item_history = tensordict.get(out_key)
+            item_history[..., :-1] = item_history[..., 1:]
+            item_history[..., -1] = item
+        return tensordict
+
+    def _step(self, tensordict: TensorDictBase) -> TensorDictBase:
+        for in_key, out_key in zip(self.in_keys, self.out_keys):
+            item = tensordict.get(in_key)
+            item_history = tensordict.get(out_key).clone()
+            item_history[..., :-1] = item_history[..., 1:]
+            item_history[..., -1] = item
+            tensordict.set(("next", out_key), item_history)
+        return tensordict
+
+    def reset(self, tensordict: TensorDictBase) -> TensorDictBase:
+        _reset = tensordict.get("_reset", None)
+        if _reset is None:
+            _reset = torch.ones(tensordict.batch_size, dtype=bool, device=tensordict.device)
+        for in_key, out_key in zip(self.in_keys, self.out_keys):
+            if out_key not in tensordict.keys(True, True):
                 item = tensordict.get(in_key)
-                history = self.history_dict[out_key]
-                history.append(item)
-                history.pop(0)
-        return tensordict
-    
-    def _call(self, tensordict: TensorDictBase) -> TensorDictBase:
-        step_count = tensordict.get("step_count")
-        history_mask = (self.arange < step_count).float()
-        for in_key, out_key in zip(self.in_keys, self.out_keys):
-            if out_key in self.history_dict:
-                observation = torch.stack(self.history_dict[out_key], dim=-2)
-                mask_shape = (-1,) + (1,) * (observation.ndim-3) + (self.steps, 1)
-                observation = observation * history_mask.reshape(mask_shape)
-                tensordict.set(
-                    out_key,
-                    observation,
+                item_history = (
+                    item.unsqueeze(-1)
+                    .expand(*item.shape, self.steps)
+                    .clone()
+                    .zero_()
                 )
+                tensordict.set(out_key, item_history)
+            else:
+                item_history = tensordict.get(out_key)
+                item_history[_reset] = 0.
         return tensordict
 
-
-import torch.nn as nn
-import torch.nn.functional as F
-
-def make_mlp(units):
-    layers = []
-    for i, u in enumerate(units):
-        layers.append(nn.LazyLinear(u))
-        if i < len(units)-1:
-            layers.append(nn.ELU())
-    return nn.Sequential(*layers)
-
-class AdaptationModule(nn.Module):
-    def __init__(self, cfg) -> None:
-        super().__init__()
-    
-    def forward(self, adapt_obs):
-
-        return x
-
-class Adaptation(Transform):
-
-    def __init__(
-        self, 
-        obs_key: str,
-        extrinsic_key: str,
-        adapt_obs_key: str,
-        encoder_units: Sequence[int],
-        adapt_cfg,
-        embed_dim: int=8,
-    ):
-        super().__init__([obs_key, extrinsic_key, adapt_obs_key], [obs_key])
-        self.obs_key = obs_key
-        self.extrinsic_key = extrinsic_key
-        self.adapt_obs_key = adapt_obs_key
-        self.initialized = False
-        
-        self.embed_dim = embed_dim
-        self.encoder = make_mlp(list(encoder_units) + [embed_dim])
-        self.adapt_module = AdaptationModule(adapt_cfg)
-    
-    def transform_observation_spec(self, observation_spec: TensorSpec) -> TensorSpec:
-        obs_spec = observation_spec[self.obs_key]
-        if isinstance(obs_spec, CompositeSpec):
-            raise TypeError
-        spec = UnboundedContinuousTensorSpec(
-            shape=[*obs_spec.shape[:-1], obs_spec.shape[-1]+self.embed_dim],
-            device=obs_spec.device
-        )
-        observation_spec[self.obs_key] = spec
-        return observation_spec
-    
-    def _call(self, tensordict: TensorDictBase) -> TensorDictBase:
-        if self.training:
-            extrinsics = tensordict.get(self.extrinsic_key)
-            obs = tensordict.get(self.obs_key)
-            embed = self.encoder(extrinsics)
-            tensordict.set(self.obs_key, torch.cat([obs, embed], dim=-1))
-        else:
-            raise
-        return tensordict
-    
-    def _inv_call(self, tensordict: TensorDictBase) -> TensorDictBase:
-        obs = tensordict.get(self.obs_key)
-        tensordict.set(self.obs_key, obs[..., :-self.embed_dim])
-        return tensordict
-    
-    forward = _call
-        
-    def train_adapt_module(self, tensordict):
-
-        extrinsics = tensordict.get(self.extrinsic_key)
-        adapt_obs = tensordict.get(self.adapt_obs_key)
-        with torch.no_grad():
-            embed = self.encoder(extrinsics)
-        embed_pred = self.adapt_module(adapt_obs)
-        loss = F.mse_loss(embed_pred, embed)

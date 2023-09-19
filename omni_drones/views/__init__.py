@@ -1,3 +1,26 @@
+# MIT License
+# 
+# Copyright (c) 2023 Botian Xu, Tsinghua University
+# 
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+# 
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+
 import torch
 from typing import Optional, Tuple, List
 from contextlib import contextmanager
@@ -280,7 +303,7 @@ class ArticulationView(_ArticulationView):
     ) -> None:
         indices = self._resolve_env_indices(env_indices)
         super().set_joint_velocities(
-            velocities.reshape(-1, self.num_dof), 
+            velocities.flatten(end_dim=-2), 
             indices,
             joint_indices
         )
@@ -497,19 +520,49 @@ class RigidPrimView(_RigidPrimView):
         clone: bool = True
     ) -> torch.Tensor:
         indices = self._resolve_env_indices(env_indices)
-        return (
-            super()
-            .get_masses(indices, clone)
-            .reshape(-1, *self.shape[1:], 1)
-        )
+        if not omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
+            current_values = self._backend_utils.move_data(self._physics_view.get_masses(), self._device)
+            masses = current_values[indices]
+            if clone:
+                masses = self._backend_utils.clone_tensor(masses, device=self._device)
+        else:
+            masses = self._backend_utils.create_zeros_tensor([indices.shape[0]], dtype="float32", device=self._device)
+            write_idx = 0
+            for i in indices:
+                if self._mass_apis[i.tolist()] is None:
+                    if self._prims[i.tolist()].HasAPI(UsdPhysics.MassAPI):
+                        self._mass_apis[i.tolist()] = UsdPhysics.MassAPI(self._prims[i.tolist()])
+                    else:
+                        self._mass_apis[i.tolist()] = UsdPhysics.MassAPI.Apply(self._prims[i.tolist()])
+                masses[write_idx] = self._backend_utils.create_tensor_from_list(
+                    self._mass_apis[i.tolist()].GetMassAttr().Get(), dtype="float32", device=self._device
+                )
+                write_idx += 1
+        return masses.reshape(-1, *self.shape[1:], 1)
     
     def set_masses(
         self, 
         masses: torch.Tensor, 
         env_indices: Optional[torch.Tensor] = None
     ) -> None:
-        indices = self._resolve_env_indices(env_indices)
-        return super().set_masses(masses.reshape(-1), indices)
+        indices = self._resolve_env_indices(env_indices).cpu()
+        masses = masses.reshape(-1, 1)
+        if not omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
+            data = self._backend_utils.clone_tensor(self._physics_view.get_masses(), device="cpu")
+            data[indices] = self._backend_utils.move_data(masses, device="cpu")
+            self._physics_view.set_masses(data, indices)
+        else:
+            indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
+            read_idx = 0
+            for i in indices:
+                if self._mass_apis[i.tolist()] is None:
+                    if self._prims[i.tolist()].HasAPI(UsdPhysics.MassAPI):
+                        self._mass_apis[i.tolist()] = UsdPhysics.MassAPI(self._prims[i.tolist()])
+                    else:
+                        self._mass_apis[i.tolist()] = UsdPhysics.MassAPI.Apply(self._prims[i.tolist()])
+                self._mass_apis[i.tolist()].GetMassAttr().Set(masses[read_idx].tolist())
+                read_idx += 1
+            return
 
     def get_coms(
         self, 

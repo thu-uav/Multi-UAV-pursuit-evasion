@@ -1,3 +1,26 @@
+# MIT License
+# 
+# Copyright (c) 2023 Botian Xu, Tsinghua University
+# 
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+# 
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+
 from functorch import vmap
 
 import omni.isaac.core.utils.torch as torch_utils
@@ -139,7 +162,8 @@ class PayloadTrack(IsaacEnv):
             obs_dim += self.time_encoding_dim
         self.observation_spec = CompositeSpec({
             "agents": {
-                "observation": UnboundedContinuousTensorSpec((1, obs_dim))
+                "observation": UnboundedContinuousTensorSpec((1, obs_dim)),
+                # "intrinsics": self.drone.intrinsics_spec.unsqueeze(0).to(self.device)
             }
         }).expand(self.num_envs).to(self.device)
         self.action_spec = CompositeSpec({
@@ -169,7 +193,6 @@ class PayloadTrack(IsaacEnv):
             "tracking_error": UnboundedContinuousTensorSpec(1),
             "action_smoothness": UnboundedContinuousTensorSpec(1),
         }).expand(self.num_envs).to(self.device)
-        info_spec.update(self.drone.info_spec.to(self.device))
         self.observation_spec["info"] = info_spec
         self.observation_spec["stats"] = stats_spec
         self.info = info_spec.zero()
@@ -202,7 +225,7 @@ class PayloadTrack(IsaacEnv):
 
         self.stats[env_ids] = 0.
 
-        self.info.update_at_(self.drone.info[env_ids], env_ids)
+        # self.info.update_at_(self.drone.info[env_ids], env_ids)
 
         if self._should_render(0) and (env_ids == self.central_env_idx).any():
             # visualize the trajectory
@@ -217,7 +240,7 @@ class PayloadTrack(IsaacEnv):
             self.draw.draw_lines(point_list_0, point_list_1, colors, sizes)
 
     def _pre_sim_step(self, tensordict: TensorDictBase):
-        actions = tensordict[("action", "drone.action")]
+        actions = tensordict[("agents", "action")]
         self.effort = self.drone.apply_action(actions)
 
     def _compute_state_and_obs(self):
@@ -278,7 +301,7 @@ class PayloadTrack(IsaacEnv):
         )
         self.stats["tracking_error"].add_(pos_rror)
         self.stats["action_smoothness"].lerp_(-self.drone.throttle_difference, (1-self.alpha))
-        self.stats["return"] += reward.unsqueeze(-1)
+        self.stats["return"].add_(reward)
         self.stats["episode_len"][:] = self.progress_buf.unsqueeze(1)
 
         done = (

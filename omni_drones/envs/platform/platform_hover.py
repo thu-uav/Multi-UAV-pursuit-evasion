@@ -1,3 +1,26 @@
+# MIT License
+# 
+# Copyright (c) 2023 Botian Xu, Tsinghua University
+# 
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+# 
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+
 from functorch import vmap
 import torch
 import torch.distributions as D
@@ -32,10 +55,10 @@ class PlatformHover(IsaacEnv):
     -----------
     The observation is a `CompositeSpec` containing the following items:
 
-    - ``state_self`` (1, \*): The state of each UAV observed by itself, containing its kinematic
+    - ``obs_self`` (1, \*): The state of each UAV observed by itself, containing its kinematic
       information with the position being relative to the frame center, and an one-hot
       identity indicating the UAV's index.
-    - ``state_others`` (k-1, \*): The observed states of other agents.
+    - ``obs_others`` (k-1, \*): The observed states of other agents.
     - ``state_frame`` (1, \*): The state of the frame.
 
     Reward
@@ -132,8 +155,8 @@ class PlatformHover(IsaacEnv):
             frame_state_dim += self.time_encoding_dim
             
         observation_spec = CompositeSpec({
-            "state_self": UnboundedContinuousTensorSpec((1, drone_state_dim + self.drone.n)),
-            "state_others": UnboundedContinuousTensorSpec((self.drone.n-1, 13)),
+            "obs_self": UnboundedContinuousTensorSpec((1, drone_state_dim + self.drone.n)),
+            "obs_others": UnboundedContinuousTensorSpec((self.drone.n-1, 13)),
             "state_frame": UnboundedContinuousTensorSpec((1, frame_state_dim)),
         }).to(self.device)
         state_spec = CompositeSpec({
@@ -143,8 +166,8 @@ class PlatformHover(IsaacEnv):
         self.observation_spec = CompositeSpec({
             "agents": {
                 "observation": observation_spec.expand(self.drone.n),
-                "state": state_spec,
-            }
+            },
+            "state": state_spec,
         }).expand(self.num_envs).to(self.device)
         self.action_spec = CompositeSpec({
             "agents": {
@@ -161,6 +184,7 @@ class PlatformHover(IsaacEnv):
             observation_key=("agents", "observation"),
             action_key=("agents", "action"),
             reward_key=("agents", "reward"),
+            state_key="state"
         )
 
         stats_spec = CompositeSpec({
@@ -250,16 +274,16 @@ class PlatformHover(IsaacEnv):
         identity = torch.eye(self.drone.n, device=self.device).expand(self.num_envs, -1, -1)
 
         obs = TensorDict({}, [self.num_envs, self.drone.n])
-        obs["state_self"] = torch.cat(
+        obs["obs_self"] = torch.cat(
             [-platform_drone_rpos, self.drone_states[..., 3:], identity], dim=-1
         ).unsqueeze(2)
-        obs["state_others"] = torch.cat(
+        obs["obs_others"] = torch.cat(
             [self.drone_rpos, vmap(others)(self.drone_states[..., 3:13])], dim=-1
         )
         obs["state_frame"] = platform_state.unsqueeze(1).expand(-1, self.drone.n, 1, -1)
 
         state = TensorDict({}, [self.num_envs])
-        state["state_drones"] = obs["state_self"].squeeze(2)    # [num_envs, drone.n, drone_state_dim]
+        state["state_drones"] = obs["obs_self"].squeeze(2)    # [num_envs, drone.n, drone_state_dim]
         state["state_frame"] = platform_state                # [num_envs, 1, platform_state_dim]
         
         self.pos_error = torch.norm(self.target_platform_rpos, dim=-1)
@@ -269,8 +293,8 @@ class PlatformHover(IsaacEnv):
             {
                 "agents": {
                     "observation": obs,
-                    "state": state
                 },
+                "state": state,
                 "stats": self.stats
             },
             self.batch_size,
@@ -313,7 +337,7 @@ class PlatformHover(IsaacEnv):
             | done_hasnan.any(-1, keepdim=True)
         )
 
-        self.stats["return"] += reward
+        self.stats["return"].add_(reward)
         self.stats["episode_len"][:] = self.progress_buf.unsqueeze(-1)
         self.stats["pos_error"].lerp_(self.pos_error, (1-self.alpha))
         self.stats["heading_alignment"].lerp_(self.heading_alignment, (1-self.alpha))

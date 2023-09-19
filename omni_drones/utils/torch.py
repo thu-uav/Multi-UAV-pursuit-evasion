@@ -1,3 +1,26 @@
+# MIT License
+# 
+# Copyright (c) 2023 Botian Xu, Tsinghua University
+# 
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+# 
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+
 import torch
 from typing import Sequence, Union
 from contextlib import contextmanager
@@ -135,7 +158,28 @@ def make_cells(
         cells = (cells.narrow(dim, 0, cells.size(dim)-1) + cells.narrow(dim, 1, cells.size(dim)-1)) / 2
     return cells
 
+import functools
+def manual_batch(func):
+    @functools.wraps(func)
+    def wrapped(*args, **kwargs):
+        batch_shapes = set(arg.shape[:-1] for arg in args if isinstance(arg, torch.Tensor))
+        if not len(batch_shapes) == 1:
+            raise ValueError
+        batch_shape = batch_shapes.pop()
+        args = (
+            arg.reshape(-1, arg.shape[-1]) if isinstance(arg, torch.Tensor) else arg 
+            for arg in args
+        )
+        kwargs = {
+            k: v.reshape(-1, v.shape[-1]) if isinstance(v, torch.Tensor) else v
+            for k, v in kwargs.items()
+        }
+        out = func(*args, **kwargs)
+        return out.unflatten(0, batch_shape)
+    return wrapped
 
+
+@manual_batch
 def quat_rotate(q: torch.Tensor, v: torch.Tensor):
     shape = q.shape
     q_w = q[:, 0]
@@ -146,6 +190,35 @@ def quat_rotate(q: torch.Tensor, v: torch.Tensor):
     return a + b + c
 
 
+@manual_batch
+def quat_rotate_inverse(q: torch.Tensor, v: torch.Tensor):
+    shape = q.shape
+    q_w = q[:, 0]
+    q_vec = q[:, 1:]
+    a = v * (2.0 * q_w ** 2 - 1.0).unsqueeze(-1)
+    b = torch.cross(q_vec, v, dim=-1) * q_w.unsqueeze(-1) * 2.0
+    c = q_vec * torch.bmm(q_vec.view(shape[0], 1, 3), v.view(shape[0], 3, 1)).squeeze(-1) * 2.0
+    return a - b + c
+
+@manual_batch
+def euler_rotate(rpy: torch.Tensor, v: torch.Tensor):
+    shape = rpy.shape
+    r, p, y = torch.unbind(rpy, dim=-1)
+    cr = torch.cos(r)
+    sr = torch.sin(r)
+    cp = torch.cos(p)
+    sp = torch.sin(p)
+    cy = torch.cos(y)
+    sy = torch.sin(y)
+    R = torch.stack([
+        cy * cp, cy * sp * sr - sy * cr, cy * sp * cr + sy * sr,
+        sy * cp, sy * sp * sr + cy * cr, sy * sp * cr - cy * sr,
+        -sp, cp * sr, cp * cr
+    ], dim=-1).view(*shape[:-1], 3, 3)
+    return torch.bmm(R, v.unsqueeze(-1)).squeeze(-1)
+
+
+@manual_batch
 def quat_axis(q: torch.Tensor, axis: int=0):
     basis_vec = torch.zeros(q.shape[0], 3, device=q.device)
     basis_vec[:, axis] = 1
@@ -153,13 +226,13 @@ def quat_axis(q: torch.Tensor, axis: int=0):
 
 
 def axis_angle_to_quaternion(angle: torch.Tensor, axis: torch.Tensor):
-    angle = angle.unsqueeze(-1)
     axis = axis / torch.norm(axis, dim=-1, keepdim=True)
     return torch.cat([torch.cos(angle / 2), torch.sin(angle / 2) * axis], dim=-1)
 
 
 def axis_angle_to_matrix(angle, axis):
-    return quaternion_to_rotation_matrix(axis_angle_to_quaternion(angle, axis))
+    quat = axis_angle_to_quaternion(angle, axis)
+    return quaternion_to_rotation_matrix(quat)
 
 
 def quat_mul(a: torch.Tensor, b: torch.Tensor):
@@ -183,3 +256,15 @@ def quat_mul(a: torch.Tensor, b: torch.Tensor):
     quat = torch.stack([w, x, y, z], dim=-1).view(shape)
 
     return quat
+
+
+def symlog(x: torch.Tensor):
+    """
+    The symlog transformation described in https://arxiv.org/pdf/2301.04104v1.pdf
+    """
+    return torch.sign(x) * torch.log(torch.abs(x) + 1)
+
+
+def symexp(x: torch.Tensor):
+    return torch.sign(x) * (torch.exp(torch.abs(x)) - 1)
+

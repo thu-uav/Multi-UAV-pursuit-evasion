@@ -12,13 +12,11 @@ from omegaconf import OmegaConf
 from omni_drones import CONFIG_PATH, init_simulation_app
 from omni_drones.utils.torchrl import SyncDataCollector, AgentSpec
 from omni_drones.utils.torchrl.transforms import (
-    DepthImageNorm,
     LogOnEpisode, 
     FromMultiDiscreteAction, 
     FromDiscreteAction,
-    flatten_composite,
-    VelController,
-    AttitudeController,
+    ravel_composite,
+    History
 )
 from omni_drones.utils.wandb import init_wandb
 from omni_drones.learning import (
@@ -29,7 +27,10 @@ from omni_drones.learning import (
     SACPolicy,
     TD3Policy,
     MATD3Policy,
-    TDMPCPolicy
+    TDMPCPolicy,
+    Policy,
+    PPOPolicy,
+    PPOAdaptivePolicy, PPORNNPolicy
 )
 
 from setproctitle import setproctitle
@@ -37,8 +38,6 @@ from torchrl.envs.transforms import (
     TransformedEnv, 
     InitTracker, 
     Compose,
-    CatTensors,
-    StepCounter,
 )
 
 from tqdm import tqdm
@@ -54,7 +53,38 @@ class Every:
             self.func(*args, **kwargs)
         self.i += 1
 
-@hydra.main(version_base=None, config_path=CONFIG_PATH, config_name="config")
+from typing import Sequence
+from tensordict import TensorDictBase
+
+class EpisodeStats:
+    def __init__(self, in_keys: Sequence[str] = None):
+        self.in_keys = in_keys
+        self._stats = []
+        self._episodes = 0
+
+    def __call__(self, tensordict: TensorDictBase) -> TensorDictBase:
+        done = tensordict.get(("next", "done"))
+        truncated = tensordict.get(("next", "truncated"), None)
+        done_or_truncated = (
+            (done | truncated) if truncated is not None else done.clone()
+        )
+        if done_or_truncated.any():
+            done_or_truncated = done_or_truncated.squeeze(-1)
+            self._episodes += done_or_truncated.sum().item()
+            self._stats.extend(
+                tensordict.select(*self.in_keys)[done_or_truncated].clone().unbind(0)
+            )
+    
+    def pop(self):
+        stats: TensorDictBase = torch.stack(self._stats).to_tensordict()
+        self._stats.clear()
+        return stats
+
+    def __len__(self):
+        return len(self._stats)
+
+
+@hydra.main(version_base=None, config_path=CONFIG_PATH, config_name="train")
 def main(cfg):
     OmegaConf.register_new_resolver("eval", eval)
     OmegaConf.resolve(cfg)
@@ -66,6 +96,9 @@ def main(cfg):
 
     from omni_drones.envs.isaac_env import IsaacEnv
     algos = {
+        "ppo": PPOPolicy,
+        "ppo_adaptive": PPOAdaptivePolicy,
+        "ppo_rnn": PPORNNPolicy,
         "mappo": MAPPOPolicy, 
         "happo": HAPPOPolicy,
         "qmix": QMIXPolicy,
@@ -73,42 +106,33 @@ def main(cfg):
         "sac": SACPolicy,
         "td3": TD3Policy,
         "matd3": MATD3Policy,
-        "tdmpc": TDMPCPolicy
+        "tdmpc": TDMPCPolicy,
+        "test": Policy
     }
 
     env_class = IsaacEnv.REGISTRY[cfg.task.name]
     base_env = env_class(cfg, headless=cfg.headless)
 
-    def log(info):
-        print(OmegaConf.to_yaml(info))
-        run.log(info)
-
     stats_keys = [
         k for k in base_env.observation_spec.keys(True, True) 
         if isinstance(k, tuple) and k[0]=="stats"
     ]
-    logger = LogOnEpisode(
-        cfg.env.num_envs,
-        in_keys=stats_keys,
-        log_keys=stats_keys,
-        logger_func=log,
-        # process_func={"return_std": lambda x: torch.std(x).item()}
-    )
-    transforms = [InitTracker(), logger]
+    transforms = [InitTracker()]
 
     # a CompositeSpec is by deafault processed by a entity-based encoder
     # flatten it to use a MLP encoder instead
     if cfg.task.get("flatten_obs", False):
-        transforms.append(flatten_composite(base_env.observation_spec, ("agents", "observation")))
+        transforms.append(ravel_composite(base_env.observation_spec, ("agents", "observation")))
     if cfg.task.get("flatten_state", False):
-        transforms.append(flatten_composite(base_env.observation_spec, ("agents", "state")))
-    if cfg.task.get("visual_obs", False):
-        min_depth = cfg.task.camera.get("min_depth", 0.1)
-        max_depth = cfg.task.camera.get("max_depth", 5)
-        transforms.append(
-            DepthImageNorm([("drone.obs", "distance_to_camera")], 
-                            min_range=min_depth, max_range=max_depth)
-        )
+        transforms.append(ravel_composite(base_env.observation_spec, "state"))
+    if (
+        cfg.task.get("flatten_intrinsics", True)
+        and ("agents", "intrinsics") in base_env.observation_spec.keys(True)
+    ):
+        transforms.append(ravel_composite(base_env.observation_spec, ("agents", "intrinsics"), start_dim=-1))
+
+    if cfg.task.get("history", False):
+        transforms.append(History([("agents", "observation")]))
     
     # optionally discretize the action space or use a controller
     action_transform: str = cfg.task.get("action_transform", None)
@@ -123,13 +147,21 @@ def main(cfg):
             transforms.append(transform)
         elif action_transform == "velocity":
             from omni_drones.controllers import LeePositionController
+            from omni_drones.utils.torchrl.transforms import VelController
             controller = LeePositionController(9.81, base_env.drone.params).to(base_env.device)
-            transform = VelController(vmap(controller))
+            transform = VelController(controller)
             transforms.append(transform)
         elif action_transform == "attitude":
-            from omni_drones.controllers import AttitudeController as _AttitudeController
-            controller = _AttitudeController(9.81, base_env.drone.params).to(base_env.device)
-            transform = AttitudeController(vmap(vmap(controller)))
+            from omni_drones.controllers import AttitudeController as Controller
+            from omni_drones.utils.torchrl.transforms import AttitudeController
+            controller = Controller(9.81, base_env.drone.params).to(base_env.device)
+            transform = AttitudeController(controller)
+            transforms.append(transform)
+        elif action_transform == "rate":
+            from omni_drones.controllers import RateController as _RateController
+            from omni_drones.utils.torchrl.transforms import RateController
+            controller = _RateController(9.81, base_env.drone.params).to(base_env.device)
+            transform = RateController(controller)
             transforms.append(transform)
         elif not action_transform.lower() == "none":
             raise NotImplementedError(f"Unknown action transform: {action_transform}")
@@ -146,6 +178,11 @@ def main(cfg):
     eval_interval = cfg.get("eval_interval", -1)
     save_interval = cfg.get("save_interval", -1)
 
+    stats_keys = [
+        k for k in base_env.observation_spec.keys(True, True) 
+        if isinstance(k, tuple) and k[0]=="stats"
+    ]
+    episode_stats = EpisodeStats(stats_keys)
     collector = SyncDataCollector(
         env,
         policy=policy,
@@ -188,13 +225,25 @@ def main(cfg):
 
     pbar = tqdm(collector)
     env.train()
+    fps = []
     for i, data in enumerate(pbar):
+        # fps.append(collector._fps)
         info = {"env_frames": collector._frames, "rollout_fps": collector._fps}
-        info.update(policy.train_op(data))
+        episode_stats(data.to_tensordict())
+
+        if len(episode_stats) >= base_env.num_envs:
+            stats = {
+                "train/" + (".".join(k) if isinstance(k, tuple) else k): torch.mean(v).item() 
+                for k, v in episode_stats.pop().items(True, True)
+            }
+            info.update(stats)
+        
+        info.update(policy.train_op(data.to_tensordict()))
 
         if eval_interval > 0 and i % eval_interval == 0:
             logging.info(f"Eval at {collector._frames} steps.")
             info.update(evaluate())
+            env.train()
 
         if save_interval > 0 and i % save_interval == 0:
             if hasattr(policy, "state_dict"):
@@ -212,6 +261,11 @@ def main(cfg):
 
         if max_iters > 0 and i >= max_iters - 1:
             break 
+
+        # if len(fps) > 50:
+        #     fps = np.array(fps)[10:]
+        #     print(fps.mean(), fps.std())
+        #     exit()
     
     logging.info(f"Final Eval at {collector._frames} steps.")
     info = {"env_frames": collector._frames}

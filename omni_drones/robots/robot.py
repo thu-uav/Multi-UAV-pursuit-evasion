@@ -1,3 +1,26 @@
+# MIT License
+# 
+# Copyright (c) 2023 Botian Xu, Tsinghua University
+# 
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+# 
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+
 import abc
 import os.path as osp
 from contextlib import contextmanager
@@ -97,12 +120,7 @@ class RobotBase(abc.ABC):
         for prim_path, translation, orientation in zip(prim_paths, translations, orientations):
             if prim_utils.is_prim_path_valid(prim_path):
                 raise RuntimeError(f"Duplicate prim at {prim_path}.")
-            prim = prim_utils.create_prim(
-                prim_path,
-                usd_path=self.usd_path,
-                translation=translation,
-                orientation=orientation,
-            )
+            prim = self._create_prim(prim_path, translation, orientation)
             # apply rigid body properties
             kit_utils.set_nested_rigid_body_properties(
                 prim_path,
@@ -127,6 +145,15 @@ class RobotBase(abc.ABC):
 
         self.n += n
         return prims
+
+    def _create_prim(self, prim_path, translation, orientation):
+        prim = prim_utils.create_prim(
+            prim_path,
+            usd_path=self.usd_path,
+            translation=translation,
+            orientation=orientation,
+        )
+        return prim
 
     def initialize(
         self,
@@ -189,10 +216,19 @@ class RobotBase(abc.ABC):
         return self._view.set_velocities(velocities, env_indices=env_indices)
 
     def get_joint_positions(self, clone: bool=False):
+        if not self.is_articulation:
+            raise NotImplementedError
         return self._view.get_joint_positions(clone=clone)
 
     def set_joint_positions(self, pos: torch.Tensor, env_indices: torch.Tensor = None):
+        if not self.is_articulation:
+            raise NotImplementedError
         return self._view.set_joint_positions(pos, env_indices=env_indices)
+
+    def set_joint_position_targets(self, pos: torch.Tensor, env_indices: torch.Tensor = None):
+        if not self.is_articulation:
+            raise NotImplementedError
+        self._view.set_joint_position_targets(pos, env_indices=env_indices)
 
     def get_joint_velocities(self, clone: bool=False):
         return self._view.get_joint_velocities(clone=clone)

@@ -17,7 +17,7 @@ reward_distance_scale: 1.2
 safe_distance: 0.3
 reward_share_ratio: 0.3
 
-flatten_obs: true
+ravel_obs: true
 flatten_state: true
 
 action_transform: null
