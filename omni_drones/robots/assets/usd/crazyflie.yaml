@@ -11,22 +11,22 @@ l: 0.096
 drag_coef: 0.2
 rotor_configuration:
   arm_lengths:
-  - 0.048
-  - 0.048
-  - 0.048
-  - 0.048
+  - 0.043
+  - 0.043
+  - 0.043
+  - 0.043
   directions:
   - -1.0
   - 1.0
   - -1.0
   - 1.0
   force_constants:
+  - 2.88e-8 # kf
   - 2.88e-8
   - 2.88e-8
   - 2.88e-8
-  - 2.88e-8
-  max_rotation_velocities:
-  - 2315
+  max_rotation_velocities:     
+  - 2315      # 16mm dc motor -- 14000 rpm/v 3.7V --> 863 rps
   - 2315
   - 2315
   - 2315
@@ -37,7 +37,7 @@ rotor_configuration:
   - 7.24e-10
   num_rotors: 4
   rotor_angles:
-  - 0
-  - 1.57079632679
-  - 3.14159265359
-  - -1.57079632679
+  - 0.78539816
+  - 2.35619449
+  - 3.92699082
+  - 5.49778714

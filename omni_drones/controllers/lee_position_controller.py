@@ -118,7 +118,8 @@ class LeePositionController(nn.Module):
         target_pos: torch.Tensor=None,
         target_vel: torch.Tensor=None,
         target_acc: torch.Tensor=None,
-        target_yaw: torch.Tensor=None
+        target_yaw: torch.Tensor=None,
+        body_rate: bool=False
     ):
         batch_shape = root_state.shape[:-1]
         device = root_state.device
@@ -146,13 +147,17 @@ class LeePositionController(nn.Module):
             target_pos.reshape(-1, 3),
             target_vel.reshape(-1, 3),
             target_acc.reshape(-1, 3),
-            target_yaw.reshape(-1, 1)
+            target_yaw.reshape(-1, 1),
+            body_rate
         )
 
         return cmd.reshape(*batch_shape, -1)
     
-    def _compute(self, root_state, target_pos, target_vel, target_acc, target_yaw):
+    def _compute(self, root_state, target_pos, target_vel, target_acc, target_yaw, body_rate):
         pos, rot, vel, ang_vel = torch.split(root_state, [3, 4, 3, 3], dim=-1)
+        if not body_rate:
+            # convert angular velocity from world frame to body frame
+            ang_vel = quat_rotate_inverse(rot, ang_vel)
         
         pos_error = pos - target_pos
         vel_error = vel - target_vel
@@ -311,9 +316,14 @@ class RateController(nn.Module):
         )
 
         self.mixer = nn.Parameter(compute_parameters(rotor_config, I))
-        self.gain_angular_rate = nn.Parameter(
-            torch.tensor([0.52, 0.52, 0.025]) @ I[:3, :3].inverse()
-        )
+        if uav_params["name"] == "crazyflie":
+            self.gain_angular_rate = nn.Parameter(
+                torch.tensor([0.0052, 0.0052, 0.00025]) @ I[:3, :3].inverse()
+            )
+        else:
+            self.gain_angular_rate = nn.Parameter(
+                torch.tensor([0.52, 0.52, 0.025]) @ I[:3, :3].inverse()
+            )
 
     
     def forward(
@@ -330,8 +340,9 @@ class RateController(nn.Module):
         target_thrust = target_thrust.reshape(-1, 1)
 
         pos, rot, linvel, angvel = root_state.split([3, 4, 3, 3], dim=1)
+        body_rate = quat_rotate_inverse(rot, angvel)
 
-        rate_error = angvel - target_rate
+        rate_error = body_rate - target_rate
         acc_des = (
             - rate_error * self.gain_angular_rate
             + angvel.cross(angvel)

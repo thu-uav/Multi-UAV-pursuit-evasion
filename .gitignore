@@ -146,3 +146,6 @@ tmp
 plot/
 
 test*.ipynb
+
+local_test/
+*.mp4
