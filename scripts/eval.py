@@ -24,14 +24,14 @@ from omni_drones.utils.torchrl.transforms import (
 from omni_drones.utils.wandb import init_wandb
 from omni_drones.learning import (
     MAPPOPolicy, 
-    HAPPOPolicy,
-    QMIXPolicy,
-    DQNPolicy,
-    SACPolicy,
-    TD3Policy,
-    MATD3Policy,
-    DreamerPolicy,
-    TDMPCPolicy
+    # HAPPOPolicy,
+    # QMIXPolicy,
+    # DQNPolicy,
+    # SACPolicy,
+    # TD3Policy,
+    # MATD3Policy,
+    # DreamerPolicy,
+    # TDMPCPolicy
 )
 
 from setproctitle import setproctitle
@@ -71,14 +71,14 @@ def main(cfg):
     from omni_drones.sensors.camera import Camera, PinholeCameraCfg
     algos = {
         "mappo": MAPPOPolicy, 
-        "happo": HAPPOPolicy,
-        "qmix": QMIXPolicy,
-        "dqn": DQNPolicy,
-        "sac": SACPolicy,
-        "td3": TD3Policy,
-        "matd3": MATD3Policy,
-        "dreamer": DreamerPolicy,
-        "tdmpc": TDMPCPolicy
+        # "happo": HAPPOPolicy,
+        # "qmix": QMIXPolicy,
+        # "dqn": DQNPolicy,
+        # "sac": SACPolicy,
+        # "td3": TD3Policy,
+        # "matd3": MATD3Policy,
+        # "dreamer": DreamerPolicy,
+        # "tdmpc": TDMPCPolicy
     }
 
     env_class = IsaacEnv.REGISTRY[run.config]
@@ -188,7 +188,7 @@ def main(cfg):
         env.eval()
         env.rollout(
             max_steps=max_steps,
-            policy=policy,
+            policy=lambda x: policy(x, deterministic=True),
             callback=Every(record_frame, 2),
             auto_reset=True,
             break_when_any_done=False,

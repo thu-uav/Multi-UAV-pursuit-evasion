@@ -204,7 +204,7 @@ def main(cfg):
         env.eval()
         env.rollout(
             max_steps=base_env.max_episode_length,
-            policy=policy,
+            policy=lambda x: policy(x, deterministic=True),
             callback=Every(record_frame, 2),
             auto_reset=True,
             break_when_any_done=False,
