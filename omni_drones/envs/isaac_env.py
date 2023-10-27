@@ -62,7 +62,6 @@ class IsaacEnv(EnvBase):
         # extract commonly used parameters
         self.num_envs = self.cfg.env.num_envs
         self.max_episode_length = self.cfg.env.max_episode_length
-        self.min_episode_length = self.cfg.env.min_episode_length
         self.substeps = self.cfg.sim.substeps
 
         torch.backends.cudnn.benchmark = True
@@ -228,14 +227,14 @@ class IsaacEnv(EnvBase):
         raise NotImplementedError
 
     def _step(self, tensordict: TensorDictBase) -> TensorDictBase:
-        for substep in range(self.substeps):
-            self._pre_sim_step(tensordict)
+        self._pre_sim_step(tensordict)
+        for substep in range(1):
             self.sim.step(self._should_render(substep))
         self._post_sim_step(tensordict)
         self.progress_buf += 1
-        tensordict = TensorDict({}, self.batch_size, device=self.device)
-        tensordict.update(self._compute_state_and_obs())
-        tensordict.update(self._compute_reward_and_done())
+        tensordict = TensorDict({"next": {}}, self.batch_size)
+        tensordict["next"].update(self._compute_state_and_obs())
+        tensordict["next"].update(self._compute_reward_and_done())
         return tensordict
 
     def _pre_sim_step(self, tensordict: TensorDictBase):
@@ -354,11 +353,11 @@ class IsaacEnv(EnvBase):
         # check if flatcache is enabled
         # this is needed to flush the flatcache data into Hydra manually when calling `env.render()`
         # ref: https://docs.omniverse.nvidia.com/prod_extensions/prod_extensions/ext_physics.html
-        if  self.sim.get_physics_context().use_flatcache:
-            from omni.physxflatcache import get_physx_flatcache_interface
+        # if  self.sim.get_physics_context().use_flatcache:
+        #     from omni.physxflatcache import get_physx_flatcache_interface
 
-            # acquire flatcache interface
-            self._flatcache_iface = get_physx_flatcache_interface()
+        #     # acquire flatcache interface
+        #     self._flatcache_iface = get_physx_flatcache_interface()
 
         # check if viewport is enabled before creating render product
         if self.enable_viewport:

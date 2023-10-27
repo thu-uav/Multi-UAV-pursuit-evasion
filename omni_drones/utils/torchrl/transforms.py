@@ -25,6 +25,7 @@ from collections import Callable, defaultdict
 from typing import Any, Dict, Optional, Sequence, Union, Tuple
 
 import torch
+import numpy as np
 from tensordict.tensordict import TensorDictBase, TensorDict
 from torchrl.data.tensor_specs import TensorSpec
 from torchrl.envs.common import EnvBase
@@ -82,7 +83,7 @@ class LogOnEpisode(Transform):
 
         self.n_episodes = n_episodes
         self.logger_func = logger_func
-        self.process_func = defaultdict(lambda: lambda x: torch.mean(x.float()).item())
+        self.process_func = defaultdict(lambda: lambda x: torch.nanmean(x.float()).item())
         if process_func is not None:
             self.process_func.update(process_func)
 
@@ -144,7 +145,7 @@ class FromDiscreteAction(Transform):
         self.action_key = action_key
 
     def transform_input_spec(self, input_spec: CompositeSpec) -> CompositeSpec:
-        action_spec = input_spec[("full_action_spec", *self.action_key)]
+        action_spec = input_spec[("_action_spec", *self.action_key)]
         if isinstance(action_spec, BoundedTensorSpec):
             if isinstance(self.nbins, int):
                 nbins = [self.nbins] * action_spec.shape[-1]
@@ -165,7 +166,7 @@ class FromDiscreteAction(Transform):
             )
         else:
             NotImplementedError("Only BoundedTensorSpec is supported.")
-        input_spec[("full_action_spec", *self.action_key)] = spec
+        input_spec[("_action_spec", *self.action_key)] = spec
         return input_spec
 
     def _inv_apply_transform(self, action: torch.Tensor) -> torch.Tensor:
@@ -190,7 +191,7 @@ class FromMultiDiscreteAction(Transform):
         self.action_key = action_key
 
     def transform_input_spec(self, input_spec: CompositeSpec) -> CompositeSpec:
-        action_spec = input_spec[("full_action_spec", *self.action_key)]
+        action_spec = input_spec[("_action_spec", *self.action_key)]
         if isinstance(action_spec, BoundedTensorSpec):
             if isinstance(self.nbins, int):
                 nbins = [self.nbins] * action_spec.shape[-1]
@@ -208,7 +209,7 @@ class FromMultiDiscreteAction(Transform):
             self.maximum = action_spec.space.maximum
         else:
             NotImplementedError("Only BoundedTensorSpec is supported.")
-        input_spec[("full_action_spec", *self.action_key)] = spec
+        input_spec[("_action_spec", *self.action_key)] = spec
         return input_spec
 
     def _inv_apply_transform(self, action: torch.Tensor) -> torch.Tensor:
@@ -272,6 +273,35 @@ def ravel_composite(
     else:
         raise TypeError
 
+class PosController(Transform):
+    def __init__(
+        self,
+        controller,
+        action_key: str = ("agents", "action"),
+    ):
+        super().__init__([], in_keys_inv=[("info", "drone_state")])
+        self.controller = controller
+        self.action_key = action_key
+    
+    def transform_input_spec(self, input_spec: TensorSpec) -> TensorSpec:
+        action_spec = input_spec[("_action_spec", *self.action_key)]
+        spec = UnboundedContinuousTensorSpec(action_spec.shape[:-1]+(7,), device=action_spec.device)
+        input_spec[("_action_spec", *self.action_key)] = spec
+        return input_spec
+    
+    def _inv_call(self, tensordict: TensorDictBase) -> TensorDictBase:
+        drone_state = tensordict[("info", "drone_state")][..., :13]
+        action = tensordict[self.action_key]
+        target_pos, target_vel, target_yaw = action.split([3, 3, 1], -1)
+        cmds = self.controller(
+            drone_state, 
+            target_pos=target_pos-drone_state[..., :3],    # using relative position to learn
+            target_vel=target_vel, 
+            target_yaw=target_yaw*torch.pi
+        )
+        torch.nan_to_num_(cmds, 0.)
+        tensordict.set(self.action_key, cmds)
+        return tensordict
 
 class VelController(Transform):
     def __init__(
@@ -284,9 +314,9 @@ class VelController(Transform):
         self.action_key = action_key
     
     def transform_input_spec(self, input_spec: TensorSpec) -> TensorSpec:
-        action_spec = input_spec[("full_action_spec", *self.action_key)]
+        action_spec = input_spec[("_action_spec", *self.action_key)]
         spec = UnboundedContinuousTensorSpec(action_spec.shape[:-1]+(4,), device=action_spec.device)
-        input_spec[("full_action_spec", *self.action_key)] = spec
+        input_spec[("_action_spec", *self.action_key)] = spec
         return input_spec
     
     def _inv_call(self, tensordict: TensorDictBase) -> TensorDictBase:
@@ -315,9 +345,9 @@ class RateController(Transform):
         self.max_thrust = self.controller.max_thrusts.sum(-1)
     
     def transform_input_spec(self, input_spec: TensorSpec) -> TensorSpec:
-        action_spec = input_spec[("full_action_spec", *self.action_key)]
+        action_spec = input_spec[("_action_spec", *self.action_key)]
         spec = UnboundedContinuousTensorSpec(action_spec.shape[:-1]+(4,), device=action_spec.device)
-        input_spec[("full_action_spec", *self.action_key)] = spec
+        input_spec[("_action_spec", *self.action_key)] = spec
         return input_spec
     
     def _inv_call(self, tensordict: TensorDictBase) -> TensorDictBase:
@@ -347,9 +377,9 @@ class AttitudeController(Transform):
         self.max_thrust = self.controller.max_thrusts.sum(-1)
     
     def transform_input_spec(self, input_spec: TensorSpec) -> TensorSpec:
-        action_spec = input_spec[("full_action_spec", *self.action_key)]
+        action_spec = input_spec[("_action_spec", *self.action_key)]
         spec = UnboundedContinuousTensorSpec(action_spec.shape[:-1]+(4,), device=action_spec.device)
-        input_spec[("full_action_spec", *self.action_key)] = spec
+        input_spec[("_action_spec", *self.action_key)] = spec
         return input_spec
     
     def _inv_call(self, tensordict: TensorDictBase) -> TensorDictBase:
