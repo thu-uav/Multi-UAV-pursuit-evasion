@@ -6,6 +6,7 @@ import hydra
 import torch
 import numpy as np
 import wandb
+
 from functorch import vmap
 from omegaconf import OmegaConf
 
@@ -193,34 +194,61 @@ def main(cfg):
     )
 
     @torch.no_grad()
-    def evaluate():
+    def evaluate(
+        seed: int=0
+    ):
         frames = []
 
+        base_env.enable_render(True)
+        base_env.eval()
+        env.eval()
+        env.set_seed(seed)
+
+        from tqdm import tqdm
+        t = tqdm(total=base_env.max_episode_length)
+        
         def record_frame(*args, **kwargs):
             frame = env.base_env.render(mode="rgb_array")
             frames.append(frame)
+            t.update(2)
 
-        base_env.enable_render(True)
-        env.eval()
-        env.rollout(
+        trajs = env.rollout(
             max_steps=base_env.max_episode_length,
             policy=lambda x: policy(x, deterministic=True),
             callback=Every(record_frame, 2),
             auto_reset=True,
             break_when_any_done=False,
             return_contiguous=False
-        )
+        ).clone()
+
         base_env.enable_render(not cfg.headless)
         env.reset()
-        env.train()
+
+        done = trajs.get(("next", "done"))
+        first_done = torch.argmax(done.long(), dim=1).cpu()
+
+        def take_first_episode(tensor: torch.Tensor):
+            indices = first_done.reshape(first_done.shape+(1,)*(tensor.ndim-2))
+            return torch.take_along_dim(tensor, indices, dim=1).reshape(-1)
+
+        traj_stats = {
+            k: take_first_episode(v)
+            for k, v in trajs[("next", "stats")].cpu().items()
+        }
+
+        info = {
+            "eval/stats." + k: torch.mean(v.float()).item() 
+            for k, v in traj_stats.items()
+        }
 
         if len(frames):
             # video_array = torch.stack(frames)
             video_array = np.stack(frames).transpose(0, 3, 1, 2)
+            frames.clear()
             info["recording"] = wandb.Video(
                 video_array, fps=0.5 / cfg.sim.dt, format="mp4"
             )
-        frames.clear()
+        
         return info
 
     pbar = tqdm(collector)

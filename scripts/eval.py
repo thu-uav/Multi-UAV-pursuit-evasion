@@ -6,6 +6,7 @@ import hydra
 from tensordict.tensordict import TensorDictBase
 import torch
 from torchrl.data.tensor_specs import TensorSpec
+import numpy as np
 import wandb
 from functorch import vmap
 from omegaconf import OmegaConf
@@ -103,10 +104,19 @@ def main(cfg):
 
     # a CompositeSpec is by deafault processed by a entity-based encoder
     # flatten it to use a MLP encoder instead
-    if cfg.task.get("ravel_obs", False):
-        transforms.append(ravel_composite(base_env.observation_spec, "drone.obs"))
+    if cfg.task.get("flatten_obs", False):
+        transforms.append(ravel_composite(base_env.observation_spec, ("agents", "observation")))
     if cfg.task.get("flatten_state", False):
-        transforms.append(flatten_composite(base_env.observation_spec, "drone.state"))
+        transforms.append(ravel_composite(base_env.observation_spec, "state"))
+    if (
+        cfg.task.get("flatten_intrinsics", True)
+        and ("agents", "intrinsics") in base_env.observation_spec.keys(True)
+    ):
+        transforms.append(ravel_composite(base_env.observation_spec, ("agents", "intrinsics"), start_dim=-1))
+
+    if cfg.task.get("history", False):
+        transforms.append(History([("agents", "observation")]))
+    
     if cfg.task.get("visual_obs", False):
         min_depth = cfg.task.camera.get("min_depth", 0.1)
         max_depth = cfg.task.camera.get("max_depth", 5)
@@ -158,15 +168,7 @@ def main(cfg):
     camera.spawn(["/World/Camera"], translations=[(7.5, 7.5, 7.5)], targets=[(0, 0, 0.5)])
     camera.initialize("/World/Camera")
 
-    # TODO: create a agent_spec view for TransformedEnv
-    agent_spec = AgentSpec(
-        name=base_env.agent_spec["drone"].name,
-        n=base_env.agent_spec["drone"].n,
-        observation_spec=env.observation_spec["drone.obs"],
-        action_spec=env.action_spec["drone.action"],
-        reward_spec=env.reward_spec["drone.reward"],
-        state_spec=env.observation_spec["drone.state"] if base_env.agent_spec["drone"].state_spec is not None else None,
-    )
+    agent_spec = env.agent_spec["drone"]
     policy = algos[cfg.algo.name.lower()](
         cfg.algo, agent_spec=agent_spec, device="cuda"
     )
@@ -177,29 +179,56 @@ def main(cfg):
     policy.load_state_dict(state_dict)
 
     @torch.no_grad()
-    def evaluate(max_steps: int):
+    def evaluate(
+        seed: int = 0,
+    ):
         frames = []
 
-        def record_frame(*args, **kwargs):
-            frame = camera.get_images()["rgb"][0]
-            frames.append(frame.cpu())
-
         base_env.enable_render(True)
+        base_env.eval()
         env.eval()
-        env.rollout(
-            max_steps=max_steps,
+        env.set_seed(seed)
+
+        from tqdm import tqdm
+        t = tqdm(total=base_env.max_episode_length)
+        
+        def record_frame(*args, **kwargs):
+            frame = env.base_env.render(mode="rgb_array")
+            frames.append(frame)
+            t.update(2)
+
+        trajs = env.rollout(
+            max_steps=base_env.max_episode_length,
             policy=lambda x: policy(x, deterministic=True),
             callback=Every(record_frame, 2),
             auto_reset=True,
             break_when_any_done=False,
             return_contiguous=False
-        )
+        ).clone()
+
         base_env.enable_render(not cfg.headless)
         env.reset()
-        env.train()
+
+        done = trajs.get(("next", "done"))
+        first_done = torch.argmax(done.long(), dim=1).cpu()
+
+        def take_first_episode(tensor: torch.Tensor):
+            indices = first_done.reshape(first_done.shape+(1,)*(tensor.ndim-2))
+            return torch.take_along_dim(tensor, indices, dim=1).reshape(-1)
+
+        traj_stats = {
+            k: take_first_episode(v)
+            for k, v in trajs[("next", "stats")].cpu().items()
+        }
+
+        info = {
+            "eval/stats." + k: torch.mean(v.float()).item() 
+            for k, v in traj_stats.items()
+        }
 
         if len(frames):
-            video_array = torch.stack(frames)
+            video_array = np.stack(frames).transpose(0, 3, 1, 2)
+            frames.clear()
             info["recording"] = wandb.Video(
                 video_array, fps=0.5 / cfg.sim.dt, format="mp4"
             )
@@ -207,7 +236,7 @@ def main(cfg):
         return info
 
     info = evaluate()
-    print(info)
+    run.log(info)
     
     simulation_app.close()
 
