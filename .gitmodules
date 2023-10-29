@@ -1,0 +1,6 @@
+[submodule "third_party/torchrl"]
+	path = third_party/torchrl
+	url = git@github.com:btx0424/rl.git
+[submodule "third_party/tensordict"]
+	path = third_party/tensordict
+	url = git@github.com:btx0424/tensordict.git
