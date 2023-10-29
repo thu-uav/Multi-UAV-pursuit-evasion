@@ -211,7 +211,7 @@ class IndependentNormalModule(nn.Module):
 class TanhNormalWithEntropy(TanhNormal):
 
     def entropy(self):
-        return -self.log_prob(self.sample())
+        return None
 
 
 class TanhIndependentNormalModule(nn.Module):
@@ -219,8 +219,8 @@ class TanhIndependentNormalModule(nn.Module):
         self,
         input_dim: int,
         output_dim: int,
-        scale_mapping: str = "softplus",
-        state_dependent_std: bool = True,
+        scale_mapping: str = "exp",
+        state_dependent_std: bool = False,
         scale_lb: float = 1e-4,
         min: Union[torch.Tensor, Number] = -1.0,
         max: Union[torch.Tensor, Number] = 1.0,
