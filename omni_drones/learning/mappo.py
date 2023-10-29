@@ -48,6 +48,7 @@ from .utils import valuenorm
 from .utils.gae import compute_gae
 
 LR_SCHEDULER = lr_scheduler._LRScheduler
+from torchrl.modules import TanhNormal, IndependentNormal
 
 
 class MAPPOPolicy(object):
@@ -259,9 +260,9 @@ class MAPPOPolicy(object):
             )
 
         log_probs_new = actor_output[self.act_logps_name]
-        dist_entropy = actor_output[f"{self.agent_spec.name}.action_entropy"]
-
-        assert advantages.shape == log_probs_new.shape == dist_entropy.shape
+        if not self.cfg.actor.tanh:
+            dist_entropy = actor_output[f"{self.agent_spec.name}.action_entropy"]
+            assert advantages.shape == log_probs_new.shape == dist_entropy.shape
 
         ratio = torch.exp(log_probs_new - log_probs_old)
         surr1 = ratio * advantages
@@ -270,7 +271,10 @@ class MAPPOPolicy(object):
             * advantages
         )
         policy_loss = - torch.mean(torch.min(surr1, surr2) * self.act_dim)
-        entropy_loss = - torch.mean(dist_entropy)
+        if not self.cfg.actor.tanh:
+            entropy_loss = - torch.mean(dist_entropy)
+        else:
+            entropy_loss = - torch.mean(-log_probs_new)
 
         self.actor_opt.zero_grad()
         (policy_loss - entropy_loss * self.cfg.entropy_coef).backward()
@@ -435,6 +439,7 @@ def make_dataset_naive(
 from .modules.distributions import (
     DiagGaussian,
     MultiCategoricalModule,
+    TanhIndependentNormalModule
 )
 
 from .modules.rnn import GRU
@@ -452,8 +457,11 @@ def make_ppo_actor(cfg, observation_spec: TensorSpec, action_spec: TensorSpec):
         act_dist = MultiCategoricalModule(encoder.output_shape.numel(), [action_spec.space.n])
     elif isinstance(action_spec, (UnboundedTensorSpec, BoundedTensorSpec)):
         action_dim = action_spec.shape[-1]
-        act_dist = DiagGaussian(encoder.output_shape.numel(), action_dim, False, 0.01)
-        # act_dist = IndependentNormalModule(encoder.output_shape.numel(), action_dim, False)
+        if cfg.tanh:
+            act_dist = TanhIndependentNormalModule(encoder.output_shape.numel(), action_dim)
+        else:
+            act_dist = DiagGaussian(encoder.output_shape.numel(), action_dim, False, 0.01)
+    #     # act_dist = IndependentNormalModule(encoder.output_shape.numel(), action_dim, False)
     else:
         raise NotImplementedError(action_spec)
 
@@ -516,7 +524,9 @@ class Actor(nn.Module):
 
         if eval_action:
             action_log_probs = action_dist.log_prob(action).unsqueeze(-1)
-            dist_entropy = action_dist.entropy().unsqueeze(-1)
+            dist_entropy = action_dist.entropy()
+            if dist_entropy is not None: 
+                dist_entropy = dist_entropy.unsqueeze(-1)
             return action, action_log_probs, dist_entropy, None
         else:
             action = action_dist.mode if deterministic else action_dist.sample()
