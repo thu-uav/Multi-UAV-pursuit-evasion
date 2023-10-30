@@ -28,6 +28,7 @@ export ISAACSIM_PATH="${HOME}/.local/share/ov/pkg/isaac_sim-*"
 
 where ``*`` corresponds to the Isaac Sim version. 
 
+After adding the environment variable, apply the changes by running:
 ```
 source ~/.bashrc
 ```
@@ -82,7 +83,6 @@ python train.py headless=true wandb.mode=disabled
 ```
 
 ### 5. Working with VSCode
-------------------------------------
 
 To enable features like linting and auto-completion with VSCode Python Extension, we need to let the extension recognize the extra paths we added during the setup process.
 
