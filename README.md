@@ -55,7 +55,7 @@ python -c "import torch; print(torch.__path__)"
 ```
 
 ### 3. Third Party Packages
-Omniverse requires specific versions of the `tensordict` and `torchrl` packages. For the **deploy** branch, it supports `tensordict` version 0.1.2+5e6205c and `torchrl` version 0.1.1+e39e701. 
+OmniDrones requires specific versions of the `tensordict` and `torchrl` packages. For the **deploy** branch, it supports `tensordict` version 0.1.2+5e6205c and `torchrl` version 0.1.1+e39e701. 
 
 We manage these two packages using Git submodules to ensure that the correct versions are used. To initialize and update the submodules, follow these steps:
 
