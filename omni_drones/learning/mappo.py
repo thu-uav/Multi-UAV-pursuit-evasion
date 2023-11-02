@@ -277,7 +277,7 @@ class MAPPOPolicy(object):
             entropy_loss = - torch.mean(-log_probs_new)
 
         self.actor_opt.zero_grad()
-        (policy_loss - entropy_loss * self.cfg.entropy_coef).backward()
+        (policy_loss + entropy_loss * self.cfg.entropy_coef).backward()
         grad_norm = torch.nn.utils.clip_grad_norm_(
             self.actor_opt.param_groups[0]["params"], self.cfg.max_grad_norm
         )

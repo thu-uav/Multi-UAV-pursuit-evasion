@@ -161,8 +161,10 @@ def main(cfg):
         elif action_transform == "rate":
             from omni_drones.controllers import RateController as _RateController
             from omni_drones.utils.torchrl.transforms import RateController
+            # from torch.distributions.transforms import TanhTransform
             controller = _RateController(9.81, base_env.drone.params).to(base_env.device)
             transform = RateController(controller)
+            # transforms.append(TanhTransform)
             transforms.append(transform)
         elif not action_transform.lower() == "none":
             raise NotImplementedError(f"Unknown action transform: {action_transform}")
