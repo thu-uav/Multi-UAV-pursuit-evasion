@@ -58,7 +58,7 @@ class Every:
             self.func(*args, **kwargs)
         self.i += 1
 
-@hydra.main(version_base=None, config_path=CONFIG_PATH, config_name="eval")
+@hydra.main(version_base=None, config_path=CONFIG_PATH, config_name="train")
 def main(cfg):
     OmegaConf.register_new_resolver("eval", eval)
     OmegaConf.resolve(cfg)
@@ -173,8 +173,8 @@ def main(cfg):
         cfg.algo, agent_spec=agent_spec, device="cuda"
     )
 
-    ckpt_name = "checkpoint_final.pt"
-    ckpt = wandb.restore(ckpt_name, run.path)
+    ckpt_name = "/home/jingyihuang/isaac_ws/OmniDrones/scripts/wandb/offline-run-20231107_233000-ckcf61ne/files/checkpoint_final.pt"
+    # ckpt = wandb.restore(ckpt_name, run.path)
     state_dict = torch.load(ckpt)
     policy.load_state_dict(state_dict)
 
