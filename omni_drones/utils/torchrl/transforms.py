@@ -46,7 +46,7 @@ from torchrl.data import (
 )
 from .env import AgentSpec
 from dataclasses import replace
-
+from torch.distributions.transforms import TanhTransform
 
 def _transform_agent_spec(self: Transform, agent_spec: AgentSpec) -> AgentSpec:
     return agent_spec
@@ -343,6 +343,7 @@ class RateController(Transform):
         self.controller = controller
         self.action_key = action_key
         self.max_thrust = self.controller.max_thrusts.sum(-1)
+        # self.tanh = TanhTransform()
     
     def transform_input_spec(self, input_spec: TensorSpec) -> TensorSpec:
         action_spec = input_spec[("_action_spec", *self.action_key)]
@@ -353,6 +354,7 @@ class RateController(Transform):
     def _inv_call(self, tensordict: TensorDictBase) -> TensorDictBase:
         drone_state = tensordict[("info", "drone_state")][..., :13]
         action = tensordict[self.action_key]
+        # action = self.tanh(action)
         target_rate, target_thrust = action.split([3, 1], -1)
         target_thrust = ((target_thrust + 1) / 2).clip(0.) * self.max_thrust
         cmds = self.controller(
