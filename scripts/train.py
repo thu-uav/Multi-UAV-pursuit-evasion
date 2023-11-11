@@ -181,7 +181,7 @@ def main(cfg):
     eval_interval = cfg.get("eval_interval", -1)
     save_interval = cfg.get("save_interval", -1)
 
-    # ckpt_name = "/home/jingyihuang/isaac_ws/OmniDrones/scripts/wandb/offline-run-20231106_123328-m39q0h3m/files/checkpoint_final.pt"
+    # ckpt_name = "/home/jingyihuang/isaac_ws/OmniDrones/scripts/wandb/offline-run-20231108_094102-df3vk969/files/checkpoint_final.pt"
     # state_dict = torch.load(ckpt_name)
     # policy.load_state_dict(state_dict)
 

@@ -150,3 +150,5 @@ test*.ipynb
 local_test/
 *.mp4
 *.png
+
+log_files_*

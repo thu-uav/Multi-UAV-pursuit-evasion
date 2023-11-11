@@ -101,6 +101,7 @@ class FormationBallForward(IsaacEnv):
         self.extra_soft_ball_safe_distance = self.cfg.task.extra_soft_ball_safe_distance
         self.ball_reward_coeff = self.cfg.task.ball_reward_coeff
         self.ball_hard_reward_coeff = self.cfg.task.ball_hard_reward_coeff
+        self.ball_speed = self.cfg.task.ball_speed
         self.draw = _debug_draw.acquire_debug_draw_interface()
         self.total_frame = self.cfg.total_frames
         self.drone.initialize() 
@@ -112,6 +113,7 @@ class FormationBallForward(IsaacEnv):
         )
 
         self.ball.initialize()
+        self.ball.set_masses(torch.ones_like(self.ball.get_masses()))
 
         self.init_poses = self.drone.get_world_poses(clone=True)
 
@@ -169,8 +171,12 @@ class FormationBallForward(IsaacEnv):
 
         # Set height of the drones
         self.target_pos_single = torch.tensor([0., 0., 1.5], device=self.device)
-        self.target_vel = torch.tensor([0., 1.5, 0.], device=self.device)
-        
+        # self.target_vel = torch.tensor([0., 3.0, 0.], device=self.device)
+        self.target_vel = list(self.cfg.task.target_vel)
+        self.target_vel = torch.Tensor(self.target_vel)
+        self.target_vel = self.target_vel.to(device=self.device)
+        # print(self.target_vel, type(self.target_vel))
+        # raise NotImplementedError
         formation = self.cfg.task.formation
         if isinstance(formation, str):
             self.formation = torch.as_tensor(
@@ -376,7 +382,7 @@ class FormationBallForward(IsaacEnv):
     
     def throw_single_ball(self):
         pos, rot = self.get_env_poses(self.drone.get_world_poses())
-        t_throw = torch.rand(self.num_envs, device=self.device) * 200 + self.throw_threshold
+        t_throw = torch.rand(self.num_envs, device=self.device) * 150 + self.throw_threshold
         flag = (self.progress_buf >= t_throw)
         should_throw = flag & (~self.flag)
         if should_throw.any():
@@ -399,44 +405,46 @@ class FormationBallForward(IsaacEnv):
             # given t_hit, randomize ball init position & final position
             t_hit = torch.rand(len(should_throw),device=self.device) * 1.5 + 0.5
             # firstly, calculate vel_z
-
-            # height of the ball 2-3 m
-            ball_pos[:,2] = torch.rand(len(should_throw), device=self.device) + 2
-            # Target height
-            ave_height = self.drone.pos[should_throw, :, 2].mean(1)
-            v_z = ((ave_height - ball_pos[:,2])+0.5*9.81*t_hit**2)/t_hit
-
-            # speed_z_limit = torch.sqrt(10**2-speed_xy.square())
-            # v_z = torch.clamp(v_z, min=-speed_z_limit, max=speed_z_limit)
-
-            # the ball should catch up with the drone within t_hit
-            # initial ball position
-            ball_ang = torch.rand(len(should_throw)) * 2 * torch.pi
-            ball_radius = torch.rand(len(should_throw)) * 3 + 2
-            ball_pos[:,0] = ball_radius * torch.cos(ball_ang)
-            ball_pos[:,1] = ball_radius * torch.sin(ball_ang)
-            ball_pos[:, :2] += centre_D
-
+            #============
+            # 注意 ball_vel 和 ball_target_vel 的差别在 vz 上
+            ball_target_vel = torch.ones(len(should_throw), 3, device=self.device)
+            ball_target_vel[:, 2] = - torch.rand(len(should_throw), device=self.device) - 1. #[-2, -1]
+            ball_target_vel[:, :2] = 2*(torch.rand(len(should_throw), 2, device=self.device)-0.5) #[-1, 1]
+            ball_target_vel = ball_target_vel/torch.norm(ball_target_vel, p=2, dim=1, keepdim=True) * self.ball_speed
+            
+            ball_vel = torch.ones(len(should_throw), 6, device=self.device)
+            ball_vel[:, :3] = ball_target_vel.clone()
+            ball_vel[:, 2] += 9.81*t_hit
+            
             drone_x_speed = torch.mean(self.root_states[should_throw, :, 7], 1)
             drone_x_dist = drone_x_speed * t_hit
 
             drone_y_speed = torch.mean(self.root_states[should_throw, :, 8], 1)
             drone_y_dist = drone_y_speed * t_hit
-
-            # drone_x_pos = drone_x_dist + torch.mean(self.root_states[should_throw, :, 0], 1)
+            
             target_ball_pos[:, 0] = torch.rand(len(should_throw), device=self.device)*2-1 + drone_x_dist
             target_ball_pos[:, 1] = torch.rand(len(should_throw), device=self.device)*2-1 + drone_y_dist
             target_ball_pos[:, :2] += centre_D
-
-            ball_vel = torch.zeros(len(should_throw), 6, device=self.device)
-            ball_vel[:,0] = (target_ball_pos[:, 0] - ball_pos[:,0])/t_hit
-            ball_vel[:,1] = (target_ball_pos[:, 1] - ball_pos[:,1])/t_hit
-            ball_vel[:,2] = v_z 
-
+            target_ball_pos[:, 2] = self.drone.pos[should_throw, :, 2].mean(1)
+            # print(target_ball_pos.shape, target_ball_pos)
+            # print(ball_vel.shape, ball_vel)
+            # print(t_hit)
+            ball_pos[:, :2] = target_ball_pos[:, :2] - ball_vel[:, :2]*t_hit.view(-1, 1)
+            ball_pos[:, 2] = target_ball_pos[:, 2] - ball_vel[:, 2]*t_hit + 0.5*9.81*t_hit**2
+            
+            #============
             self.t_hit[should_throw] = t_hit / self.cfg.sim.dt
             assert len(should_throw) == ball_pos.shape[0]
             self.ball.set_world_poses(positions=ball_pos + self.envs_positions[should_throw], env_indices=should_throw)
             self.ball.set_velocities(ball_vel, env_indices=should_throw)
+            # draw target in red, draw init in green
+            # self.draw.clear_points()
+            draw_target_coordinates = target_ball_pos + self.envs_positions[should_throw]
+            draw_init_coordinates = ball_pos + self.envs_positions[should_throw]
+            colors = [(1.0, 0.0, 0.0, 1.0) for _ in range(len(should_throw))] + [(0.0, 1.0, 0.0, 1.0) for _ in range(len(should_throw))]
+            sizes = [2.0 for _ in range(2*len(should_throw))]
+            
+            self.draw.draw_points(draw_target_coordinates.tolist() + draw_init_coordinates.tolist(), colors, sizes)
         self.flag.bitwise_or_(flag)
 
     def _compute_state_and_obs(self):
@@ -524,9 +532,9 @@ class FormationBallForward(IsaacEnv):
         vel_diff = self.root_states[..., 7:10] - self.target_vel
         indi_v_reward = 1 / (1 + torch.norm(vel_diff, p = 2, dim=-1))
 
-        # cost if height drop
+        # cost if height drop or too high
         height = pos[..., 2]   # [num_envs, drone.n]
-        height_penalty = height < 0.5
+        height_penalty = ((height < 0.5) | (height > 2.0))
         if height_penalty.any():
             height_penalty = torch.nonzero(height_penalty, as_tuple=True)[0]
             self.height_penalty[height_penalty] = -1
@@ -599,7 +607,7 @@ class FormationBallForward(IsaacEnv):
                 # + reward_pos
                 # + reward_target
                 + reward_effort
-            ).unsqueeze(1).expand(-1, self.drone.n, 1) + indi_v_reward.unsqueeze(-1) / 2
+            ).unsqueeze(1).expand(-1, self.drone.n, 1) + indi_v_reward.unsqueeze(-1)
             
         drone_moved = ((~torch.isnan(self.t_launched)) & (torch.isnan(self.t_moved)))
         if drone_moved.any():
@@ -620,12 +628,12 @@ class FormationBallForward(IsaacEnv):
 
         terminated = (self.progress_buf >= self.max_episode_length).unsqueeze(-1)
         crash = (pos[..., 2] < 0.2).any(-1, keepdim=True)
-        hit = (self.relative_b_dis < 0.1).any(-1, keepdim=True) #& (self.ball_reward_flag.unsqueeze(1))
+        hit = (self.relative_b_dis < 0.4).any(-1, keepdim=True) #& (self.ball_reward_flag.unsqueeze(1))
     
         done = terminated | crash | (separation<0.4) | hit
 
         self.frame_counter += (torch.sum((done.squeeze()).float() * self.progress_buf)).item()
-        too_close = separation<0.2
+        too_close = separation<0.4
         # assert torch.isclose(-torch.log(indi_d_reward), mean_dis_error, atol=1e-5).all()
         self.stats["cost_hausdorff"].lerp_(self.cost_h, (1-self.alpha))
         # self.stats["mean_dis_error"].lerp_(mean_dis_error, (1-self.alpha))

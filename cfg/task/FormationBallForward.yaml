@@ -12,6 +12,8 @@ env:
   max_episode_length: 700
 
 target_height: [0, 0, 1.5]
+target_vel: [0., 3.0, 0.]
+ball_speed: 5.
 drone_model: Hummingbird
 force_sensor: false
 time_encoding: true
@@ -21,7 +23,7 @@ reward_effort_weight: 0.1
 
 
 safe_distance: 0.4
-ball_safe_distance: 0.3
+ball_safe_distance: 0.35
 soft_ball_safe_distance: 0.5
 extra_soft_ball_safe_distance: 0.8
 ball_reward_coeff: 20. # 40

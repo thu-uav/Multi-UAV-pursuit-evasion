@@ -88,8 +88,9 @@ def sample_from_grid(cells: torch.Tensor, n):
     idx = torch.randperm(cells.shape[0], device=cells.device)[:n]
     return cells[idx]
 
-class FormationBallForward(IsaacEnv):
+class FormationMultiBallForward(IsaacEnv):
     def __init__(self, cfg, headless):
+        self.ball_num = cfg.task.ball_num
         super().__init__(cfg, headless)
         self.reward_effort_weight = self.cfg.task.reward_effort_weight
         self.time_encoding = self.cfg.task.time_encoding
@@ -103,7 +104,6 @@ class FormationBallForward(IsaacEnv):
         self.ball_hard_reward_coeff = self.cfg.task.ball_hard_reward_coeff
         self.draw = _debug_draw.acquire_debug_draw_interface()
         self.total_frame = self.cfg.total_frames
-        self.ball_num = self.cfg.ball_num
         self.drone.initialize() 
         self.throw_threshold = self.cfg.task.throw_threshold
         # create and initialize additional views
@@ -464,7 +464,8 @@ class FormationBallForward(IsaacEnv):
         self.drone_pdist = vmap(off_diag)(torch.norm(relative_pos, dim=-1, keepdim=True))   # pair wise distance
 
         # Relative position between the ball and all the drones
-        balls_pos, balls_rot = self.get_env_poses(self.ball.get_world_poses()) # [env_num, ball_num, 3]
+        reshape_ball_world_poses = (self.ball.get_world_poses()[0].view(-1, self.ball_num, 3), self.ball.get_world_poses()[1].view(-1, self.ball_num, 4))
+        balls_pos, balls_rot = self.get_env_poses(reshape_ball_world_poses) # [env_num, ball_num, 3]
 
         relative_b_pos = pos[..., :3].unsqueeze(2) - balls_pos.unsqueeze(1) # [env_num, drone_num, 1, 3] - [env_num, 1, ball_num, 3]
         balls_vel = self.ball.get_linear_velocities().unsqueeze(1) # [env_num, 1, ball_num, 3]
@@ -482,7 +483,7 @@ class FormationBallForward(IsaacEnv):
             relative_b_dis, 
             relative_b_pos, 
             balls_vel.expand_as(relative_b_pos)
-        ], dim=-1) #[env, agent, ball_num, *]
+        ], dim=-1).view(-1, self.ball_num, 3) #[env, agent, ball_num, *]
         
         manual_mask = torch.isnan(self.t_launched)
         if manual_mask.any():

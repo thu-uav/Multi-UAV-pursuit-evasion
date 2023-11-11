@@ -7,8 +7,8 @@ env: ${task.env}
 
 total_frames: 200_000_000 #1000_000_000
 max_iters: -1
-eval_interval: 500
-save_interval: 500
+eval_interval: 1000
+save_interval: 1000
 seed: 0
 
 viewer:
@@ -22,7 +22,7 @@ wandb:
   job_type: train
   entity: marl-drones
   project: omnidrones
-  mode: online # set to 'disabled' when debugging locally
+  mode: online # set to 'disabled' when debugging locally, online
   run_id: 
   monitor_gym: True
   tags: 
