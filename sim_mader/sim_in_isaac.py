@@ -186,152 +186,38 @@ def main(cfg):
 
     num_drones = env.base_env.drone.n
 
-
-    
     global td, target_pos, target_vel, target_acc, target_yaw, simulation_time
-    global target_pos_0, target_pos_1, target_pos_2, target_pos_3, target_pos_4, target_pos_5
-    global target_vel_0, target_vel_1, target_vel_2, target_vel_3, target_vel_4, target_vel_5
-    global target_acc_0, target_acc_1, target_acc_2, target_acc_3, target_acc_4, target_acc_5
-    global target_yaw_0, target_yaw_1, target_yaw_2, target_yaw_3, target_yaw_4, target_yaw_5
-    
+    target_pos = torch.zeros(num_drones, 3, device=env.device)
+    target_vel = torch.zeros_like(target_pos)
+    target_acc = torch.zeros_like(target_pos)
+    target_yaw = torch.zeros(num_drones, 1, device=env.device)
+    target_pos = td[("info", 'drone_state')][..., :3].squeeze(dim=0)
     simulation_time = time.time()
     td = env.reset()
-
-    target_pos_0 = td[("info", 'drone_state')][0][0][:3].clone().cpu()
-    target_pos_1 = td[("info", 'drone_state')][0][1][:3].clone().cpu()
-    target_pos_2 = td[("info", 'drone_state')][0][2][:3].clone().cpu()
-    target_pos_3 = td[("info", 'drone_state')][0][3][:3].clone().cpu()
-    target_pos_4 = td[("info", 'drone_state')][0][4][:3].clone().cpu()
-    target_pos_5 = td[("info", 'drone_state')][0][4][:3].clone().cpu()
-
-    target_vel_0 = torch.tensor([0., 0., 0.])
-    target_vel_1 = torch.tensor([0., 0., 0.])
-    target_vel_2 = torch.tensor([0., 0., 0.])
-    target_vel_3 = torch.tensor([0., 0., 0.])
-    target_vel_4 = torch.tensor([0., 0., 0.])
-    target_vel_5 = torch.tensor([0., 0., 0.])
-
-    target_acc_0 = torch.tensor([0., 0., 0.])
-    target_acc_1 = torch.tensor([0., 0., 0.])
-    target_acc_2 = torch.tensor([0., 0., 0.])
-    target_acc_3 = torch.tensor([0., 0., 0.])
-    target_acc_4 = torch.tensor([0., 0., 0.])
-    target_acc_5 = torch.tensor([0., 0., 0.])
-
-    target_yaw_0 = torch.tensor([0.])
-    target_yaw_1 = torch.tensor([0.])
-    target_yaw_2 = torch.tensor([0.])
-    target_yaw_3 = torch.tensor([0.])
-    target_yaw_4 = torch.tensor([0.])
-    target_yaw_5 = torch.tensor([0.])
-
-    target_pos = torch.stack([target_pos_0, target_pos_1, target_pos_2, target_pos_3, target_pos_4, target_pos_5]).to(base_env.device)
-    target_vel = torch.stack([target_vel_0, target_vel_1, target_vel_2, target_vel_3, target_vel_4, target_vel_5]).to(base_env.device)
-    target_acc = torch.stack([target_acc_0, target_acc_1, target_acc_2, target_acc_3, target_acc_4, target_acc_5]).to(base_env.device)
-    target_yaw = torch.stack([target_yaw_0, target_yaw_1, target_yaw_2, target_yaw_3, target_yaw_4, target_yaw_5]).to(base_env.device)
     
-
-    def change_action_0(position:Goal):
-        # print(position.v)
-        # drone_id = 0
-        global target_pos_0, target_vel_0, target_acc_0, target_yaw_0, is_running
-        is_running = True
-        target_pos_0[0] = position.p.x
-        target_pos_0[1] = position.p.y
-        target_pos_0[2] = position.p.z
-        target_vel_0[0] = position.v.x 
-        target_vel_0[1] = position.v.y
-        target_vel_0[2] = position.v.z 
-        target_acc_0[0] = position.a.x
-        target_acc_0[1] = position.a.y
-        target_acc_0[2] = position.a.z
-        target_yaw_0[0] = position.psi
-
-
-    def change_action_1(position: Goal):
-        # print(position.v)
-        # drone_id = 1
-        global target_pos_1, target_vel_1, target_acc_1, target_yaw_1, is_running
-        is_running = True
-        target_pos_1[0] = position.p.x
-        target_pos_1[1] = position.p.y
-        target_pos_1[2] = position.p.z
-        target_vel_1[0] = position.v.x 
-        target_vel_1[1] = position.v.y
-        target_vel_1[2] = position.v.z 
-        target_acc_1[0] = position.a.x
-        target_acc_1[1] = position.a.y
-        target_acc_1[2] = position.a.z
-        target_yaw_1[0] = position.psi
-
-
-    def change_action_2(position: Goal):
-        # print(position.v)
-        # drone_id = 2
-        global target_pos_2, target_vel_2, target_acc_2, target_yaw_2, is_running
-        is_running = True
-        target_pos_2[0] = position.p.x
-        target_pos_2[1] = position.p.y
-        target_pos_2[2] = position.p.z
-        target_vel_2[0] = position.v.x 
-        target_vel_2[1] = position.v.y
-        target_vel_2[2] = position.v.z 
-        target_acc_2[0] = position.a.x
-        target_acc_2[1] = position.a.y
-        target_acc_2[2] = position.a.z
-        target_yaw_2[0] = position.psi
+    class RosDrone:
+        def __init__(self, idx) -> None:
+            self.idx = idx
+            # rospy.Subscriber('/SQ01s/goal', Goal, change_action_1)
+            self.subscriber = rospy.Subscriber(f'/SQ0{self.idx}s/goal', Goal, self.call_back)
+            pass
+       
         
-
-    def change_action_3(position: Goal):
-        # print(position.v)
-        # drone_id = 3
-        global target_pos_3, target_vel_3, target_acc_3, target_yaw_3, is_running
-        is_running = True
-        target_pos_3[0] = position.p.x
-        target_pos_3[1] = position.p.y
-        target_pos_3[2] = position.p.z
-        target_vel_3[0] = position.v.x 
-        target_vel_3[1] = position.v.y
-        target_vel_3[2] = position.v.z 
-        target_acc_3[0] = position.a.x
-        target_acc_3[1] = position.a.y
-        target_acc_3[2] = position.a.z
-        target_yaw_3[0] = position.psi
-        
-
-    def change_action_4(position: Goal):
-        # print(position.v)
-        # drone_id = 4
-        global target_pos_4, target_vel_4, target_acc_4, target_yaw_4, is_running
-        is_running = True
-        target_pos_4[0] = position.p.x
-        target_pos_4[1] = position.p.y
-        target_pos_4[2] = position.p.z
-        target_vel_4[0] = position.v.x 
-        target_vel_4[1] = position.v.y
-        target_vel_4[2] = position.v.z 
-        target_acc_4[0] = position.a.x
-        target_acc_4[1] = position.a.y
-        target_acc_4[2] = position.a.z
-        target_yaw_4[0] = position.psi
-        
+        def call_back(self, position: Goal):
+            global is_running
+            is_running = True
+            target_pos[self.idx][0] = position.p.x
+            target_pos[self.idx][1] = position.p.y
+            target_pos[self.idx][2] = position.p.z
+            target_vel[self.idx][0] = position.v.x
+            target_vel[self.idx][1] = position.v.y
+            target_vel[self.idx][2] = position.v.z
+            target_acc[self.idx][0] = position.a.x
+            target_acc[self.idx][1] = position.a.y
+            target_acc[self.idx][2] = position.a.z
+            target_yaw[self.idx][:] = position.psi
+            pass
     
-    def change_action_5(position: Goal):
-        # print(position.v)
-        # drone_id = 4
-        global target_pos_5, target_vel_5, target_acc_5, target_yaw_5, is_running
-        is_running = True
-        target_pos_5[0] = position.p.x
-        target_pos_5[1] = position.p.y
-        target_pos_5[2] = position.p.z
-        target_vel_5[0] = position.v.x 
-        target_vel_5[1] = position.v.y
-        target_vel_5[2] = position.v.z 
-        target_acc_5[0] = position.a.x
-        target_acc_5[1] = position.a.y
-        target_acc_5[2] = position.a.z
-        target_yaw_5[0] = position.psi
-        
 
     global ball_xyz_list, ball_t_list
     ball_xyz_list = []
@@ -340,10 +226,6 @@ def main(cfg):
     def step(cnt):
         global td, target_pos, target_vel, target_acc, target_yaw, is_running
         root_state = td[("info", 'drone_state')].squeeze(0)
-        global target_pos_0, target_pos_1, target_pos_2, target_pos_3, target_pos_4, target_pos_5
-        global target_vel_0, target_vel_1, target_vel_2, target_vel_3, target_vel_4, target_vel_5
-        global target_acc_0, target_acc_1, target_acc_2, target_acc_3, target_acc_4, target_acc_5
-        global target_yaw_0, target_yaw_1, target_yaw_2, target_yaw_3, target_yaw_4, target_yaw_5
         global ball_xyz_list, ball_t_list
 
         for i in range(num_drones):
@@ -355,16 +237,6 @@ def main(cfg):
         if not is_running:
             time.sleep(0.1)
             return cnt
-
-        target_pos = torch.stack([target_pos_0, target_pos_1, target_pos_2, target_pos_3, target_pos_4, target_pos_5]).to(base_env.device)
-        target_vel = torch.stack([target_vel_0, target_vel_1, target_vel_2, target_vel_3, target_vel_4, target_vel_5]).to(base_env.device)
-        target_acc = torch.stack([target_acc_0, target_acc_1, target_acc_2, target_acc_3, target_acc_4, target_acc_5]).to(base_env.device)
-        target_yaw = torch.stack([target_yaw_0, target_yaw_1, target_yaw_2, target_yaw_3, target_yaw_4, target_yaw_5]).to(base_env.device)
-
-        # print(target_pos)
-        # print(f"target_vel = \n{target_vel}")
-        # print(f"target_acc = \n{target_acc}")
-        # print(target_yaw)
     
 
         action = controller(root_state=root_state, 
@@ -378,7 +250,7 @@ def main(cfg):
         
         td = td.update({("agents", "action"): action})
         td = env.step(td)
-        print(td.keys())
+        # print(td.keys())
         
         
         record_frame()
@@ -392,7 +264,8 @@ def main(cfg):
         
         t = rospy.get_time()
         t_ros = rospy.Time.now()
-        ball_pos = env.ball.get_world_poses().squeeze() # 
+        
+        ball_pos = env.ball.get_world_poses().squeeze()
         print(ball_pos.shape, ball_pos)
         # raise NotImplementedError()
         if not ball_pos[1] == -20. and ball_pos[2] > 0.1:
@@ -452,12 +325,11 @@ def main(cfg):
     
     rospy.init_node('sim', anonymous = True)
     state = State()
-    rospy.Subscriber('/SQ01s/goal', Goal, change_action_1)
-    rospy.Subscriber('/SQ02s/goal', Goal, change_action_2)
-    rospy.Subscriber('/SQ03s/goal', Goal, change_action_3)
-    rospy.Subscriber('/SQ04s/goal', Goal, change_action_4)
-    rospy.Subscriber('/SQ05s/goal', Goal, change_action_5)
-    rospy.Subscriber('/SQ00s/goal', Goal, change_action_0)
+    subscriber_list = []
+    for i in range(num_drones):
+        subscriber = RosDrone(idx=i)
+        subscriber_list.append(subscriber)
+        
     pub_state_list : list[rospy.Publisher] = []
     pub_rviz_pos_list : list[rospy.Publisher] = []
     marker_colors = torch.rand((num_drones, 3))
@@ -485,8 +357,6 @@ def main(cfg):
     global is_running
     is_running = False
     cnt = 0
-
-    is_running = True
     
     T_REF = rospy.get_time()
     while True:

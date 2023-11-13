@@ -1,10 +1,9 @@
-#!/home/zanghongzhi/.local/share/ov/pkg/isaac_sim-2022.2.0/python.sh
 import argparse
 import os
 import time
 
 def convertToStringCommand(quad):
-    return "roslaunch omnidrones mader_specific.launch gazebo:=false quad:="+quad
+    return "roslaunch mader mader_specific.launch gazebo:=false quad:="+quad
 
 def create_session(session_name, commands):
     os.system("tmux new -d -s "+str(session_name)+" -x 300 -y 300")

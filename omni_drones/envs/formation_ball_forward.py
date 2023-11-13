@@ -95,10 +95,11 @@ class FormationBallForward(IsaacEnv):
         self.time_encoding = self.cfg.task.time_encoding
         self.safe_distance = self.cfg.task.safe_distance
         self.formation_size = self.cfg.task.formation_size
+        self.ball_hit_distance = self.cfg.task.ball_hit_distance
         self.ball_safe_distance = self.cfg.task.ball_safe_distance
         self.soft_ball_safe_distance = self.cfg.task.soft_ball_safe_distance
-        self.ball_gaussian_loc = self.cfg.task.ball_safe_distance
-        self.extra_soft_ball_safe_distance = self.cfg.task.extra_soft_ball_safe_distance
+        # self.ball_gaussian_loc = self.cfg.task.ball_safe_distance
+        # self.extra_soft_ball_safe_distance = self.cfg.task.extra_soft_ball_safe_distance
         self.ball_reward_coeff = self.cfg.task.ball_reward_coeff
         self.ball_hard_reward_coeff = self.cfg.task.ball_hard_reward_coeff
         self.ball_speed = self.cfg.task.ball_speed
@@ -281,6 +282,7 @@ class FormationBallForward(IsaacEnv):
             "ball_return": UnboundedContinuousTensorSpec(1),
             "drone_return": UnboundedContinuousTensorSpec(1),
             "hard_ball_return": UnboundedContinuousTensorSpec(1),
+            "indi_b_dist": UnboundedContinuousTensorSpec(1)
             # "soft_ball_return": UnboundedContinuousTensorSpec(1),
         }).expand(self.num_envs).to(self.device)
         info_spec = CompositeSpec({
@@ -467,9 +469,9 @@ class FormationBallForward(IsaacEnv):
         # Relative position between the ball and all the drones
         ball_pos, ball_rot = self.get_env_poses(self.ball.get_world_poses())
 
-        relative_b_pos = pos[..., :3] - ball_pos.unsqueeze(1)
+        relative_b_pos = pos[..., :3] - ball_pos.unsqueeze(1) # [env_num, drone_num, 3]
         ball_vel = self.ball.get_linear_velocities().unsqueeze(1)
-        self.relative_b_dis = torch.norm(relative_b_pos, p=2, dim=-1)
+        self.relative_b_dis = torch.norm(relative_b_pos, p=2, dim=-1) #[env_num, drone_num]
         relative_b_dis = self.relative_b_dis.unsqueeze(2)
         relative_pos = vmap(off_diag)(relative_pos)
 
@@ -529,12 +531,12 @@ class FormationBallForward(IsaacEnv):
         # indi_d_reward = 1/(1+indi_distance)
 
         # change to velocity reward
-        vel_diff = self.root_states[..., 7:10] - self.target_vel
-        indi_v_reward = 1 / (1 + torch.norm(vel_diff, p = 2, dim=-1))
+        vel_diff = self.root_states[..., 7:10] - self.target_vel #[env_num, drone_num, 3]
+        indi_v_reward = 1 / (1 + torch.norm(vel_diff, p = 2, dim=-1)) # [env_num, drone_num]
 
         # cost if height drop or too high
         height = pos[..., 2]   # [num_envs, drone.n]
-        height_penalty = ((height < 0.5) | (height > 2.0))
+        height_penalty = ((height < 0.5) | (height > 2.5))
         if height_penalty.any():
             height_penalty = torch.nonzero(height_penalty, as_tuple=True)[0]
             self.height_penalty[height_penalty] = -1
@@ -552,12 +554,19 @@ class FormationBallForward(IsaacEnv):
             should_penalise = torch.nonzero(should_penalise, as_tuple=True)[0]
             self.ball_hard_cost[should_penalise] = -self.ball_hard_reward_coeff
 
-        indi_b_dis, indi_b_ind = torch.min(self.relative_b_dis, keepdim=True, dim=1)
-        indi_b_reward = torch.clamp(indi_b_dis-self.extra_soft_ball_safe_distance, max=0) * self.ball_reward_coeff * (self.ball_alarm.float()).unsqueeze(1) * (self.ball_reward_flag.float()).unsqueeze(1)
+        indi_b_dis, indi_b_ind = torch.min(self.relative_b_dis, keepdim=True, dim=1) #[env_num, 1]
+        # smaller than ball_safe_dist, apply exponential penaty (it should be consider together with hard penalty, so it is positive)
+        k = 0.5 * self.ball_hard_reward_coeff/(self.soft_ball_safe_distance-self.ball_safe_distance)
+        indi_b_reward = torch.exp(torch.clamp(indi_b_dis, max=self.ball_safe_distance) - self.ball_safe_distance) * k
+        # between ball_safe_dist and soft_ball_safe_dist, apply linear penalty
+        indi_b_reward = (torch.clamp(indi_b_dis, min=self.ball_safe_distance, max=self.soft_ball_safe_distance) - self.soft_ball_safe_distance) * k
+        # larger than soft_ball_safe_dist, apply linear
+        indi_b_reward += torch.clamp(indi_b_dis-self.soft_ball_safe_distance, min=0, max=1.0) * self.ball_reward_coeff 
+        indi_b_reward *= (self.ball_alarm.float()).unsqueeze(1) * (self.ball_reward_flag.float()).unsqueeze(1)
      
         ball_vel = self.ball.get_linear_velocities()
         ball_pos, ball_rot = self.get_env_poses(self.ball.get_world_poses())
-        should_neglect = ((ball_vel[:,2] < -0.1) & (ball_pos[:,2] < 1.45))
+        should_neglect = ((ball_vel[:,2] < -0.1) & (ball_pos[:,2] < 0.5)) # ball_pos[:, 2] < 1.45
         if should_neglect.any():
             should_neglect = torch.nonzero(should_neglect, as_tuple=True)[0]
             self.ball_alarm[should_neglect] = 0
@@ -597,13 +606,13 @@ class FormationBallForward(IsaacEnv):
                 # + ball_hard_reward
                 # # + indi_b_reward
                 # )
-                ball_hard_reward
-                + indi_b_reward
+                ball_hard_reward # < ball_soft_distance, penalize a big constant
+                + indi_b_reward # > ball_extra_soft_dictance
                 # + indi_v_reward
                 + height_reward
                 # + reward_heading
                 #+ separation_reward
-                + reward_formation * 1.5
+                + reward_formation * 2.
                 # + reward_pos
                 # + reward_target
                 + reward_effort
@@ -628,17 +637,17 @@ class FormationBallForward(IsaacEnv):
 
         terminated = (self.progress_buf >= self.max_episode_length).unsqueeze(-1)
         crash = (pos[..., 2] < 0.2).any(-1, keepdim=True)
-        hit = (self.relative_b_dis < 0.4).any(-1, keepdim=True) #& (self.ball_reward_flag.unsqueeze(1))
+        hit = (self.relative_b_dis < self.ball_hit_distance).any(-1, keepdim=True) #& (self.ball_reward_flag.unsqueeze(1))
     
-        done = terminated | crash | (separation<0.4) | hit
+        done = terminated | crash | (separation<self.safe_distance) | hit
 
         self.frame_counter += (torch.sum((done.squeeze()).float() * self.progress_buf)).item()
-        too_close = separation<0.4
+        too_close = separation<self.safe_distance
         # assert torch.isclose(-torch.log(indi_d_reward), mean_dis_error, atol=1e-5).all()
         self.stats["cost_hausdorff"].lerp_(self.cost_h, (1-self.alpha))
         # self.stats["mean_dis_error"].lerp_(mean_dis_error, (1-self.alpha))
         self.stats["ball_reward"].lerp_(ball_hard_reward, (1-self.alpha))
-        # self.stats["soft_ball_reward"].lerp_(indi_b_reward, (1-self.alpha))
+        self.stats["soft_ball_reward"].lerp_(indi_b_reward, (1-self.alpha))
         self.stats["drone_reward"].lerp_(indi_v_reward, (1-self.alpha))
         self.stats["formation reward"].lerp_(reward_formation, (1-self.alpha))
         # self.stats["heading reward"].lerp_(reward_heading, (1-self.alpha))
@@ -659,6 +668,7 @@ class FormationBallForward(IsaacEnv):
         self.stats["drone_return"].add_(torch.mean(indi_v_reward.unsqueeze(-1)))
         # self.stats["soft_ball_return"].add_(torch.mean(indi_b_reward.unsqueeze(1).expand(-1, self.drone.n, 1),dim=1))
         self.stats["hard_ball_return"].add_(torch.mean(ball_hard_reward.unsqueeze(1).expand(-1, self.drone.n, 1),dim=1))
+        self.stats["indi_b_dist"].lerp_(torch.mean(indi_b_dis), 1-self.alpha)
         
         assert self.ball_reward_flag.dtype == torch.bool
         assert self.ball_alarm.dtype == torch.bool

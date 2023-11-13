@@ -1,4 +1,3 @@
-#!/home/zanghongzhi/.local/share/ov/pkg/isaac_sim-2022.2.0/python.sh
 import argparse
 import os
 import time

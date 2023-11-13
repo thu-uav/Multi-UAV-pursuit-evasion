@@ -4,7 +4,7 @@
 filename="log_files_$(date).txt"
 echo > $filename
 ball_speeds="3.0 4.0 5.0 6.0 7.0"
-drone_speeds="1.0 2.0 3.0 4.0 5.0"
+drone_speeds="2.0 3.0 4.0 5.0"
 for ball_speed in $ball_speeds
 do
     for drone_speed in $drone_speeds
