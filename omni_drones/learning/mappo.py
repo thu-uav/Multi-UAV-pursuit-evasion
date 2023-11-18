@@ -232,9 +232,12 @@ class MAPPOPolicy(object):
             actor_input["is_init"], (*actor_input.batch_size, self.agent_spec.n)
         )
         actor_input.batch_size = [*actor_input.batch_size, self.agent_spec.n] # [env_num, drone_num]
-        actor_output = vmap(self.actor, in_dims=(1, 0), out_dims=1, randomness="different")(
-            actor_input, self.actor_params, deterministic=deterministic
-        )
+        if self.cfg.share_actor:
+            actor_output = self.actor(actor_input, self.actor_params, deterministic=deterministic)
+        else:
+            actor_output = vmap(self.actor, in_dims=(1, 0), out_dims=1, randomness="different")(
+                actor_input, self.actor_params, deterministic=deterministic
+            )
 
         tensordict.update(actor_output)
         tensordict.update(self.value_op(tensordict))
@@ -255,9 +258,12 @@ class MAPPOPolicy(object):
                 actor_input, self.actor_params, eval_action=True
             )
         else: # [N, A, *]
-            actor_output = vmap(self.actor, in_dims=(1, 0), out_dims=1)(
-                actor_input, self.actor_params, eval_action=True
-            )
+            if self.cfg.share_actor:
+                actor_output = self.actor(actor_input, self.actor_params, eval_action=True)
+            else:
+                actor_output = vmap(self.actor, in_dims=(1, 0), out_dims=1)(
+                    actor_input, self.actor_params, eval_action=True
+                )
 
         log_probs_new = actor_output[self.act_logps_name]
         if not self.cfg.actor.tanh:
