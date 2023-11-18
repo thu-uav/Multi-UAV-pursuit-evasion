@@ -223,10 +223,9 @@ class FormationBallForward(IsaacEnv):
         if self.cfg.task.time_encoding:
             self.time_encoding_dim = 4
             obs_self_dim += self.time_encoding_dim
-        # if self.cfg.algo.share_actor:
-        #     print("share actor")
-        #     self.id_dim = 1
-        #     obs_self_dim += self.id_dim
+        if self.cfg.algo.share_actor:
+            self.id_dim = 3
+            obs_self_dim += self.id_dim
 
         #observation_dim = obs_self_dim+3 + 13+1 + 3+1+3
 
@@ -466,9 +465,8 @@ class FormationBallForward(IsaacEnv):
         if self.time_encoding:
             t = (self.progress_buf / self.max_episode_length).reshape(-1, 1, 1)
             obs_self.append(t.expand(-1, self.drone.n, self.time_encoding_dim))
-        # if self.cfg.algo.share_actor:
-        #     print(self.root_states.shape)
-        #     obs_self.append(self.drone_id.reshape(1, -1, 1).expand(self.root_states.shape[0], -1, self.id_dim))
+        if self.cfg.algo.share_actor:
+            obs_self.append(self.drone_id.reshape(1, -1, 1).expand(self.root_states.shape[0], -1, self.id_dim))
         obs_self = torch.cat(obs_self, dim=-1)
 
         relative_pos = vmap(cpos)(pos, pos)
