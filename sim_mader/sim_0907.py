@@ -3,6 +3,7 @@
 import logging
 import os
 import time
+from datetime import datetime
 
 import hydra
 import torch
@@ -10,7 +11,9 @@ import numpy as np
 import wandb
 from functorch import vmap
 from omegaconf import OmegaConf
-
+from snapstack_msgs.msg import Goal
+from send_goal import GOAL, TARGET_CENTER
+GOAL = torch.Tensor(GOAL)
 import sys
 dir_name = os.path.dirname(os.path.abspath(__file__))
 OMNIDRONES_ENV_DIR = os.path.dirname(dir_name)
@@ -43,7 +46,7 @@ from tqdm import tqdm
 import rospy
 # from quadrotor_msgs.msg.PositionCommand import PositionCommand
 # from nav_msgs.msg import Odometry, GridCells
-# from geometry_msgs.msg import PoseStamped , TransformStamped, PointStamped, Point
+from geometry_msgs.msg import PoseStamped 
 from snapstack_msgs.msg import State, Goal
 from visualization_msgs.msg import Marker
 from mader_msgs.msg import DynTraj
@@ -91,17 +94,17 @@ def getRvizPosMarker(statemsg: State, idx: int, marker_color, r):
 
 
 def fill_statemsg(statemsg : State, state):
-        statemsg.pos.x = state[0]
-        statemsg.pos.y = state[1]
-        statemsg.pos.z = state[2]
-        statemsg.quat.x = state[4]
-        statemsg.quat.y = state[5]
-        statemsg.quat.z = state[6]
-        statemsg.quat.w = state[3]
-        statemsg.vel.x = state[7]
-        statemsg.vel.y = state[8]
-        statemsg.vel.z = state[9]
-        return statemsg
+    statemsg.pos.x = state[0]
+    statemsg.pos.y = state[1]
+    statemsg.pos.z = state[2]
+    statemsg.quat.x = state[4]
+    statemsg.quat.y = state[5]
+    statemsg.quat.z = state[6]
+    statemsg.quat.w = state[3]
+    statemsg.vel.x = state[7]
+    statemsg.vel.y = state[8]
+    statemsg.vel.z = state[9]
+    return statemsg
 
 
 def solve_param(xyz_list, t_list, t_throw=None):
@@ -136,6 +139,7 @@ def main(cfg):
     OmegaConf.resolve(cfg)
     OmegaConf.set_struct(cfg, False)
     cfg.wandb.mode = "disabled"
+    cfg.task.throw_threshold = 350
     simulation_app = init_simulation_app(cfg)
     run = init_wandb(cfg)
     setproctitle(run.name)
@@ -151,11 +155,26 @@ def main(cfg):
     import rospy
 
     from omni_drones.envs.isaac_env import IsaacEnv
+    from omni_drones.sensors.camera import Camera, PinholeCameraCfg
+    from omni.isaac.core.utils.viewports import set_camera_view
 
     env_class = IsaacEnv.REGISTRY[cfg.task.name]
     cfg.env.num_envs = 1
     base_env = env_class(cfg, headless=cfg.headless)
 
+    camera_cfg = PinholeCameraCfg(
+        sensor_tick=0,
+        resolution=(960, 720),
+        data_types=["rgb"],
+    )
+    # camera for visualization
+    camera_vis = Camera(camera_cfg)
+    camera_vis.initialize("/OmniverseKit_Persp")
+    mid_y = TARGET_CENTER[1]/2
+    set_camera_view(
+        eye=np.array([5., mid_y, 12.]), 
+        target=np.array([0., mid_y, 1.5])
+    )
     def log(info):
         print(OmegaConf.to_yaml(info))
         # run.log(info)
@@ -176,8 +195,7 @@ def main(cfg):
     frame_ind = []
 
     def record_frame():
-        frame = env.base_env.render(mode="rgb_array")
-        frames.append(frame)
+        frames.append(camera_vis.get_images().cpu())
 
 
     base_env.enable_render(True)
@@ -218,12 +236,12 @@ def main(cfg):
     target_acc_4 = torch.tensor([0., 0., 0.])
     target_acc_5 = torch.tensor([0., 0., 0.])
 
-    target_yaw_0 = torch.tensor([0.])
-    target_yaw_1 = torch.tensor([0.])
-    target_yaw_2 = torch.tensor([0.])
-    target_yaw_3 = torch.tensor([0.])
-    target_yaw_4 = torch.tensor([0.])
-    target_yaw_5 = torch.tensor([0.])
+    target_yaw_0 = torch.tensor([np.pi/2])
+    target_yaw_1 = torch.tensor([np.pi/2])
+    target_yaw_2 = torch.tensor([np.pi/2])
+    target_yaw_3 = torch.tensor([np.pi/2])
+    target_yaw_4 = torch.tensor([np.pi/2])
+    target_yaw_5 = torch.tensor([np.pi/2])
 
     target_pos = torch.stack([target_pos_0, target_pos_1, target_pos_2, target_pos_3, target_pos_4, target_pos_5]).to(base_env.device)
     target_vel = torch.stack([target_vel_0, target_vel_1, target_vel_2, target_vel_3, target_vel_4, target_vel_5]).to(base_env.device)
@@ -235,7 +253,7 @@ def main(cfg):
         # print(position.v)
         # drone_id = 0
         global target_pos_0, target_vel_0, target_acc_0, target_yaw_0, is_running
-        is_running = True
+        is_running[0] = True
         target_pos_0[0] = position.p.x
         target_pos_0[1] = position.p.y
         target_pos_0[2] = position.p.z
@@ -252,7 +270,7 @@ def main(cfg):
         # print(position.v)
         # drone_id = 1
         global target_pos_1, target_vel_1, target_acc_1, target_yaw_1, is_running
-        is_running = True
+        is_running[1] = True
         target_pos_1[0] = position.p.x
         target_pos_1[1] = position.p.y
         target_pos_1[2] = position.p.z
@@ -269,7 +287,7 @@ def main(cfg):
         # print(position.v)
         # drone_id = 2
         global target_pos_2, target_vel_2, target_acc_2, target_yaw_2, is_running
-        is_running = True
+        is_running[2] = True
         target_pos_2[0] = position.p.x
         target_pos_2[1] = position.p.y
         target_pos_2[2] = position.p.z
@@ -286,7 +304,7 @@ def main(cfg):
         # print(position.v)
         # drone_id = 3
         global target_pos_3, target_vel_3, target_acc_3, target_yaw_3, is_running
-        is_running = True
+        is_running[3] = True
         target_pos_3[0] = position.p.x
         target_pos_3[1] = position.p.y
         target_pos_3[2] = position.p.z
@@ -303,7 +321,7 @@ def main(cfg):
         # print(position.v)
         # drone_id = 4
         global target_pos_4, target_vel_4, target_acc_4, target_yaw_4, is_running
-        is_running = True
+        is_running[4] = True
         target_pos_4[0] = position.p.x
         target_pos_4[1] = position.p.y
         target_pos_4[2] = position.p.z
@@ -320,7 +338,7 @@ def main(cfg):
         # print(position.v)
         # drone_id = 4
         global target_pos_5, target_vel_5, target_acc_5, target_yaw_5, is_running
-        is_running = True
+        is_running[5] = True
         target_pos_5[0] = position.p.x
         target_pos_5[1] = position.p.y
         target_pos_5[2] = position.p.z
@@ -338,7 +356,7 @@ def main(cfg):
     ball_t_list = []
     # ball_r = env.ball
     def step(cnt):
-        global td, target_pos, target_vel, target_acc, target_yaw, is_running
+        global td, target_pos, target_vel, target_acc, target_yaw, is_running, is_reached
         root_state = td[("info", 'drone_state')].squeeze(0)
         global target_pos_0, target_pos_1, target_pos_2, target_pos_3, target_pos_4, target_pos_5
         global target_vel_0, target_vel_1, target_vel_2, target_vel_3, target_vel_4, target_vel_5
@@ -348,11 +366,17 @@ def main(cfg):
 
         for i in range(num_drones):
             state = State()
-            state = fill_statemsg(statemsg=state, state=td[("info", 'drone_state')][0][i])
+            state = fill_statemsg(statemsg=state, state=root_state[i])
             pub_state_list[i].publish(state)
+            marker = getRvizPosMarker(state, idx=i, 
+                                marker_color=marker_colors[i], 
+                                r=marker_r)
+            pub_rviz_pos_list[i].publish(marker)
+            if is_reached[i] == False:
+                is_reached[i] = ((root_state[i][:3]-GOAL.to(device=base_env.device)).norm(p=2) < 0.15)
 
 
-        if not is_running:
+        if not is_running.all():
             time.sleep(0.1)
             return cnt
 
@@ -373,29 +397,27 @@ def main(cfg):
                             target_acc=target_acc,
                             target_yaw=target_yaw,
                             )
+        
+        # if not traveling:
+        # return cnt?
+        # 或者设置一下 yaw max
         if base_env.num_envs == 1:
             action = action.unsqueeze(0)
         
         td = td.update({("agents", "action"): action})
         td = env.step(td)
-        print(td.keys())
+        # print(td.keys())
         
-        
-        record_frame()
-
-        for i in range(num_drones):
-            state = State()
-            state = fill_statemsg(state, td[("info", 'drone_state')][0][i])
-            pub_state_list[i].publish(state)
-            # print(f"state.vel = {state.vel}")
-            # print(f"state.acc = {state.a}")
+        if cnt % 2 == 0:
+            record_frame()
         
         t = rospy.get_time()
         t_ros = rospy.Time.now()
-        ball_pos = env.ball.get_world_poses().squeeze() # 
-        print(ball_pos.shape, ball_pos)
+        ball_pos = env.ball.get_world_poses()
+        # print(ball_pos[0].shape, ball_pos)
+        ball_pos = ball_pos[0].squeeze()
         # raise NotImplementedError()
-        if not ball_pos[1] == -20. and ball_pos[2] > 0.1:
+        if not ball_pos[1] == -20. and ball_pos[2] > 0.15:
             ball_xyz_list.append([float(ball_pos[i]) for i in range(len(ball_pos))])
             ball_t_list.append(t - T_REF)
         if len(ball_xyz_list) > FITTING_NUM:
@@ -415,10 +437,10 @@ def main(cfg):
             # import omni.usd
             # stage = omni.usd.get_context().get_stage()
             ball_pos, ball_rot = env.get_env_poses(env.ball.get_world_poses())
-            print(ball_pos)
-            print(f"x={x}, y={y}, z={z}")
-            print(f"xyz_list = {ball_xyz_list}")
-            print(f"t_list = {ball_t_list}")
+            # print(ball_pos)
+            # print(f"x={x}, y={y}, z={z}")
+            # print(f"xyz_list = {ball_xyz_list}")
+            # print(f"t_list = {ball_t_list}")
             dynamic_trajectory_msg.bbox = [0.15, 0.15, 0.15]
             dynamic_trajectory_msg.is_agent = False
             dynamic_trajectory_msg.header.stamp = t_ros
@@ -436,20 +458,37 @@ def main(cfg):
         # print(cnt)
         cnt = cnt + 1
 
-        if len(frames) > 800:
-            video_array = np.stack(frames).transpose(0, 3, 1, 2)
-            print(video_array.shape)
-            video = wandb.Video(
-                video_array, fps=1 / cfg.sim.dt, format="mp4"
-            )
-            wandb.log({"video": video})
-
+        if is_reached.all() or len(frames) > 600:
+            # video_array = np.stack(frames).transpose(0, 3, 1, 2)
+            # print(video_array.shape)
+            # video = wandb.Video(
+            #     video_array, fps=1 / cfg.sim.dt, format="mp4"
+            # )
+            # wandb.log({"video": video})
+            from torchvision.io import write_video
+            print(frames[0])
+            print(frames[0].shape)
+            # write_video(f"rgb.mp4", np.array(frames), fps=1/cfg.sim.dt)
+            # simulation_app.close()
+            # exit(0)
+            now = datetime.now()
+            video_name = f"{now.strftime('%Y%m%d-%H%M%S')}.mp4"
+            print(video_name)
+            for image_type, arrays in torch.stack(frames).items():
+                 for _, arrays_drone in enumerate(arrays.unbind(1)):
+                    if image_type == "rgb":
+                        arrays_drone = arrays_drone.permute(0, 2, 3, 1)[..., :3]
+                        write_video(video_name, arrays_drone, fps=1/cfg.sim.dt)
             simulation_app.close()
             exit(0)
         
         return cnt
     
-    
+    # def term_goal_received(msg: PoseStamped):
+    #     print("received goal")
+    #     global is_running
+    #     is_running = True
+        
     rospy.init_node('sim', anonymous = True)
     state = State()
     rospy.Subscriber('/SQ01s/goal', Goal, change_action_1)
@@ -458,6 +497,7 @@ def main(cfg):
     rospy.Subscriber('/SQ04s/goal', Goal, change_action_4)
     rospy.Subscriber('/SQ05s/goal', Goal, change_action_5)
     rospy.Subscriber('/SQ00s/goal', Goal, change_action_0)
+    # rospy.Subscriber('/SQ01s/term_goal', PoseStamped, term_goal_received)
     pub_state_list : list[rospy.Publisher] = []
     pub_rviz_pos_list : list[rospy.Publisher] = []
     marker_colors = torch.rand((num_drones, 3))
@@ -482,16 +522,18 @@ def main(cfg):
     
     print("all nodes has been initialized")
 
-    global is_running
-    is_running = False
+    global is_running, is_reached
+    is_running = torch.zeros(num_drones, dtype=bool)
+    is_reached = torch.zeros(num_drones, dtype=bool)
     cnt = 0
 
-    is_running = True
+    # is_running = True
     
     T_REF = rospy.get_time()
     while True:
         cnt = step(cnt)
-
+        if cnt % 10 == 0:
+            print("step =", cnt)
 
 if __name__ == "__main__":
     main()

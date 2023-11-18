@@ -27,7 +27,7 @@ def main(args):
     
     create_session(session_name, commands)
     time.sleep(n)
-    os.system("tmux attach")
+    # os.system("tmux attach")
 
 
 if __name__ == "__main__":

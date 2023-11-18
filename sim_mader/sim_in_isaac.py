@@ -187,13 +187,14 @@ def main(cfg):
     num_drones = env.base_env.drone.n
 
     global td, target_pos, target_vel, target_acc, target_yaw, simulation_time
+    td = env.reset()
     target_pos = torch.zeros(num_drones, 3, device=env.device)
     target_vel = torch.zeros_like(target_pos)
     target_acc = torch.zeros_like(target_pos)
     target_yaw = torch.zeros(num_drones, 1, device=env.device)
     target_pos = td[("info", 'drone_state')][..., :3].squeeze(dim=0)
     simulation_time = time.time()
-    td = env.reset()
+    
     
     class RosDrone:
         def __init__(self, idx) -> None:

@@ -231,7 +231,7 @@ class MAPPOPolicy(object):
             actor_input["is_init"] = expand_right(
             actor_input["is_init"], (*actor_input.batch_size, self.agent_spec.n)
         )
-        actor_input.batch_size = [*actor_input.batch_size, self.agent_spec.n]
+        actor_input.batch_size = [*actor_input.batch_size, self.agent_spec.n] # [env_num, drone_num]
         actor_output = vmap(self.actor, in_dims=(1, 0), out_dims=1, randomness="different")(
             actor_input, self.actor_params, deterministic=deterministic
         )
