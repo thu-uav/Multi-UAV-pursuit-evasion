@@ -277,7 +277,7 @@ class MAPPOPolicy(object):
             entropy_loss = - torch.mean(-log_probs_new)
 
         self.actor_opt.zero_grad()
-        (policy_loss - entropy_loss * self.cfg.entropy_coef).backward()
+        (policy_loss + entropy_loss * self.cfg.entropy_coef).backward()
         grad_norm = torch.nn.utils.clip_grad_norm_(
             self.actor_opt.param_groups[0]["params"], self.cfg.max_grad_norm
         )
@@ -407,7 +407,7 @@ class MAPPOPolicy(object):
         return state_dict
     
     def load_state_dict(self, state_dict):
-        self.actor_params = TensorDictParams(state_dict["actor_params"])
+        self.actor_params = TensorDictParams(state_dict["actor_params"].to_tensordict())
         self.actor_opt = torch.optim.Adam(self.actor_params.parameters(), lr=self.cfg.actor.lr)
         self.critic.load_state_dict(state_dict["critic"])
         self.value_normalizer.load_state_dict(state_dict["value_normalizer"])
