@@ -20,7 +20,7 @@ wandb:
   group: ${oc.select:..task.name}
   run_name: ${oc.select:..task.name,test}-${oc.select:..algo.name,none}-${oc.select:..task.stage,none}
   job_type: train
-  entity: marl-drones
+  entity: nics-marl
   project: omnidrones
   mode: online # set to 'disabled' when debugging locally, online
   run_id: 
