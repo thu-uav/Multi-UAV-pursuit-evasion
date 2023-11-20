@@ -243,7 +243,7 @@ def main(cfg):
         }
 
         info = {
-            "eval/stats." + k: torch.mean(v.float()).item() 
+            "eval/stats." + k: torch.nanmean(v.float()).item() 
             for k, v in traj_stats.items()
         }
 
