@@ -510,7 +510,6 @@ class FormationMultiBallForward(IsaacEnv):
         too_close_reward = self.cfg.task.too_close_penalty * hit
         done = terminated | crash | too_close | hit
         done = torch.sum(done, dim=-1) > 0
-        done = torch.zeros_like(done)
 
         reward = (
             ball_hard_reward # < ball_soft_distance, penalize a big constant # [n, k]
