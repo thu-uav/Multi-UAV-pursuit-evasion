@@ -58,17 +58,6 @@ from tf.transformations import *
 GRAVITY = 9.81
 FITTING_NUM = 3
 
-class Every:
-    def __init__(self, func, steps):
-        self.func = func
-        self.steps = steps
-        self.i = 0
-
-    def __call__(self, *args, **kwargs):
-        if self.i % self.steps == 0:
-            self.func(*args, **kwargs)
-        self.i += 1
-
 
 def getRvizPosMarker(statemsg: State, idx: int, marker_color, r): 
     marker = Marker()
@@ -354,6 +343,7 @@ def main(cfg):
     global ball_xyz_list, ball_t_list
     ball_xyz_list = []
     ball_t_list = []
+    done = False
     # ball_r = env.ball
     def step(cnt):
         global td, target_pos, target_vel, target_acc, target_yaw, is_running, is_reached
@@ -406,7 +396,12 @@ def main(cfg):
         
         td = td.update({("agents", "action"): action})
         td = env.step(td)
-        # print(td.keys())
+        print(td.keys())
+        print(td[("next", "done")])
+        raise NotImplementedError()
+        if td[("next", "done")].all():
+            done = True
+        print(td.keys())
         
         if cnt % 2 == 0:
             record_frame()
@@ -458,7 +453,7 @@ def main(cfg):
         # print(cnt)
         cnt = cnt + 1
 
-        if is_reached.all() or len(frames) > 600:
+        if is_reached.all() or len(frames) > 600 or done:
             # video_array = np.stack(frames).transpose(0, 3, 1, 2)
             # print(video_array.shape)
             # video = wandb.Video(

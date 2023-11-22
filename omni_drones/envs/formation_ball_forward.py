@@ -133,20 +133,26 @@ class FormationBallForward(IsaacEnv):
         self.flag = torch.zeros(self.num_envs, dtype=bool, device=self.device)
         self.cost_h = torch.ones(self.num_envs, dtype=bool, device=self.device)
         self.t_formed_indicator = torch.zeros(self.num_envs, dtype=bool, device=self.device)
-        self.t_formed = torch.full(size=(self.num_envs,1), fill_value=torch.nan, device=self.device).squeeze(1)
-        self.t_launched = torch.full(size=(self.num_envs,1), fill_value=torch.nan, device=self.device).squeeze(1)
-        self.ball_reward_flag = torch.zeros(self.num_envs, dtype=bool, device=self.device)
+        self.t_formed = torch.full(size=(self.num_envs,), fill_value=torch.nan, device=self.device)
+        self.t_launched = torch.full(size=(self.num_envs,), fill_value=torch.nan, device=self.device)
+        self.t_neglect = torch.full(size=(self.num_envs,), fill_value=torch.nan, device=self.device)
         self.ball_alarm = torch.ones(self.num_envs, dtype=bool, device=self.device)
+        self.ball_reward_flag = torch.zeros(self.num_envs, dtype=bool, device=self.device)
         #self.ball_vel = torch.zeros(self.num_envs, 6, device=self.device)
         #self.ball_pos = torch.zeros(self.num_envs, 3, device=self.device)
         # self.mask = torch.zeros(self.num_envs, self.drone.n + 1, dtype=bool, device=self.device)
         self.height_penalty = torch.zeros(self.num_envs, self.drone.n, device=self.device)
-        self.separation_penalty = torch.zeros(self.num_envs, self.drone.n, self.drone.n-1, device=self.device)
+        # self.separation_penalty = torch.zeros(self.num_envs, self.drone.n, self.drone.n-1, device=self.device)
         self.t_moved = torch.full(size=(self.num_envs,1), fill_value=torch.nan, device=self.device).squeeze(1)
         self.t_difference = torch.full(size=(self.num_envs,1), fill_value=torch.nan, device=self.device).squeeze(1)
         self.t_hit = torch.full(size=(self.num_envs,1), fill_value=torch.nan, device=self.device).squeeze(1)
         self.frame_counter = 0
 
+        # add some log helper variable
+        self.formation_dist_sum = torch.zeros(size=(self.num_envs, 1), device=self.device)
+        self.formation_dist_no_ball_sum = torch.zeros_like(self.formation_dist_sum)
+        self.formation_dist_has_ball_sum = torch.zeros_like(self.formation_dist_sum)
+        self.indi_ball_dist_sum = torch.zeros_like(self.formation_dist_sum)
         # target_rpy = torch.zeros(self.num_envs, self.drone.n, 3, device=self.device)
         # target_yaw = torch.linspace(0, 2*torch.pi, self.drone.n)[:self.drone.n-1]
         # target_rpy[:,:5,2] = target_yaw.unsqueeze(0).expand(self.num_envs, -1).clone()
@@ -262,31 +268,41 @@ class FormationBallForward(IsaacEnv):
         )
 
         stats_spec = CompositeSpec({
-            "cost_hausdorff": UnboundedContinuousTensorSpec(1),
-            # "mean_dis_error": UnboundedContinuousTensorSpec(1),
-            "ball_reward": UnboundedContinuousTensorSpec(1),
-            "soft_ball_reward": UnboundedContinuousTensorSpec(1),
-            "drone_reward": UnboundedContinuousTensorSpec(self.drone.n),
-            "formation reward": UnboundedContinuousTensorSpec(1),
+            # "cost_hausdorff": UnboundedContinuousTensorSpec(1),
+            # # "mean_dis_error": UnboundedContinuousTensorSpec(1),
+            # "ball_reward": UnboundedContinuousTensorSpec(1),
+            # "soft_ball_reward": UnboundedContinuousTensorSpec(1),
+            # "drone_reward": UnboundedContinuousTensorSpec(self.drone.n),
+            # "formation reward": UnboundedContinuousTensorSpec(1),
             # "heading reward": UnboundedContinuousTensorSpec(1),
             "t_launched": UnboundedContinuousTensorSpec(1),
             "t_moved": UnboundedContinuousTensorSpec(1),
             "t_difference": UnboundedContinuousTensorSpec(1),
             "t_hit": UnboundedContinuousTensorSpec(1),
+            
             "terminated": UnboundedContinuousTensorSpec(1),
             "crash": UnboundedContinuousTensorSpec(1),
             "hit": UnboundedContinuousTensorSpec(1),
             "too close": UnboundedContinuousTensorSpec(1),
             "done": UnboundedContinuousTensorSpec(1),
+            
             "height_penalty": UnboundedContinuousTensorSpec(1),
-            "separation_penalty": UnboundedContinuousTensorSpec(1),
+            # "separation_penalty": UnboundedContinuousTensorSpec(1),
             "return": UnboundedContinuousTensorSpec(1),
             "episode_len": UnboundedContinuousTensorSpec(1),
             "ball_return": UnboundedContinuousTensorSpec(1),
             "drone_return": UnboundedContinuousTensorSpec(1),
             "hard_ball_return": UnboundedContinuousTensorSpec(1),
+            # "indi_b_dist_sum": UnboundedContinuousTensorSpec(1),
             "indi_b_dist": UnboundedContinuousTensorSpec(1),
-            "formation_dist": UnboundedContinuousTensorSpec(1)
+            # "formation_dist_sum": UnboundedContinuousTensorSpec(1),
+            "formation_dist": UnboundedContinuousTensorSpec(1),
+            "formation_has_ball_dist": UnboundedContinuousTensorSpec(1),
+            "formation_no_ball_dist": UnboundedContinuousTensorSpec(1),
+            "crash_return": UnboundedContinuousTensorSpec(1),
+            "hit_return": UnboundedContinuousTensorSpec(1),
+            "too_close_return": UnboundedContinuousTensorSpec(1),
+            "terminated_return": UnboundedContinuousTensorSpec(1),
             # "soft_ball_return": UnboundedContinuousTensorSpec(1),
         }).expand(self.num_envs).to(self.device)
         info_spec = CompositeSpec({
@@ -330,32 +346,6 @@ class FormationBallForward(IsaacEnv):
 
         target_height = torch.tensor(self.cfg.task.target_height, device = self.device)
         self.flag[env_ids] = False
-        # point_list_0 = ((torch.as_tensor([[2., 0,0],
-        #             [0.618, 1.9021,0],
-        #             [-1.618, 1.1756,0],
-        #             [-1.618, -1.1756,0],
-        #             [0.618, -1.9021,0],
-        #             [2., 0,0],
-        #             [0.618, 1.9021,0],
-        #             [-1.618, 1.1756,0],
-        #             [-1.618, -1.1756,0],
-        #             [0.618, -1.9021,0],
-        #             ], device=self.device).float())*self.formation_size/2 + self.target_pos_single + self.envs_positions[self.central_env_idx]).tolist()
-        # point_list_1 = ((torch.as_tensor([[0.618, 1.9021,0],
-        #             [-1.618, 1.1756,0],
-        #             [-1.618, -1.1756,0],
-        #             [0.618, -1.9021,0],
-        #             [2., 0, 0],
-        #             [0., 0, 0],
-        #             [0., 0, 0],
-        #             [0., 0, 0],
-        #             [0., 0, 0],
-        #             [0., 0, 0], 
-        #             ], device=self.device).float())*self.formation_size/2 + self.target_pos_single  + self.envs_positions[self.central_env_idx]).tolist()
-        # colors = [(1.0, 1.0, 1.0, 1.0) for _ in range(len(point_list_0))]
-        # sizes = [1 for _ in range(len(point_list_0))]
-        # self.draw.draw_lines(point_list_0, point_list_1, colors, sizes)
-        
 
         self.stats[env_ids] = 0.
         self.t_formed[env_ids]=torch.nan
@@ -363,11 +353,15 @@ class FormationBallForward(IsaacEnv):
         self.t_moved[env_ids]=torch.nan
         self.t_difference[env_ids]=torch.nan
         self.t_hit[env_ids] =torch.nan
+        self.t_neglect[env_ids] = torch.nan
         self.ball_alarm[env_ids] = 1
         # self.mask[env_ids] = False #0.
         # self.mask[env_ids, -1] = True #1.
-        self.height_penalty[:] = 0.
-        self.separation_penalty[:] = 0.
+        self.height_penalty[env_ids] = 0.
+        self.formation_dist_sum[env_ids] = 0.
+        self.formation_dist_no_ball_sum[env_ids] = 0.
+        self.formation_dist_has_ball_sum[env_ids] = 0.
+        self.indi_ball_dist_sum[env_ids] = 0.
         
 
     def _pre_sim_step(self, tensordict: TensorDictBase):
@@ -442,14 +436,14 @@ class FormationBallForward(IsaacEnv):
             assert len(should_throw) == ball_pos.shape[0]
             self.ball.set_world_poses(positions=ball_pos + self.envs_positions[should_throw], env_indices=should_throw)
             self.ball.set_velocities(ball_vel, env_indices=should_throw)
-            # draw target in red, draw init in green
-            # self.draw.clear_points()
-            draw_target_coordinates = target_ball_pos + self.envs_positions[should_throw]
-            draw_init_coordinates = ball_pos + self.envs_positions[should_throw]
-            colors = [(1.0, 0.0, 0.0, 1.0) for _ in range(len(should_throw))] + [(0.0, 1.0, 0.0, 1.0) for _ in range(len(should_throw))]
-            sizes = [2.0 for _ in range(2*len(should_throw))]
+            # # draw target in red, draw init in green
+            # # self.draw.clear_points()
+            # draw_target_coordinates = target_ball_pos + self.envs_positions[should_throw]
+            # draw_init_coordinates = ball_pos + self.envs_positions[should_throw]
+            # colors = [(1.0, 0.0, 0.0, 1.0) for _ in range(len(should_throw))] + [(0.0, 1.0, 0.0, 1.0) for _ in range(len(should_throw))]
+            # sizes = [2.0 for _ in range(2*len(should_throw))]
             
-            self.draw.draw_points(draw_target_coordinates.tolist() + draw_init_coordinates.tolist(), colors, sizes)
+            # self.draw.draw_points(draw_target_coordinates.tolist() + draw_init_coordinates.tolist(), colors, sizes)
         self.flag.bitwise_or_(flag)
 
     def _compute_state_and_obs(self):
@@ -511,7 +505,18 @@ class FormationBallForward(IsaacEnv):
         }, [self.num_envs, self.drone.n]) # [N, K, n_i, m_i]
 
         state = TensorDict({"drones": self.root_states}, self.batch_size)
-
+        terminated = (self.progress_buf >= self.max_episode_length).unsqueeze(-1)
+        
+        separation = self.drone_pdist.min(dim=-2).values.min(dim=-2).values
+        crash = (pos[..., 2] < 0.2).any(-1, keepdim=True)
+        hit = (self.relative_b_dis < self.ball_hit_distance).any(-1, keepdim=True)
+        too_close = separation<self.safe_distance
+        done = terminated | crash | too_close | hit
+        self.stats["terminated"][:] = (terminated.float())
+        self.stats["crash"][:] = (crash.float())
+        self.stats["hit"][:] = (hit.float())
+        self.stats["too close"][:] = (too_close.float())
+        self.stats["done"][:] = (done.float())
         return TensorDict({
             "agents":{
                 "observation": obs,    # input for the network
@@ -549,9 +554,10 @@ class FormationBallForward(IsaacEnv):
 
         ball_vel = self.ball.get_linear_velocities()
         ball_pos, ball_rot = self.get_env_poses(self.ball.get_world_poses())
-        should_neglect = ((ball_vel[:,2] < -0.1) & (ball_pos[:,2] < 0.5)) # ball_pos[:, 2] < 1.45
+        should_neglect = ((ball_vel[:,2] < -0.1) & (ball_pos[:,2] < 0.5) & (~torch.isnan(self.t_launched)) & torch.isnan(self.t_neglect)) # ball_pos[:, 2] < 1.45
         if should_neglect.any():
             should_neglect = torch.nonzero(should_neglect, as_tuple=True)[0]
+            self.t_neglect[should_neglect] = self.progress_buf[should_neglect]
             self.ball_alarm[should_neglect] = 0
             # self.mask[should_neglect, -1] = True
         # compute ball hard reward (< self.ball_safe_distance)
@@ -572,7 +578,6 @@ class FormationBallForward(IsaacEnv):
         # larger than soft_ball_safe_dist, apply linear
         indi_b_reward += torch.clamp(indi_b_dis-self.soft_ball_safe_distance, min=0, max=1.0) * self.ball_reward_coeff 
         indi_b_reward *= (self.ball_alarm.float()).unsqueeze(1) * (self.ball_reward_flag.float()).unsqueeze(1)
-     
         
         
         
@@ -599,7 +604,7 @@ class FormationBallForward(IsaacEnv):
         hit = (self.relative_b_dis < self.ball_hit_distance).any(-1, keepdim=True) #& (self.ball_reward_flag.unsqueeze(1))
         hit_reward = self.cfg.task.hit_penalty * hit
         too_close = separation<self.safe_distance
-        too_close_reward = self.cfg.task.too_close_penalty * hit
+        too_close_reward = self.cfg.task.too_close_penalty * too_close
         done = terminated | crash | too_close | hit
         
         if self.cfg.task.stage == 1:
@@ -637,7 +642,7 @@ class FormationBallForward(IsaacEnv):
             
         # drone_moved = ((~torch.isnan(self.t_launched) & (mean_dis_error >= 0.35)) & (torch.isnan(self.t_moved)))
         # 可能需要用 formation 判断一下
-        formation_dis = compute_formation_dis(pos, self.formation)
+        formation_dis = compute_formation_dis(pos, self.formation) #[env_num, 1]
         drone_moved = ((~torch.isnan(self.t_launched)) & (formation_dis > 0.35) & (torch.isnan(self.t_moved)))
         if drone_moved.any():
             drone_moved = torch.nonzero(drone_moved, as_tuple=True)[0]
@@ -658,33 +663,55 @@ class FormationBallForward(IsaacEnv):
 
         self.frame_counter += (torch.sum((done.squeeze()).float() * self.progress_buf)).item()
         
+        t_with_ball = torch.full(size=(self.num_envs,), fill_value=torch.nan, device=self.device) # [env_num]
+        t_no_ball = torch.full(size=(self.num_envs,), fill_value=torch.nan, device=self.device)
+        time_full_flag = ~(torch.isnan(self.t_launched) | torch.isnan(self.t_neglect))
+        if time_full_flag.any():
+            t_with_ball[time_full_flag] = self.t_neglect[time_full_flag] - self.t_launched[time_full_flag]
+            t_no_ball[time_full_flag] = self.progress_buf[time_full_flag] - t_with_ball[time_full_flag]
+            assert (t_with_ball[time_full_flag] >= 0).all() 
+            assert (t_no_ball[time_full_flag] >= 0).all()
+        time_part_flag = (~torch.isnan(self.t_launched)) & torch.isnan(self.t_neglect)
+        if time_part_flag.any():   
+            t_with_ball[time_part_flag] = self.progress_buf[time_part_flag] - self.t_launched[time_part_flag]
+            t_no_ball[time_part_flag] = self.t_launched[time_part_flag]
+            assert (t_with_ball[time_part_flag] >= 0).all()
+        t_no_ball[torch.isnan(self.t_launched)] = self.progress_buf[torch.isnan(self.t_launched)]
+        t_with_ball = t_with_ball.reshape(-1, 1)
+        t_no_ball = t_no_ball.reshape(-1, 1)
         # assert torch.isclose(-torch.log(indi_d_reward), mean_dis_error, atol=1e-5).all()
-        self.stats["cost_hausdorff"].lerp_(self.cost_h, (1-self.alpha))
-        # self.stats["mean_dis_error"].lerp_(mean_dis_error, (1-self.alpha))
-        self.stats["ball_reward"].lerp_(ball_hard_reward, (1-self.alpha))
-        self.stats["soft_ball_reward"].lerp_(indi_b_reward, (1-self.alpha))
-        self.stats["drone_reward"].lerp_(indi_v_reward, (1-self.alpha))
-        self.stats["formation reward"].lerp_(reward_formation, (1-self.alpha))
+        # self.stats["cost_hausdorff"].lerp_(self.cost_h, (1-self.alpha))
+        # # self.stats["mean_dis_error"].lerp_(mean_dis_error, (1-self.alpha))
+        # self.stats["ball_reward"].lerp_(ball_hard_reward, (1-self.alpha))
+        # self.stats["soft_ball_reward"].lerp_(indi_b_reward, (1-self.alpha))
+        # self.stats["drone_reward"].lerp_(indi_v_reward, (1-self.alpha))
+        # self.stats["formation reward"].lerp_(reward_formation, (1-self.alpha))
         # self.stats["heading reward"].lerp_(reward_heading, (1-self.alpha))
         self.stats["t_launched"][:] = torch.nanmean(self.t_launched.unsqueeze(1), keepdim=True)
         self.stats["t_moved"][:] = torch.nanmean(self.t_moved.unsqueeze(1), keepdim=True)
         self.stats["t_difference"][:] =  torch.nanmean(self.t_difference.unsqueeze(1), keepdim=True)
         self.stats["t_hit"][:] =  torch.nanmean(self.t_hit.unsqueeze(1), keepdim=True)
-        self.stats["terminated"][:] = (terminated.float())
-        self.stats["crash"][:] = (crash.float())
-        self.stats["hit"][:] = (hit.float())
-        self.stats["too close"][:] = (too_close.float())
-        self.stats["done"][:] = (done.float())
-        self.stats["height_penalty"].lerp_(height_reward, (1-self.alpha))
+        
+        self.stats["height_penalty"].add_(height_reward)
         # self.stats["separation_penalty"].lerp_(separation_reward, (1-self.alpha))
         self.stats["return"].add_(torch.mean(reward, dim=1))
         self.stats["episode_len"][:] = self.progress_buf.unsqueeze(1)
-        # self.stats["ball_return"].add_(torch.mean(((1/reward_separation) * (ball_hard_reward + indi_b_reward)).unsqueeze(1).expand(-1, self.drone.n, 1),dim=1))
+        self.stats["ball_return"].add_(ball_hard_reward + indi_b_reward)
         self.stats["drone_return"].add_(torch.mean(indi_v_reward.unsqueeze(-1)))
         # self.stats["soft_ball_return"].add_(torch.mean(indi_b_reward.unsqueeze(1).expand(-1, self.drone.n, 1),dim=1))
-        self.stats["hard_ball_return"].add_(torch.mean(ball_hard_reward.unsqueeze(1).expand(-1, self.drone.n, 1),dim=1))
-        self.stats["indi_b_dist"][:] = torch.mean(indi_b_dis)
-        self.stats["formation_dist"][:] = formation_dis
+        self.stats["hard_ball_return"].add_(ball_hard_reward)
+        self.indi_ball_dist_sum += torch.mean(indi_b_dis)
+        self.stats["indi_b_dist"][:] = self.indi_ball_dist_sum / t_with_ball
+        self.formation_dist_sum += torch.mean(formation_dis)
+        self.stats["formation_dist"][:] = self.formation_dist_sum / self.stats["episode_len"]
+        self.formation_dist_has_ball_sum += formation_dis * (self.ball_alarm.float()).unsqueeze(1) * (self.ball_reward_flag.float()).unsqueeze(1)
+        self.stats["formation_has_ball_dist"][:] = self.formation_dist_has_ball_sum / t_with_ball
+        self.formation_dist_no_ball_sum += formation_dis * (1 - (self.ball_alarm.float()).unsqueeze(1) * (self.ball_reward_flag.float()).unsqueeze(1))
+        self.stats["formation_no_ball_dist"][:] = self.formation_dist_no_ball_sum / t_no_ball
+        self.stats["crash_return"].add_(torch.mean(crash_reward.unsqueeze(-1)))
+        self.stats["hit_return"].add_(torch.mean(hit_reward.unsqueeze(-1)))
+        self.stats["too_close_return"].add_(torch.mean(too_close_reward.unsqueeze(-1)))
+        self.stats["terminated_return"].add_(torch.mean(terminated_reward.unsqueeze(-1)))
         
         assert self.ball_reward_flag.dtype == torch.bool
         assert self.ball_alarm.dtype == torch.bool

@@ -33,7 +33,7 @@ ball_hit_distance: 0.25 # hit
 ball_safe_distance: 0.3 # hard penalty
 soft_ball_safe_distance: 0.4 # soft penalty
 ball_reward_coeff: 1. # 40
-ball_hard_reward_coeff: 10. # 10
+ball_hard_reward_coeff: 5. # 10
 formation: regular_pentagon #dense_square # hexagon # tetragon
 
 flatten_obs: true #false

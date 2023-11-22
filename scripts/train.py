@@ -238,16 +238,15 @@ def main(cfg):
             indices = first_done.reshape(first_done.shape+(1,)*(tensor.ndim-2))
             return torch.take_along_dim(tensor, indices, dim=1).reshape(-1)
 
-        # traj_stats = {
-        #     k: take_first_episode(v)
-        #     for k, v in trajs[("next", "stats")].cpu().items()
-        # }
+        traj_stats = {
+            k: take_first_episode(v)
+            for k, v in trajs[("next", "stats")].cpu().items()
+        }
 
-        # info = {
-        #     "eval/stats." + k: torch.mean(v.float()).item() 
-        #     for k, v in traj_stats.items()
-        # }
-        info = {}
+        info = {
+            "eval/stats." + k: torch.nanmean(v.float()).item() 
+            for k, v in traj_stats.items()
+        }
 
         if len(frames):
             # video_array = torch.stack(frames)
