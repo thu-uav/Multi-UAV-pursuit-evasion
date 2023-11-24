@@ -422,7 +422,7 @@ class FormationMultiBallForward(IsaacEnv):
             balls_vel.expand_as(relative_b_pos)
         ], dim=-1).view(self.num_envs, self.drone.n, self.ball_num, 7) #[env, agent, ball_num, *]
         
-        manual_mask = torch.isnan(self.t_launched)
+        manual_mask = torch.isnan(self.t_launched).unsqueeze(-1)
         if manual_mask.any():
             manual_mask = torch.nonzero(manual_mask, as_tuple=True)
             obs_ball[manual_mask[0], :, manual_mask[1]] = -1.
@@ -468,7 +468,7 @@ class FormationMultiBallForward(IsaacEnv):
         reshape_ball_world_poses = (self.ball.get_world_poses()[0].view(-1, self.ball_num, 3), self.ball.get_world_poses()[1].view(-1, self.ball_num, 4))
         ball_pos, ball_rot = self.get_env_poses(reshape_ball_world_poses) # [env_num, ball_num, 3]
 
-        should_neglect = ((ball_vel[:,2] < -0.1) & (ball_pos[:,2] < 0.5)) # ball_pos[:, 2] < 1.45
+        should_neglect = ((ball_vel[...,2] < -0.1) & (ball_pos[...,2] < 0.5)) # ball_pos[:, 2] < 1.45
         if should_neglect.any():
             should_neglect = torch.nonzero(should_neglect, as_tuple=True)
             self.ball_alarm[should_neglect] = 0
