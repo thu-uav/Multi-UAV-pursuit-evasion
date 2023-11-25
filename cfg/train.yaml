@@ -5,7 +5,7 @@ headless: true
 sim: ${task.sim}
 env: ${task.env}
 
-total_frames: 400_000_000 #1000_000_000
+total_frames: 200_000_000 #1000_000_000
 max_iters: -1
 eval_interval: -1
 save_interval: -1
@@ -20,7 +20,7 @@ wandb:
   group: ${oc.select:..task.name}
   run_name: ${oc.select:..task.name,test}-${oc.select:..algo.name,none}-${oc.select:..task.stage,none}
   job_type: train
-  entity: marl-drones # new wandb team name
+  entity: sapios # new wandb team name
   project: FormationMultiBall
   mode: online
   run_id: 

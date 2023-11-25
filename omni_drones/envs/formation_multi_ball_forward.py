@@ -102,6 +102,9 @@ class FormationMultiBallForward(IsaacEnv):
         self.ball_reward_coeff = self.cfg.task.ball_reward_coeff
         self.ball_hard_reward_coeff = self.cfg.task.ball_hard_reward_coeff
         self.ball_speed = self.cfg.task.ball_speed
+        self.velocity_coeff = self.cfg.task.velocity_coeff
+        self.formation_coeff = self.cfg.task.formation_coeff
+        self.height_coeff = self.cfg.task.height_coeff
         self.draw = _debug_draw.acquire_debug_draw_interface()
         self.total_frame = self.cfg.total_frames
         self.drone.initialize() 
@@ -133,14 +136,14 @@ class FormationMultiBallForward(IsaacEnv):
         self.cost_h = torch.ones(self.num_envs, dtype=bool, device=self.device)
         self.t_formed_indicator = torch.zeros(self.num_envs, dtype=bool, device=self.device)
         self.t_formed = torch.full(size=(self.num_envs,1), fill_value=torch.nan, device=self.device).squeeze(1)
-        self.t_launched = torch.full(size=(self.num_envs, self.ball_num), fill_value=torch.nan, device=self.device).squeeze(1)
+        self.t_launched = torch.full(size=(self.num_envs, self.ball_num), fill_value=torch.nan, device=self.device)
         self.ball_reward_flag = torch.zeros((self.num_envs, self.ball_num), dtype=bool, device=self.device)
         self.ball_alarm = torch.ones((self.num_envs, self.ball_num), dtype=bool, device=self.device)
         self.height_penalty = torch.zeros(self.num_envs, self.drone.n, device=self.device)
         self.separation_penalty = torch.zeros(self.num_envs, self.drone.n, self.drone.n-1, device=self.device)
-        self.t_moved = torch.full(size=(self.num_envs,self.ball_num), fill_value=torch.nan, device=self.device).squeeze(1)
-        self.t_difference = torch.full(size=(self.num_envs,self.ball_num), fill_value=torch.nan, device=self.device).squeeze(1)
-        self.t_hit = torch.full(size=(self.num_envs, self.ball_num), fill_value=torch.nan, device=self.device).squeeze(1)
+        self.t_moved = torch.full(size=(self.num_envs,self.ball_num), fill_value=torch.nan, device=self.device)
+        self.t_difference = torch.full(size=(self.num_envs,self.ball_num), fill_value=torch.nan, device=self.device)
+        self.t_hit = torch.full(size=(self.num_envs, self.ball_num), fill_value=torch.nan, device=self.device)
         self.frame_counter = 0
 
         self.alpha = 0.
@@ -250,7 +253,7 @@ class FormationMultiBallForward(IsaacEnv):
             "hit": UnboundedContinuousTensorSpec(1),
             "too close": UnboundedContinuousTensorSpec(1),
             "done": UnboundedContinuousTensorSpec(1),
-            "height_penalty": UnboundedContinuousTensorSpec(self.drone.n),
+            "height_reward": UnboundedContinuousTensorSpec(self.drone.n),
             "separation_penalty": UnboundedContinuousTensorSpec(1),
             "return": UnboundedContinuousTensorSpec(1),
             "episode_len": UnboundedContinuousTensorSpec(1),
@@ -450,11 +453,11 @@ class FormationMultiBallForward(IsaacEnv):
         pos, rot = self.get_env_poses(self.drone.get_world_poses())
 
         self.cost_h = vmap(cost_formation_hausdorff)(pos, desired_p=self.formation)
-        reward_formation =  1 / (1 + torch.square(self.cost_h * 1.6))
+        reward_formation =  1 / (1 + torch.square(self.cost_h * 1.6)) * self.formation_coeff
 
         # change to velocity reward
         vel_diff = self.root_states[..., 7:10] - self.target_vel #[env_num, drone_num, 3]
-        indi_v_reward = 1 / (1 + torch.norm(vel_diff, p = 2, dim=-1)) # [env_num, drone_num]
+        indi_v_reward = 1 / (1 + torch.norm(vel_diff, p = 2, dim=-1)) * self.velocity_coeff # [env_num, drone_num]
 
         # cost if height drop or too high
         height = pos[..., 2]   # [num_envs, drone.n]
@@ -462,7 +465,7 @@ class FormationMultiBallForward(IsaacEnv):
         if height_penalty.any():
             height_penalty = torch.nonzero(height_penalty, as_tuple=True)
             self.height_penalty[height_penalty] = -1
-        height_reward = self.height_penalty # torch.sum(self.height_penalty, dim=-1, keepdim=True)
+        height_reward = self.height_penalty * self.height_coeff # torch.sum(self.height_penalty, dim=-1, keepdim=True)
 
         ball_vel = self.ball.get_linear_velocities().view(-1, self.ball_num, 3) # [env_num, ball_num, 3]
         reshape_ball_world_poses = (self.ball.get_world_poses()[0].view(-1, self.ball_num, 3), self.ball.get_world_poses()[1].view(-1, self.ball_num, 4))
@@ -515,7 +518,7 @@ class FormationMultiBallForward(IsaacEnv):
             ball_hard_reward # < ball_soft_distance, penalize a big constant # [n, k]
             + indi_b_reward # > ball_extra_soft_dictance # [n, k]
             + height_reward # [n, k]
-            + reward_formation * 2. # [n, 1]
+            + reward_formation # [n, 1]
             + reward_effort # [n, k]
             + crash_reward # [n, k]
             + hit_reward # [n, k]
@@ -559,7 +562,7 @@ class FormationMultiBallForward(IsaacEnv):
         self.stats["hit"][:] = torch.mean(hit.float())
         self.stats["too close"][:] = (too_close.float())
         self.stats["done"][:] = (done.float()).unsqueeze(1)
-        self.stats["height_penalty"].lerp_(height_reward, (1-self.alpha))
+        self.stats["height_reward"].lerp_(height_reward, (1-self.alpha))
         # self.stats["separation_penalty"].lerp_(separation_reward, (1-self.alpha))
         self.stats["return"].add_(torch.mean(reward, dim=1))
         self.stats["episode_len"][:] = self.progress_buf.unsqueeze(1)
