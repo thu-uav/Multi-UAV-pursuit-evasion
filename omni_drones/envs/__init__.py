@@ -31,6 +31,9 @@ from .spread import Spread
 from .forest import Forest
 from .payload import PayloadTrack, PayloadFlyThrough
 from .dragon import DragonHover
+from .predatorprey import PredatorPrey
+from .predatorprey_debug import PredatorPrey_debug
+from .predatorprey_cl import PredatorPrey_cl
 # from .multi_gate import MultiGate
 from .rearrange import Rearrange
 from .pinballV0 import PinballV0
