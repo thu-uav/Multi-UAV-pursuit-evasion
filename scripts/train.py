@@ -70,10 +70,11 @@ class EpisodeStats:
             (done | truncated) if truncated is not None else done.clone()
         )
         if done_or_truncated.any():
-            done_or_truncated = done_or_truncated.squeeze(-1)
+            done_or_truncated = done_or_truncated.squeeze(-1) # [env_num, 1, 1]
             self._episodes += done_or_truncated.sum().item()
             self._stats.extend(
-                tensordict.select(*self.in_keys)[done_or_truncated].clone().unbind(0)
+                # [env, n, 1]
+                tensordict.select(*self.in_keys)[:, 1:][done_or_truncated[:, :-1]].clone().unbind(0)
             )
     
     def pop(self):

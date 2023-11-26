@@ -712,21 +712,22 @@ class FormationBallForward(IsaacEnv):
         self.stats["drone_return"].add_(torch.mean(indi_v_reward.unsqueeze(-1)))
         # self.stats["soft_ball_return"].add_(torch.mean(indi_b_reward.unsqueeze(1).expand(-1, self.drone.n, 1),dim=1))
         self.stats["hard_ball_return"].add_(ball_hard_reward)
-        self.indi_ball_dist_sum += torch.mean(indi_b_dis)
-        self.stats["indi_b_dist"][:] = torch.nanmean(self.indi_ball_dist_sum / t_with_ball)
+        self.indi_ball_dist_sum += torch.mean(indi_b_dis, dim=1, keepdim=True)
+        
+        self.stats["indi_b_dist"][:] = torch.nanmean((self.indi_ball_dist_sum)*(self.ball_alarm.float().unsqueeze(1))*(self.ball_reward_flag.float().unsqueeze(1)) / t_with_ball)
         self.formation_dist_sum += torch.mean(formation_dis)
         self.stats["formation_dist"][:] = self.formation_dist_sum / self.stats["episode_len"]
         self.formation_dist_has_ball_sum += formation_dis * (self.ball_alarm.float()).unsqueeze(1) * (self.ball_reward_flag.float()).unsqueeze(1)
         self.stats["formation_has_ball_dist"][:] = torch.nanmean(self.formation_dist_has_ball_sum / t_with_ball)
         self.formation_dist_no_ball_sum += formation_dis * (1 - (self.ball_alarm.float()).unsqueeze(1) * (self.ball_reward_flag.float()).unsqueeze(1))
         self.stats["formation_no_ball_dist"][:] = torch.nanmean(self.formation_dist_no_ball_sum / t_no_ball)
-        self.stats["crash_return"].add_(torch.mean(crash_reward))
-        self.stats["hit_return"].add_(torch.mean(hit_reward))
+        self.stats["crash_return"].add_(torch.mean(crash_reward, dim=-1, keepdim=True))
+        self.stats["hit_return"].add_(torch.mean(hit_reward, dim=-1, keepdim=True))
         # print(self.stats["too_close_return"].shape)
-        self.stats["too_close_return"].add_(torch.mean(too_close_reward))
+        self.stats["too_close_return"].add_(too_close_reward)
         # print(self.stats["too_close_return"].shape)
         # raise NotImplementedError()
-        self.stats["terminated_return"].add_(torch.mean(terminated_reward))
+        self.stats["terminated_return"].add_(terminated_reward)
         
         assert self.ball_reward_flag.dtype == torch.bool
         assert self.ball_alarm.dtype == torch.bool

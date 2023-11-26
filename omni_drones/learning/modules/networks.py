@@ -286,14 +286,15 @@ class PartialAttentionEncoder(nn.Module):
             padding_mask: (batch, N)
         """
         x = self.split_embed(x)
+        original_shape = x.shape[:-2]
+        x = x.reshape(-1, x.shape[-2], x.shape[-1])
         if self.norm_first:
             x = x[:, self.query_index] + self._pa_block(self.norm1(x), key_padding_mask)
             x = x + self._ff_block(self.norm2(x))
         else:
             x = self.norm1(x[:, self.query_index] + self._pa_block(x, key_padding_mask))
             x = self.norm2(x + self._ff_block(x))
-
-        return x.mean(-2)
+        return x.mean(-2).reshape(*original_shape, -1)
 
     def _pa_block(self, x: Tensor, key_padding_mask: Optional[Tensor] = None):
         x = self.attn(

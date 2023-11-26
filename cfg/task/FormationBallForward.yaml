@@ -21,10 +21,10 @@ throw_threshold: 150
 formation_size: 1
 reward_effort_weight: 0.1
 
-terminated_reward: 10.
-crash_penalty: -10.
-too_close_penalty: -10.
-hit_penalty: -10.
+terminated_reward: 50.
+crash_penalty: -50.
+too_close_penalty: -50.
+hit_penalty: -50.
 
 
 hard_safe_distance: 0.4
