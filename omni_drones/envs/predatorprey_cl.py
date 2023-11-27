@@ -117,6 +117,10 @@ class PredatorPrey_cl(IsaacEnv):
         super().__init__(cfg, headless)
         self.drone.initialize()
 
+        # batch_size = list(self.batch_size)
+        # batch_size.append(self.drone.n)
+        # self.batch_size = torch.Size(batch_size)
+
         self.target = RigidPrimView(
             "/World/envs/env_*/target", 
             reset_xform_properties=False
@@ -187,10 +191,11 @@ class PredatorPrey_cl(IsaacEnv):
         self.curriculum_buffer.update_states()
         weights = np.ones(len(self.curriculum_buffer._state_buffer), dtype=np.float32)
         self.curriculum_buffer.update_weights(weights)
-        
+
+    def _set_specs(self):        
         drone_state_dim = self.drone.state_spec.shape.numel()
         frame_state_dim = 9 # target_pos_dim + target_vel
-        if self.time_encoding:
+        if self.cfg.task.time_encoding:
             self.time_encoding_dim = 4
             frame_state_dim += self.time_encoding_dim        
 
@@ -206,15 +211,40 @@ class PredatorPrey_cl(IsaacEnv):
             "obstacles": UnboundedContinuousTensorSpec((self.num_obstacles, 6)),
         }).to(self.device)
         
+        self.observation_spec = CompositeSpec({
+            "agents": CompositeSpec({
+                "observation": observation_spec.expand(self.drone.n),
+                "state": state_spec,
+            })
+        }).expand(self.num_envs).to(self.device)
+        self.action_spec = CompositeSpec({
+            "agents": CompositeSpec({
+                "action": torch.stack([self.drone.action_spec]*self.drone.n, dim=0),
+            })
+        }).expand(self.num_envs).to(self.device)
+        self.reward_spec = CompositeSpec({
+            "agents": CompositeSpec({
+                "reward": UnboundedContinuousTensorSpec((self.drone.n, 1)),                
+            })
+        }).expand(self.num_envs).to(self.device)
+
         self.agent_spec["drone"] = AgentSpec(
-            "drone",
-            self.drone.n,
-            observation_spec,
-            self.drone.action_spec.to(self.device),
-            UnboundedContinuousTensorSpec(1).to(self.device),
-            state_spec
-        )  
+            "drone", self.drone.n,
+            observation_key=("agents", "observation"),
+            action_key=("agents", "action"),
+            reward_key=("agents", "reward"),
+            state_key=("agents", "state")
+        )
         
+        # self.agent_spec["drone"] = AgentSpec(
+        #     "drone",
+        #     self.drone.n,
+        #     observation_spec,
+        #     self.drone.action_spec.to(self.device),
+        #     UnboundedContinuousTensorSpec(1).to(self.device),
+        #     state_spec
+        # )  
+
         # infos
         info_spec = CompositeSpec({
             "capture": UnboundedContinuousTensorSpec(1),
@@ -474,7 +504,7 @@ class PredatorPrey_cl(IsaacEnv):
                 self.v_obstacle = torch.Tensor(np.array(self.v_obstacle)).to(self.device)
         
         self.step_spec += 1
-        actions = tensordict[("action", "drone.action")]
+        actions = tensordict[("agents", "action")]
         self.effort = self.drone.apply_action(actions)
         
         target_vel = self.target.get_velocities()
@@ -574,8 +604,12 @@ class PredatorPrey_cl(IsaacEnv):
         state["obstacles"] = torch.concat([obstacle_pos, obstacles_vel], dim=-1)            # [num_envs, num_obstacles, obstacles_dim]
         return TensorDict(
             {
-                "drone.obs": obs,
-                "drone.state": state,
+                "agents": {
+                    "observation": obs,
+                    "state": state,
+                },
+                # "drone.obs": obs,
+                # "drone.state": state,
                 "info": self.info,
             },
             self.batch_size,
@@ -625,9 +659,9 @@ class PredatorPrey_cl(IsaacEnv):
         else:
             reward = speed_reward + 1.0 * catch_reward + 1.0 * distance_reward
         
-        self._tensordict["return"] += reward.unsqueeze(-1)
-        self.returns = self._tensordict["return"].sum(1)
-        self.info["return"].set_(self.returns)
+        # self._tensordict["return"] += reward.unsqueeze(-1)
+        # self.returns = self._tensordict["return"].sum(1)
+        # self.info["return"].set_(self.returns)
 
         done  = (
             (self.progress_buf >= self.max_episode_length).unsqueeze(-1)
@@ -641,8 +675,11 @@ class PredatorPrey_cl(IsaacEnv):
         self.progress_std = torch.std(self.progress_buf)
 
         return TensorDict({
-            "reward": {
-                "drone.reward": reward.unsqueeze(-1)
+            # "reward": {
+            #     "drone.reward": reward.unsqueeze(-1)
+            # },
+            "agents": {
+                "reward": reward.unsqueeze(-1)
             },
             "done": done,
         }, self.batch_size)

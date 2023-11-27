@@ -254,6 +254,7 @@ def main(cfg):
     pbar = tqdm(collector)
     env.train()
     fps = []
+    # breakpoint()
     for i, data in enumerate(pbar):
         # fps.append(collector._fps)
         info = {"env_frames": collector._frames, "rollout_fps": collector._fps}

@@ -1,3 +1,28 @@
+# exp
+num_agents: 3
+num_obstacles: 5
+obstacle_size: 0.05
+v_drone: 1.0
+v_low: 1.3
+v_high: 5.0
+v_obstacle_min: 1.0
+v_obstacle_max: 5.0
+size_min: 0.5
+size_max: 1.0
+obstacle_control_fre: 20
+fixed_config: False # if True, only eval max_config
+# model_dir: /root/OmniDrones/scripts/outputs/5obstacle_size1_speed5_obstaclespeed5_decay0_cl_various/10-17_10-51/wandb/run-20231017_105104-ykhedgrr/files/checkpoint_15500_5079367680.pt
+model_dir: null
+use_collision: 1
+use_speed_penalty: 1
+catch_radius: 0.15
+collision_radius: 0.01
+use_dynamic: False
+
+# cl
+prob_curriculum: 0.9
+prob_decay: 2
+
 # hydra.job.chdir: false
 
 headless: false
@@ -28,6 +53,6 @@ wandb:
   tags: 
 
 defaults:
-  - task: Hover
+  - task: PredatorPrey_cl
   - algo: mappo
   - _self_
