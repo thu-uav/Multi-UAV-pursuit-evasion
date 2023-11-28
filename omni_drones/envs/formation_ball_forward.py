@@ -385,6 +385,12 @@ class FormationBallForward(IsaacEnv):
         pos, rot = self.get_env_poses(self.drone.get_world_poses())
         flag = (self.progress_buf >= self.t_throw)
         should_throw = flag & (~self.flag)
+        if self.frame_counter < 2/3 * self.total_frame:
+            self.ball_speed = 3.0
+        elif self.frame_counter < 5/6 * self.total_frame:
+            self.ball_speed = 4.0
+        else:
+            self.ball_speed = 5.0
         if should_throw.any():
             should_throw = torch.nonzero(should_throw, as_tuple=True)[0]
             self.t_launched[should_throw] = self.progress_buf[should_throw]
@@ -530,9 +536,6 @@ class FormationBallForward(IsaacEnv):
     def _compute_reward_and_done(self):
         pos, rot = self.get_env_poses(self.drone.get_world_poses())
 
-        # cost_l = vmap(cost_formation_laplacian)(pos, desired_L=self.formation_L)
-        self.cost_h = vmap(cost_formation_hausdorff)(pos, desired_p=self.formation)
-        reward_formation =  1 / (1 + torch.square(self.cost_h * 1.6))
         # # Individual distance from target position
         # indi_rel_pos = pos - self.target_pos
         # indi_distance = torch.norm(indi_rel_pos[:,:,:3], p = 2, dim=-1)
@@ -545,14 +548,6 @@ class FormationBallForward(IsaacEnv):
         vel_diff = self.root_states[..., 7:10] - self.target_vel #[env_num, drone_num, 3]
         indi_v_reward = 1 / (1 + torch.norm(vel_diff, p = 2, dim=-1)) # [env_num, drone_num]
 
-        # cost if height drop or too high
-        height = pos[..., 2]   # [num_envs, drone.n]
-        height_penalty = ((height < 0.5) | (height > 2.5))
-        # if height_penalty.any():
-        #     height_penalty = torch.nonzero(height_penalty, as_tuple=True)[0]
-        self.height_penalty[height_penalty] = -1
-        height_reward = self.height_penalty.clone()
-
         ball_vel = self.ball.get_linear_velocities()
         ball_pos, ball_rot = self.get_env_poses(self.ball.get_world_poses())
         should_neglect = ((ball_vel[:,2] < -0.1) & (ball_pos[:,2] < 0.5) & (~torch.isnan(self.t_launched)) & torch.isnan(self.t_neglect)) # ball_pos[:, 2] < 1.45 #[env_num, ]
@@ -563,12 +558,13 @@ class FormationBallForward(IsaacEnv):
     
             # self.mask[should_neglect, -1] = True
         # compute ball hard reward (< self.ball_safe_distance)
+        ball_flag = (self.ball_alarm).unsqueeze(1) * (self.ball_reward_flag).unsqueeze(1)
         should_penalise = self.relative_b_dis < self.ball_safe_distance
         ball_hard_reward = torch.zeros(self.num_envs, self.drone.n, device=self.device)
         # if should_penalise.any():
         #     should_penalise = torch.nonzero(should_penalise, as_tuple=True)[0]
         ball_hard_reward[should_penalise] = -self.ball_hard_reward_coeff
-        ball_hard_reward = torch.sum(ball_hard_reward, dim=-1, keepdim=True) * (self.ball_alarm.float()).unsqueeze(1) * (self.ball_reward_flag.float()).unsqueeze(1)
+        ball_hard_reward = torch.sum(ball_hard_reward, dim=-1, keepdim=True) * ball_flag
 
         # compute ball soft reward (encourage > self.soft_ball_safe_distance)
         # indi_b_dis, indi_b_ind = torch.min(self.relative_b_dis, keepdim=True, dim=1) #[env_num, 1]
@@ -580,11 +576,18 @@ class FormationBallForward(IsaacEnv):
         indi_b_reward = (torch.clamp(indi_b_dis, min=self.ball_safe_distance, max=self.soft_ball_safe_distance) - self.soft_ball_safe_distance) * k
         # larger than soft_ball_safe_dist, apply linear
         indi_b_reward += torch.clamp(indi_b_dis-self.soft_ball_safe_distance, min=0, max=1.0) * self.ball_reward_coeff 
-        indi_b_reward *= (self.ball_alarm.float()).unsqueeze(1) * (self.ball_reward_flag.float()).unsqueeze(1)
+        indi_b_reward *= ball_flag
         
+        # cost_l = vmap(cost_formation_laplacian)(pos, desired_L=self.formation_L)
+        self.cost_h = vmap(cost_formation_hausdorff)(pos, desired_p=self.formation)
+        reward_formation_base =  1 / (1 + torch.square(self.cost_h * 1.6))
+        reward_formation = reward_formation_base * (ball_flag * self.cfg.task.has_ball_f_coeff + (~ball_flag)* self.cfg.task.no_ball_f_coeff)
         
-        
-        # reward_pos = 1 / (1 + cost_pos)
+        # cost if height drop or too high
+        height = pos[..., 2]   # [num_envs, drone.n]
+        height_penalty = ((height < 0.5) | (height > 2.5))
+        self.height_penalty[height_penalty] = -1
+        height_reward = self.height_penalty * (ball_flag * self.cfg.task.has_ball_height_coeff + (~ball_flag) * self.cfg.task.no_ball_height_coeff)
 
         reward_effort = (self.reward_effort_weight * torch.exp(-self.effort))
 

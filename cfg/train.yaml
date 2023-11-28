@@ -5,7 +5,7 @@ headless: true
 sim: ${task.sim}
 env: ${task.env}
 
-total_frames: 400_000_000 #1000_000_000
+total_frames: 600_000_000 #1000_000_000
 max_iters: -1
 eval_interval: -1
 save_interval: -1
@@ -18,7 +18,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: ${oc.select:..task.ball_speed,test}-${oc.select:..task.target_vel,none}-${oc.select:..task.stage,none}
+  run_name: ${oc.select:..task.name,test}-${oc.select:..task.target_vel,none}-${oc.select:..task.stage,none}
   job_type: train
   entity: nics_marl
   project: rapid_dodge

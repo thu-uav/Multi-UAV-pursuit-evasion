@@ -8,7 +8,7 @@ defaults:
 
 env: 
   num_envs: 512
-  env_spacing: 12
+  env_spacing: 15
   max_episode_length: 700
 
 ball_num: 4
@@ -33,11 +33,14 @@ safe_distance: 0.6
 ball_hit_distance: 0.25 # hit
 ball_safe_distance: 0.3 # hard penalty
 soft_ball_safe_distance: 0.4 # soft penalty
-ball_reward_coeff: 1. # 40
+ball_reward_coeff: 5. # 40
 ball_hard_reward_coeff: 10. # 10
+formation_coeff: 1.
+velocity_coeff: 1.
+height_coeff: 1.
 formation: regular_pentagon #dense_square # hexagon # tetragon
 
-flatten_obs: false
+flatten_obs: true
 flatten_state: false
 
 action_transform: null
