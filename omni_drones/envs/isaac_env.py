@@ -217,10 +217,11 @@ class IsaacEnv(EnvBase):
         # self.sim.step(render=False)
         self.sim._physics_sim_view.flush()
         self.progress_buf[env_ids] = 0.
-        tensordict = TensorDict({}, self.batch_size, device=self.device)
-        tensordict.update(self._compute_state_and_obs())
-        tensordict.set("truncated", (self.progress_buf > self.max_episode_length).unsqueeze(1))
-        return tensordict
+        self._tensordict["return"][env_ids] = 0.
+        # tensordict = TensorDict({}, self.batch_size, device=self.device)
+        self._tensordict.update(self._compute_state_and_obs())
+        self._tensordict.set("truncated", (self.progress_buf > self.max_episode_length).unsqueeze(1))
+        return self._tensordict
 
     @abc.abstractmethod
     def _reset_idx(self, env_ids: torch.Tensor):
@@ -379,7 +380,9 @@ class _AgentSpecView(Dict[str, AgentSpec]):
         super().__init__(env._agent_spec)
         self.env = env
 
-    def __setitem__(self, k: str, v: AgentSpec) -> None:
-        v._env = self.env
-        return self.env._agent_spec.__setitem__(k, v)
+    def __setitem__(self, __key: str, __value: AgentSpec) -> None:
+        self.env._tensordict["return"] = self.env.reward_spec.zero()
+        __value._env = self.env
+        return self.env._agent_spec.__setitem__(__key, __value)
+        
 
