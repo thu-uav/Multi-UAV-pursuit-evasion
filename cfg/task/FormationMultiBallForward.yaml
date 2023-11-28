@@ -13,8 +13,8 @@ env:
 
 ball_num: 4
 target_height: [0, 0, 1.5]
-target_vel: [0., 3.0, 0.]
-ball_speed: 5.
+target_vel: [0., 1.0, 0.]
+ball_speed: 3.
 drone_model: Hummingbird # 直径 0.34
 force_sensor: false
 time_encoding: true

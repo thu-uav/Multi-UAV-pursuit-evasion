@@ -1,26 +1,3 @@
-# MIT License
-# 
-# Copyright (c) 2023 Botian Xu, Tsinghua University
-# 
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-# 
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-# 
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
-
-
 import functorch
 import torch
 import torch.distributions as D
@@ -34,6 +11,7 @@ from omni_drones.utils.torch import euler_to_quaternion, quat_axis
 
 from tensordict.tensordict import TensorDict, TensorDictBase
 from torchrl.data import UnboundedContinuousTensorSpec, CompositeSpec
+import collections
 
 def attach_payload(parent_path):
     from omni.isaac.core import objects
@@ -60,53 +38,38 @@ def attach_payload(parent_path):
 class Hover(IsaacEnv):
     r"""
     A basic control task. The goal for the agent is to maintain a stable
-    position and heading in mid-air without drifting. This task is designed
-    to serve as a sanity check.
+    position and heading in mid-air without drifting. 
 
-    ## Observation
+    Observation
+    -----------
     The observation space consists of the following part:
 
     - `rpos` (3): The position relative to the target hovering position.
-    - `root_state` (16 + `num_rotors`): The basic information of the drone (except its position), 
+    - `root_state` (16 + num_rotors): The basic information of the drone (except its position), 
       containing its rotation (in quaternion), velocities (linear and angular), 
       heading and up vectors, and the current throttle.
     - `rheading` (3): The difference between the reference heading and the current heading.
-    - `time_encoding` (optional): The time encoding, which is a 4-dimensional vector encoding the current
-      progress of the episode.
+    - *time_encoding*:
 
-    ## Reward
-    - `pos`: Reward computed from the position error to the target position.
-    - `heading_alignment`: Reward computed from the alignment of the heading to the target heading.
-    - `up`: Reward computed from the uprightness of the drone to discourage large tilting.
-    - `spin`: Reward computed from the spin of the drone to discourage spinning.
-    - `effort`: Reward computed from the effort of the drone to optimize the
-      energy consumption.
-    - `action_smoothness`: Reward that encourages smoother drone actions, computed based on the throttle difference of the drone.
+    Reward 
+    ------
+    - pos: 
+    - heading_alignment:
+    - up:
+    - spin:
 
-    The total reward is computed as follows:
+    The total reward is 
 
-    ```{math}
-        r = r_\text{pos} + r_\text{pos} * (r_\text{up} + r_\text{spin}) + r_\text{effort} + r_\text{action_smoothness}
-    ```
-        
-    ## Episode End
-    The episode ends when the drone mishebaves, i.e., it crashes into the ground or flies too far away:
-
-    ```{math}
-        d_\text{pos} > 4 \text{ or } x^w_z < 0.2
-    ```
+    .. math:: 
     
-    or when the episode reaches the maximum length.
+        r = r_\text{pos} + r_\text{pos} * (r_\text{up} + r_\text{heading})
 
+    Episode End
+    -----------
+    - Termination: 
 
-    ## Config
-
-    | Parameter               | Type  | Default   | Description |
-    |-------------------------|-------|-----------|-------------|
-    | `drone_model`           | str   | "firefly" | Specifies the model of the drone being used in the environment. |
-    | `reward_distance_scale` | float | 1.2       | Scales the reward based on the distance between the drone and its target. |
-    | `time_encoding`         | bool  | True      | Indicates whether to include time encoding in the observation space. If set to True, a 4-dimensional vector encoding the current progress of the episode is included in the observation. If set to False, this feature is not included. |
-    | `has_payload`           | bool  | False     | Indicates whether the drone has a payload attached. If set to True, it means that a payload is attached; otherwise, if set to False, no payload is attached. |
+    Config
+    ------
 
 
     """
@@ -150,7 +113,7 @@ class Hover(IsaacEnv):
 
         self.init_pos_dist = D.Uniform(
             torch.tensor([-2.5, -2.5, 1.], device=self.device),
-            torch.tensor([2.5, 2.5, 2.5], device=self.device)
+            torch.tensor([2.5, 2.5, 3.], device=self.device)
         )
         self.init_rpy_dist = D.Uniform(
             torch.tensor([-.2, -.2, 0.], device=self.device) * torch.pi,
@@ -200,15 +163,25 @@ class Hover(IsaacEnv):
         return ["/World/defaultGroundPlane"]
 
     def _set_specs(self):
-        drone_state_dim = self.drone.state_spec.shape[-1]
-        observation_dim = drone_state_dim + 3
+        # drone_state_dim = self.drone.state_spec.shape[-1]
+        observation_dim = 3 + 3 + 4 + 3 + 3 + 3 # position, velocity, quaternion, heading, up, relative heading
+
+        if self.cfg.task.omega:
+            observation_dim += 3
+
+        if self.cfg.task.motor:
+            observation_dim += self.drone.num_rotors
 
         if self.cfg.task.time_encoding:
             self.time_encoding_dim = 4
             observation_dim += self.time_encoding_dim
 
+        self.latency = 2 if self.cfg.task.latency else 0
+        self.obs_buffer = collections.deque(maxlen=self.latency)
+
         self.observation_spec = CompositeSpec({
             "agents": CompositeSpec({
+                #"observation": UnboundedContinuousTensorSpec((1, observation_dim-6), device=self.device),   remove throttle
                 "observation": UnboundedContinuousTensorSpec((1, observation_dim), device=self.device),
                 "intrinsics": self.drone.intrinsics_spec.unsqueeze(0).to(self.device)
             })
@@ -284,6 +257,8 @@ class Hover(IsaacEnv):
 
     def _pre_sim_step(self, tensordict: TensorDictBase):
         actions = tensordict[("agents", "action")]
+        if self.cfg.task.action_noise:
+            actions *= torch.randn(actions.shape, device=self.device) * 0.1 + 1
         self.effort = self.drone.apply_action(actions)
 
     def _compute_state_and_obs(self):
@@ -294,11 +269,23 @@ class Hover(IsaacEnv):
         self.rpos = self.target_pos - self.root_state[..., :3]
         self.rheading = self.target_heading - self.root_state[..., 13:16]
         
-        obs = [self.rpos, self.root_state[..., 3:], self.rheading,]
+        obs = [self.rpos, self.root_state[..., 3:10], self.root_state[..., 13:19], self.rheading,]  # (relative) position, velocity, quaternion, heading, up, relative heading
+        if self.cfg.task.omega:
+            obs.append(self.root_state[..., 10:13])
+        if self.cfg.task.motor:
+            obs.append(self.root_state[..., 19:])
         if self.time_encoding:
             t = (self.progress_buf / self.max_episode_length).unsqueeze(-1)
+            # t = torch.zeros_like(self.progress_buf).unsqueeze(-1)
             obs.append(t.expand(-1, self.time_encoding_dim).unsqueeze(1))
         obs = torch.cat(obs, dim=-1)
+
+        if self.cfg.task.add_noise:
+            obs *= torch.randn(obs.shape, device=self.device) * 0.1 + 1 # add a gaussian noise of mean 0 and variance 0.01
+        
+        if self.latency:
+            self.obs_buffer.append(obs)
+            obs = self.obs_buffer[0]
 
         return TensorDict({
             "agents": {
@@ -321,18 +308,18 @@ class Hover(IsaacEnv):
         # uprightness
         reward_up = torch.square((self.drone.up[..., 2] + 1) / 2)
 
-        # spin reward
-        spinnage = torch.square(self.drone.vel[..., -1])
-        reward_spin = 1.0 / (1.0 + torch.square(spinnage))
+        # # spin reward
+        # spinnage = torch.square(self.drone.vel[..., -1])
+        # reward_spin = 1.0 / (1.0 + torch.square(spinnage))
 
         # effort
         reward_effort = self.reward_effort_weight * torch.exp(-self.effort)
         reward_action_smoothness = self.reward_action_smoothness_weight * torch.exp(-self.drone.throttle_difference)
 
-        assert reward_pose.shape == reward_up.shape == reward_spin.shape
+        # assert reward_pose.shape == reward_up.shape == reward_spin.shape
         reward = (
             reward_pose 
-            + reward_pose * (reward_up + reward_spin) 
+            + reward_pose * (reward_up) 
             + reward_effort 
             + reward_action_smoothness
         )
