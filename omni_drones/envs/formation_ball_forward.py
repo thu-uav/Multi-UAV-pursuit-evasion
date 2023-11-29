@@ -245,7 +245,8 @@ class FormationBallForward(IsaacEnv):
                     "obs_ball": UnboundedContinuousTensorSpec((1, 3+1+3)), # 7
                 }).expand(self.drone.n), 
                 "state": CompositeSpec({
-                    "drones": UnboundedContinuousTensorSpec((self.drone.n, state_dim))
+                    "drones": UnboundedContinuousTensorSpec((self.drone.n, state_dim)),
+                    "obs_ball": UnboundedContinuousTensorSpec((1, 3+3)), # pos + vel
                 })
             }
         }).expand(self.num_envs).to(self.device)
@@ -511,7 +512,10 @@ class FormationBallForward(IsaacEnv):
             #"mask": self.mask.unsqueeze(1).expand(self.num_envs, self.drone.n, -1).clone(),
         }, [self.num_envs, self.drone.n]) # [N, K, n_i, m_i]
 
-        state = TensorDict({"drones": self.root_states}, self.batch_size)
+        state = TensorDict({
+            "drones": self.root_states,
+            "obs_ball": torch.cat([ball_pos.unsqueeze(1), ball_vel], dim=-1),
+            }, self.batch_size)
         terminated = (self.progress_buf >= self.max_episode_length).unsqueeze(-1)
         
         separation = self.drone_pdist.min(dim=-2).values.min(dim=-2).values
