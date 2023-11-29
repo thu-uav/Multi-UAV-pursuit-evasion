@@ -21,13 +21,13 @@ wandb:
   run_name: ${oc.select:..task.name,test}-${oc.select:..task.target_vel,none}-${oc.select:..task.stage,none}
   job_type: train
   entity: nics_marl
-  project: rapid_dodge
+  project: Hover
   mode: online # set to 'disabled' when debugging locally, online
   run_id: 
   monitor_gym: True
   tags: 
 
 defaults:
-  - task: FormationBallForward
+  - task: Hover
   - algo: mappo
   - _self_
