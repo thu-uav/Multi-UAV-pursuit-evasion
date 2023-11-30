@@ -158,7 +158,7 @@ class MAPPOPolicy(object):
 
         assert self.cfg.critic_input in ("state", "obs")
         if self.cfg.critic_input == "state" and self.agent_spec.state_spec is not None:
-            self.critic_in_keys = ["state"]
+            self.critic_in_keys = [("agents", "state")]
             self.critic_out_keys = ["state_value"]
             if cfg.get("rnn", None):
                 self.critic_in_keys.extend([
@@ -231,10 +231,13 @@ class MAPPOPolicy(object):
             actor_input["is_init"] = expand_right(
             actor_input["is_init"], (*actor_input.batch_size, self.agent_spec.n)
         )
-        actor_input.batch_size = [*actor_input.batch_size, self.agent_spec.n]
-        actor_output = vmap(self.actor, in_dims=(1, 0), out_dims=1, randomness="different")(
-            actor_input, self.actor_params, deterministic=deterministic
-        )
+        actor_input.batch_size = [*actor_input.batch_size, self.agent_spec.n] # [env_num, drone_num]
+        if self.cfg.share_actor:
+            actor_output = self.actor(actor_input, self.actor_params, deterministic=deterministic)
+        else:
+            actor_output = vmap(self.actor, in_dims=(1, 0), out_dims=1, randomness="different")(
+                actor_input, self.actor_params, deterministic=deterministic
+            )
 
         tensordict.update(actor_output)
         tensordict.update(self.value_op(tensordict))
@@ -255,9 +258,12 @@ class MAPPOPolicy(object):
                 actor_input, self.actor_params, eval_action=True
             )
         else: # [N, A, *]
-            actor_output = vmap(self.actor, in_dims=(1, 0), out_dims=1)(
-                actor_input, self.actor_params, eval_action=True
-            )
+            if self.cfg.share_actor:
+                actor_output = self.actor(actor_input, self.actor_params, eval_action=True)
+            else:
+                actor_output = vmap(self.actor, in_dims=(1, 0), out_dims=1)(
+                    actor_input, self.actor_params, eval_action=True
+                )
 
         log_probs_new = actor_output[self.act_logps_name]
         if not self.cfg.actor.tanh:
