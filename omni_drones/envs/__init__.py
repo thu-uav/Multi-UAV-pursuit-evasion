@@ -26,6 +26,7 @@ from .platform import PlatformHover, PlatformFlyThrough
 from .inv_pendulum import InvPendulumHover, InvPendulumFlyThrough
 from .transport import TransportHover, TransportFlyThrough, TransportTrack
 from .formation import Formation
+from .formation_forward import FormationForward
 from .formation_dodging import FormationDodge
 from .formation_ball_forward import FormationBallForward
 from .formation_multi_ball_forward import FormationMultiBallForward

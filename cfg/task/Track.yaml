@@ -8,13 +8,14 @@ defaults:
 env:
   max_episode_length: 600
 
-drone_model: Hummingbird
+drone_model: Crazyflie
 force_sensor: false
 time_encoding: true
 intrinsics: false
 wind: false
+latency: false
 
-reset_thres: 0.5
+reset_thres: 1.
 future_traj_steps: 4
 
 reward_effort_weight: 0.1
@@ -22,4 +23,10 @@ reward_action_smoothness_weight: 0.
 reward_motion_smoothness_weight: 0.
 reward_distance_scale: 1.6
 
-action_transform: null
+action_transform: rate
+
+randomization:
+  drone:
+    train:
+      mass_scale: [1., 1.1]
+      # inertia_scale: [0.7, 1.3]

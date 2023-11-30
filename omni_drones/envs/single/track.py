@@ -37,6 +37,7 @@ from torchrl.data import UnboundedContinuousTensorSpec, CompositeSpec
 from omni.isaac.debug_draw import _debug_draw
 
 from ..utils import lemniscate, scale_time
+import collections
 
 class Track(IsaacEnv):
     r"""
@@ -169,7 +170,7 @@ class Track(IsaacEnv):
         return ["/World/defaultGroundPlane"]
     
     def _set_specs(self):
-        drone_state_dim = self.drone.state_spec.shape[-1]
+        drone_state_dim = 3 + 3 + 4 + 3 + 3 # position, velocity, quaternion, heading, up
         obs_dim = drone_state_dim + 3 * (self.future_traj_steps-1)
         if self.time_encoding:
             self.time_encoding_dim = 4
@@ -213,6 +214,9 @@ class Track(IsaacEnv):
         self.observation_spec["stats"] = stats_spec
         self.info = info_spec.zero()
         self.stats = stats_spec.zero()
+
+        self.latency = 2 if self.cfg.task.latency else 0
+        self.obs_buffer = collections.deque(maxlen=self.latency)
 
     def _reset_idx(self, env_ids: torch.Tensor):
         self.drone._reset_idx(env_ids)
@@ -271,7 +275,7 @@ class Track(IsaacEnv):
         self.rpos = self.target_pos - self.root_state[..., :3]
         obs = [
             self.rpos.flatten(1).unsqueeze(1),
-            self.root_state[..., 3:],
+            self.root_state[..., 3:10], self.root_state[..., 13:19],
         ]
         if self.time_encoding:
             t = (self.progress_buf / self.max_episode_length).unsqueeze(-1)
@@ -282,6 +286,10 @@ class Track(IsaacEnv):
         obs = torch.cat(obs, dim=-1)
 
         self.stats["action_smoothness"].lerp_(-self.drone.throttle_difference, (1-self.alpha))
+        
+        if self.latency:
+            self.obs_buffer.append(obs)
+            obs = self.obs_buffer[0]
 
         return TensorDict({
             "agents": {
