@@ -109,13 +109,13 @@ For usage and more details, please refer to the [documentation](https://omnidron
 
 Note that for this ``deploy`` branch, it currently supports following environments:
 
-| Environment              |
-|-------------------|
-| Hover             |
-| Track             |
-| InvPendulumHover  |
-| InvPendulumTrack  |
-| PayloadTrack      |
+| Environment       | Single-agent or Multi-agent task |
+|-------------------|----------------------------------|
+| Hover             | Single                           |
+| Track             | Single                           |
+| InvPendulumHover  | Single                           |
+| InvPendulumTrack  | Single                           |
+| PayloadTrack      | Single                           |
  
 
 ## Citation
