@@ -17,16 +17,16 @@
 
 ### 1. Isaac Sim
 
-Download the [Omniverse Isaac Sim (local version/in the cloud version)](https://developer.nvidia.com/isaac-sim) and install the desired Isaac Sim release following the [official document](https://docs.omniverse.nvidia.com/isaacsim/latest/installation/install_workstation.html). *Note that Omniverse Isaac Sim supports multi-user access, eliminating the need for repeated downloads and installations across different user accounts.*
+Download the [Omniverse Isaac Sim (local version/in the cloud version)](https://developer.nvidia.com/isaac-sim) and install the desired Isaac Sim release **(version 2022.2.0)** following the [official document](https://docs.omniverse.nvidia.com/isaacsim/latest/installation/install_workstation.html). *Note that Omniverse Isaac Sim supports multi-user access, eliminating the need for repeated downloads and installations across different user accounts.*
 
 Set the following environment variables to your ``~/.bashrc`` or ``~/.zshrc`` files :
 
 ```
 # Isaac Sim root directory
-export ISAACSIM_PATH="${HOME}/.local/share/ov/pkg/isaac_sim-*"
+export ISAACSIM_PATH="${HOME}/.local/share/ov/pkg/isaac_sim-2022.2.0"
 ```
 
-where ``*`` corresponds to the Isaac Sim version. 
+*(Currently we use isaac_sim-2022.2.0. Whether other versions can work or not is not guaranteed.)*
 
 After adding the environment variable, apply the changes by running:
 ```
