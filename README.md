@@ -79,7 +79,7 @@ pip install -e .
 ```
 # at OmniDrones/
 cd scripts
-python train.py headless=true wandb.mode=disabled total_frames=50000
+python train.py headless=true wandb.mode=disabled total_frames=50000 task=Hover
 ```
 
 ### 5. Working with VSCode
@@ -113,7 +113,6 @@ Note that for this ``deploy`` branch, it currently supports following environmen
 |-------------------|
 | Hover             |
 | Track             |
-| PlatformHover     |
 | InvPendulumHover  |
 | InvPendulumTrack  |
 | PayloadTrack      |

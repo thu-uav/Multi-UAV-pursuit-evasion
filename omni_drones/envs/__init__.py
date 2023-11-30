@@ -22,7 +22,6 @@
 
 
 from .single import Hover, Track
-from .platform import PlatformHover
 from .inv_pendulum import InvPendulumHover, InvPendulumTrack
 from .payload import PayloadTrack
 
