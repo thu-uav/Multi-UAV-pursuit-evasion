@@ -55,7 +55,7 @@ python -c "import torch; print(torch.__path__)"
 ```
 
 ### 3. Third Party Packages
-OmniDrones requires specific versions of the `tensordict` and `torchrl` packages. For the **deploy** branch, it supports `tensordict` version 0.1.2+5e6205c and `torchrl` version 0.1.1+e39e701. 
+OmniDrones requires specific versions of the `tensordict` and `torchrl` packages. For the ``deploy`` branch, it supports `tensordict` version 0.1.2+5e6205c and `torchrl` version 0.1.1+e39e701. 
 
 We manage these two packages using Git submodules to ensure that the correct versions are used. To initialize and update the submodules, follow these steps:
 
@@ -79,7 +79,7 @@ pip install -e .
 ```
 # at OmniDrones/
 cd scripts
-python train.py headless=true wandb.mode=disabled
+python train.py headless=true wandb.mode=disabled total_frames=50000
 ```
 
 ### 5. Working with VSCode
@@ -107,6 +107,17 @@ and edit ``.vscode/settings.json`` as:
 
 For usage and more details, please refer to the [documentation](https://omnidrones.readthedocs.io/en/latest/).
 
+Note that for this ``deploy`` branch, it currently supports following environments:
+
+| Environment              |
+|-------------------|
+| Hover             |
+| Track             |
+| PlatformHover     |
+| InvPendulumHover  |
+| InvPendulumTrack  |
+| PayloadTrack      |
+ 
 
 ## Citation
 
