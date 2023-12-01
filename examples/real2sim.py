@@ -9,9 +9,10 @@ from omegaconf import OmegaConf
 from omni_drones import init_simulation_app
 from tensordict import TensorDict
 import pandas as pd
+import pdb
 
 rosbags = [
-    '/home/cf/ros2_ws/rosbags/goodrl.csv',
+    '/root/OmniDrones/realdata/crazyflie/takeoff.csv',
     # '/home/cf/ros2_ws/rosbags/takeoff.csv',
     # '/home/cf/ros2_ws/rosbags/square.csv',
     # '/home/cf/ros2_ws/rosbags/rl.csv',
@@ -19,6 +20,7 @@ rosbags = [
 
 @hydra.main(version_base=None, config_path=".", config_name="real2sim")
 def main(cfg):
+    pdb.set_trace()
     OmegaConf.resolve(cfg)
     simulation_app = init_simulation_app(cfg)
     print(OmegaConf.to_yaml(cfg))
@@ -64,6 +66,7 @@ def main(cfg):
     drone.initialize()
     drone.base_link.set_masses(torch.tensor([0.03785]).to(sim.device))
 
+    pdb.set_trace()
     controller = RateController(9.81, drone.params).to(sim.device)
     max_thrust = controller.max_thrusts.sum(-1)
 
