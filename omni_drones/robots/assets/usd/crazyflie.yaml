@@ -30,7 +30,7 @@ rotor_configuration:
   - 2315
   - 2315
   - 2315
-  moment_constants:
+  moment_constants: # km
   - 7.24e-10
   - 7.24e-10
   - 7.24e-10
