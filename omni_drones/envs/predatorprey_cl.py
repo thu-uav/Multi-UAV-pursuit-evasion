@@ -117,10 +117,6 @@ class PredatorPrey_cl(IsaacEnv):
         super().__init__(cfg, headless)
         self.drone.initialize()
 
-        # batch_size = list(self.batch_size)
-        # batch_size.append(self.drone.n)
-        # self.batch_size = torch.Size(batch_size)
-
         self.target = RigidPrimView(
             "/World/envs/env_*/target", 
             reset_xform_properties=False

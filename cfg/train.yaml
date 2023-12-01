@@ -36,7 +36,7 @@ env: ${task.env}
 # save_interval: -1
 # seed: 0
 total_frames: 100_000_000_000
-max_iters: 5000
+max_iters: 30000
 eval_interval: 100
 save_interval: 100
 seed: 1
