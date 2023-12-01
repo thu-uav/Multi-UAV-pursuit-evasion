@@ -70,10 +70,11 @@ class EpisodeStats:
             (done | truncated) if truncated is not None else done.clone()
         )
         if done_or_truncated.any():
-            done_or_truncated = done_or_truncated.squeeze(-1)
+            done_or_truncated = done_or_truncated.squeeze(-1) # [env_num, 1, 1]
             self._episodes += done_or_truncated.sum().item()
             self._stats.extend(
-                tensordict.select(*self.in_keys)[done_or_truncated].clone().unbind(0)
+                # [env, n, 1]
+                tensordict.select(*self.in_keys)[:, 1:][done_or_truncated[:, :-1]].clone().unbind(0)
             )
     
     def pop(self):
@@ -125,7 +126,7 @@ def main(cfg):
     if cfg.task.get("flatten_obs", False):
         transforms.append(ravel_composite(base_env.observation_spec, ("agents", "observation")))
     if cfg.task.get("flatten_state", False):
-        transforms.append(ravel_composite(base_env.observation_spec, "state"))
+        transforms.append(ravel_composite(base_env.observation_spec, ("agents", "state")))
     if (
         cfg.task.get("flatten_intrinsics", True)
         and ("agents", "intrinsics") in base_env.observation_spec.keys(True)
@@ -237,7 +238,7 @@ def main(cfg):
         }
 
         info = {
-            "eval/stats." + k: torch.mean(v.float()).item() 
+            "eval/stats." + k: torch.nanmean(v.float()).item() 
             for k, v in traj_stats.items()
         }
 

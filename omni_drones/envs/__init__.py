@@ -23,7 +23,7 @@
 
 from .single import Hover, Track, TrackV1
 from .platform import PlatformHover, PlatformFlyThrough
-from .inv_pendulum import InvPendulumHover, InvPendulumFlyThrough
+from .inv_pendulum import InvPendulumHover, InvPendulumFlyThrough, InvPendulumTrack
 from .transport import TransportHover, TransportFlyThrough, TransportTrack
 from .formation import Formation
 from .formation_dodging import FormationDodge
@@ -38,9 +38,5 @@ from .predatorprey_cl import PredatorPrey_cl
 from .rearrange import Rearrange
 from .pinballV0 import PinballV0
 from .pinball_multiV0 import PingPongMultiV0
-from .isaac_env import IsaacEnv
 
-try:
-    from .velocity import VelocityEnv
-except:
-    pass
+from .isaac_env import IsaacEnv

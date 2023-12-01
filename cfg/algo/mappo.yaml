@@ -31,7 +31,7 @@ actor:
   attn_encoder: PartialAttentionEncoder # if applicable
   use_orthogonal: true
 
-  tanh: true
+  tanh: false
 
   # rnn:
   #   cls: gru

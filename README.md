@@ -17,16 +17,16 @@
 
 ### 1. Isaac Sim
 
-Download the [Omniverse Isaac Sim (local version/in the cloud version)](https://developer.nvidia.com/isaac-sim) and install the desired Isaac Sim release following the [official document](https://docs.omniverse.nvidia.com/isaacsim/latest/installation/install_workstation.html). *Note that Omniverse Isaac Sim supports multi-user access, eliminating the need for repeated downloads and installations across different user accounts.*
+Download the [Omniverse Isaac Sim (local version/in the cloud version)](https://developer.nvidia.com/isaac-sim) and install the desired Isaac Sim release **(version 2022.2.0)** following the [official document](https://docs.omniverse.nvidia.com/isaacsim/latest/installation/install_workstation.html). *Note that Omniverse Isaac Sim supports multi-user access, eliminating the need for repeated downloads and installations across different user accounts.*
 
 Set the following environment variables to your ``~/.bashrc`` or ``~/.zshrc`` files :
 
 ```
 # Isaac Sim root directory
-export ISAACSIM_PATH="${HOME}/.local/share/ov/pkg/isaac_sim-*"
+export ISAACSIM_PATH="${HOME}/.local/share/ov/pkg/isaac_sim-2022.2.0"
 ```
 
-where ``*`` corresponds to the Isaac Sim version. 
+*(Currently we use isaac_sim-2022.2.0. Whether other versions can work or not is not guaranteed.)*
 
 After adding the environment variable, apply the changes by running:
 ```
@@ -55,7 +55,7 @@ python -c "import torch; print(torch.__path__)"
 ```
 
 ### 3. Third Party Packages
-OmniDrones requires specific versions of the `tensordict` and `torchrl` packages. For the **deploy** branch, it supports `tensordict` version 0.1.2+5e6205c and `torchrl` version 0.1.1+e39e701. 
+OmniDrones requires specific versions of the `tensordict` and `torchrl` packages. For the ``deploy`` branch, it supports `tensordict` version 0.1.2+5e6205c and `torchrl` version 0.1.1+e39e701. 
 
 We manage these two packages using Git submodules to ensure that the correct versions are used. To initialize and update the submodules, follow these steps:
 
@@ -79,7 +79,7 @@ pip install -e .
 ```
 # at OmniDrones/
 cd scripts
-python train.py headless=true wandb.mode=disabled
+python train.py headless=true wandb.mode=disabled total_frames=50000 task=Hover
 ```
 
 ### 5. Working with VSCode
@@ -107,6 +107,16 @@ and edit ``.vscode/settings.json`` as:
 
 For usage and more details, please refer to the [documentation](https://omnidrones.readthedocs.io/en/latest/).
 
+Note that for this ``deploy`` branch, it currently supports following environments:
+
+| Environment       | Single-agent or Multi-agent task |
+|-------------------|----------------------------------|
+| Hover             | Single                           |
+| Track             | Single                           |
+| InvPendulumHover  | Single                           |
+| InvPendulumTrack  | Single                           |
+| PayloadTrack      | Single                           |
+ 
 
 ## Citation
 
