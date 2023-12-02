@@ -24,9 +24,9 @@ reward_motion_smoothness_weight: 0.
 reward_distance_scale: 1.6
 
 action_transform: rate
-
+history: true
 randomization:
   drone:
     train:
-      mass_scale: [1., 1.1]
+      mass_scale: [1., 1.15]
       # inertia_scale: [0.7, 1.3]

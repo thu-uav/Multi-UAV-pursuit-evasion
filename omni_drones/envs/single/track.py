@@ -222,7 +222,7 @@ class Track(IsaacEnv):
         self.drone._reset_idx(env_ids)
         self.traj_c[env_ids] = self.traj_c_dist.sample(env_ids.shape)
         self.traj_rot[env_ids] = euler_to_quaternion(self.traj_rpy_dist.sample(env_ids.shape))
-        self.traj_scale[env_ids] = self.traj_scale_dist.sample(env_ids.shape)
+        self.traj_scale[env_ids] = self.traj_scale_dist.sample(env_ids.shape) / 4 # for crazyflie, traj should be smaller
         traj_w = self.traj_w_dist.sample(env_ids.shape)
         self.traj_w[env_ids] = torch.randn_like(traj_w).sign() * traj_w
 

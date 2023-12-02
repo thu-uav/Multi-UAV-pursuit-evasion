@@ -226,6 +226,9 @@ class FormationForward(IsaacEnv):
             "crash_return": UnboundedContinuousTensorSpec(1),
             "too_close_return": UnboundedContinuousTensorSpec(1),
             "terminated_return": UnboundedContinuousTensorSpec(1),
+            "height_reward": UnboundedContinuousTensorSpec(self.drone.n),
+            "velocity_reward": UnboundedContinuousTensorSpec(self.drone.n),
+            "formation_reward": UnboundedContinuousTensorSpec(1),
         }).expand(self.num_envs).to(self.device)
         info_spec = CompositeSpec({
             "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13)),
@@ -363,8 +366,8 @@ class FormationForward(IsaacEnv):
         ).unsqueeze(1).expand(-1, self.drone.n, 1) 
         + (indi_v_reward
             + height_reward
-            + reward_effort
-            + crash_reward).unsqueeze(-1)
+            + reward_effort).unsqueeze(-1)
+            # + crash_reward
 
         formation_dis = compute_formation_dis(pos, self.formation) #[env_num, 1]
 
@@ -385,7 +388,10 @@ class FormationForward(IsaacEnv):
         self.stats["crash_return"].add_(torch.mean(crash_reward, dim=-1, keepdim=True))
         self.stats["too_close_return"].add_(too_close_reward)
         self.stats["terminated_return"].add_(terminated_reward)
-        
+        self.stats["velocity_reward"].lerp_(indi_v_reward, (1-self.alpha))
+        self.stats["formation_reward"].lerp_(reward_formation, (1-self.alpha))
+        self.stats["height_reward"].lerp_(height_reward, (1-self.alpha))
+
         return TensorDict(
             {
                 "agents": {

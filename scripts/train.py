@@ -134,7 +134,7 @@ def main(cfg):
         transforms.append(ravel_composite(base_env.observation_spec, ("agents", "intrinsics"), start_dim=-1))
 
     if cfg.task.get("history", False):
-        transforms.append(History([("agents", "observation")]))
+        transforms.append(History([("agents", "observation")], steps=4))
     
     # optionally discretize the action space or use a controller
     action_transform: str = cfg.task.get("action_transform", None)
