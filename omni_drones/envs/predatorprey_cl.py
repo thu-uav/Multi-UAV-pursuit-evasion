@@ -332,18 +332,16 @@ class PredatorPrey_cl(IsaacEnv):
             )
         
         for idx in range(self.num_capsules):
-            cap = self.cfg.capsules['cap' + str(idx)]
-            if cap.position is not None:
-                position = (cap.position.x, cap.position.y, cap.position.z)
-            if cap.translation is not None:
+            cap = self.cfg.capsules['cap{}'.format(idx)]
+            translation = orientation = None
+            if 'translation' in cap:
                 translation = (cap.translation.x, cap.translation.y, cap.translation.z)
-            if cap.orientation is not None:
+            if 'orientation' in cap:
                 orientation = (cap.orientation.qw, cap.orientation.qx, cap.orientation.qy, cap.orientation.qz)
             attributes = {'axis': cap.axis, 'radius': cap.radius, 'height': cap.height}
             create_obstacle(
-                "/World/envs/env_0/obstacle_0" + str(idx), 
+                "/World/envs/env_0/obstacle_0{}".format(idx), 
                 prim_type="Capsule",
-                position=position,
                 translation=translation,
                 orientation=orientation,
                 attributes=attributes
@@ -444,10 +442,13 @@ class PredatorPrey_cl(IsaacEnv):
                 torch.tensor([-size, -size, 0.0], device=self.device),
                 torch.tensor([size, size, 2 * size], device=self.device)
             )
-            obstacle_pos.append(torch.concat([
-                obstacles_pos_dist.sample((1, self.num_obstacles - self.num_capsules)),
-                torch.tensor([[[0., 0., 1.2]]], device=self.device),
-                torch.tensor([[[0., 0., 2.2]]], device=self.device)], dim=1))
+            obstacle_pos_temp = obstacles_pos_dist.sample((1, self.num_obstacles - self.num_capsules))
+            for idx in range(self.num_capsules):
+                cap = self.cfg.capsules['cap{}'.format(idx)]
+                translation = [[[cap.translation.x, cap.translation.y, cap.translation.z]]]
+                obstacle_pos_temp = torch.concat(
+                    (obstacle_pos_temp, torch.tensor(translation, device=self.device)), dim=1)
+            obstacle_pos.append(obstacle_pos_temp)
 
         drone_pos = torch.concat(drone_pos, dim=0).type(torch.float32)
         target_pos = torch.stack(target_pos, dim=0).type(torch.float32)

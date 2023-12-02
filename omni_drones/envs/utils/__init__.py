@@ -59,16 +59,16 @@ def create_obstacle(
         attributes (dict, optional): Key-value pairs of prim attributes to set.
     """
     prim = prim_utils.create_prim(
-        prim_path = prim_path,
-        prim_type = prim_type,
-        position = position,
-        translation = translation,
-        orientation = orientation,
-        scale = scale,
-        usd_path = usd_path,
-        semantic_label = semantic_label,
-        semantic_type = semantic_type,
-        attributes = attributes,
+        prim_path=prim_path,
+        prim_type=prim_type,
+        position=position,
+        translation=translation,
+        orientation=orientation,
+        scale=scale,
+        usd_path=usd_path,
+        semantic_label=semantic_label,
+        semantic_type=semantic_type,
+        attributes=attributes,
     )
     UsdPhysics.RigidBodyAPI.Apply(prim)
     UsdPhysics.CollisionAPI.Apply(prim)
