@@ -278,6 +278,7 @@ class PredatorPrey_cl(IsaacEnv):
     def _design_scene(self):
         self.num_agents = self.cfg.num_agents
         self.num_obstacles = self.cfg.num_obstacles
+        self.num_capsules = self.cfg.capsules.num
         self.obstacle_size = self.cfg.obstacle_size
         self.size_min = self.cfg.size_min
         self.size_max = self.cfg.size_max
@@ -317,8 +318,10 @@ class PredatorPrey_cl(IsaacEnv):
             torch.tensor([-size, -size, 0.0], device=self.device),
             torch.tensor([size, size, 0.0], device=self.device)
         )
-        obstacle_pos = random_pos_dist.sample(obstacle_pos.shape[:-1])
-        for idx in range(self.num_obstacles):
+        obstacle_pos[:-self.num_capsules] = random_pos_dist.sample(
+            obstacle_pos[:-self.num_capsules].shape[:-1])
+
+        for idx in range(self.num_obstacles - self.num_capsules):
             objects.DynamicSphere(
                 prim_path="/World/envs/env_0/obstacle_{}".format(idx),
                 name="obstacle_{}".format(idx),
@@ -327,6 +330,25 @@ class PredatorPrey_cl(IsaacEnv):
                 color=torch.tensor([1., 1., 1.]),
                 mass=1.0
             )
+        
+        for idx in range(self.num_capsules):
+            cap = self.cfg.capsules['cap' + str(idx)]
+            if cap.position is not None:
+                position = (cap.position.x, cap.position.y, cap.position.z)
+            if cap.translation is not None:
+                translation = (cap.translation.x, cap.translation.y, cap.translation.z)
+            if cap.orientation is not None:
+                orientation = (cap.orientation.qw, cap.orientation.qx, cap.orientation.qy, cap.orientation.qz)
+            attributes = {'axis': cap.axis, 'radius': cap.radius, 'height': cap.height}
+            create_obstacle(
+                "/World/envs/env_0/obstacle_0" + str(idx), 
+                prim_type="Capsule",
+                position=position,
+                translation=translation,
+                orientation=orientation,
+                attributes=attributes
+            )
+            obstacle_pos[-self.num_capsules + idx] = torch.tensor(translation, device=self.device)
         
         objects.VisualCuboid(
             prim_path="/World/envs/env_0/ground",
@@ -422,7 +444,10 @@ class PredatorPrey_cl(IsaacEnv):
                 torch.tensor([-size, -size, 0.0], device=self.device),
                 torch.tensor([size, size, 2 * size], device=self.device)
             )
-            obstacle_pos.append(obstacles_pos_dist.sample((1, self.num_obstacles)))
+            obstacle_pos.append(torch.concat([
+                obstacles_pos_dist.sample((1, self.num_obstacles - self.num_capsules)),
+                torch.tensor([[[0., 0., 1.2]]], device=self.device),
+                torch.tensor([[[0., 0., 2.2]]], device=self.device)], dim=1))
 
         drone_pos = torch.concat(drone_pos, dim=0).type(torch.float32)
         target_pos = torch.stack(target_pos, dim=0).type(torch.float32)
