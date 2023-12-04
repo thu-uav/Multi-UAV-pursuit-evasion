@@ -113,6 +113,62 @@ class CurriculumBuffer(object):
         return [list(x) for x in result]
 
 class PredatorPrey_cl(IsaacEnv): 
+    """
+    PredatorPrey environment designed for curriculum learning.
+
+    Internal functions:
+
+        _set_specs(self): 
+            Set environment specifications for observations, states, actions, 
+            rewards, statistics, infos, and initialize agent specifications
+
+        _design_scenes(self): 
+            Generate simulation scene and initialize all required objects
+            
+        _reset_idx(self, env_ids: torch.Tensor): 
+            Reset poses of all objects, statistics and infos
+
+        _update_curriculum(self, capture):
+            Determine whether the capture result matches requirements and 
+            insert corresponding states and weights into curriculum buffer
+
+        _pre_sim_step(self, tensordict: TensorDictBase):
+            Process need to be completed before each step of simulation, 
+            including setting the velocities and poses of target and obstacles
+
+        _compute_state_and_obs(self):
+            Obtain the observations and states tensor from drone state data
+            Observations:
+                state_self:     [relative position of target,       ==> torch.Size([num_envs, num_drone, 1, obs_dim(35)])
+                                 absolute velocity of target (expanded to n),
+                                 states of all drones,
+                                 identity matrix]                   
+                state_others:   [relative positions of drones]      ==> torch.Size([num_envs, num_drone, num_drone-1, pos_dim(3)])
+                state_frame:    [absolute position of target,       ==> torch.Size([num_envs, num_drone, 1, frame_dim(13)])
+                                 absolute velocity of target,
+                                 time progress] (expanded to n)     
+                obstacles:      [relative position of obstacles,    ==> torch.Size([num_envs, num_drone, num_obstacles, posvel_dim(6)])
+                                 absolute velocity of obstacles (expanded to n)]
+            States:
+                state_drones:   "state_self" in Obs                 ==> torch.Size([num_envs, num_drone, obs_dim(35)])
+                state_frame:    "state_frame" in Obs (unexpanded)   ==> torch.Size([num_envs, 1, frame_dim(13)])
+                obstacles:      [absolute position of obstacles,    ==> torch.Size([num_envs, num_obstacles, posvel_dim(6)])
+                                 absolute velocity of obstacles]
+
+        _compute_reward_and_done(self):
+            Obtain the reward value and done flag from the position of drones, target and obstacles
+            Reward = speed_rw + catch_rw + distance_rw + collision_rw
+                speed:      if use speed penalty, then punish speed exceeding cfg.v_drone
+                catch:      reward distance within capture radius 
+                distance:   punish distance outside capture radius by the minimum distance
+                collision:  if use collision penalty, then punish distance to obstacles within collision radius
+            Done = whether or not progress_buf (increases 1 every step) reaches max_episode_length
+
+        _get_dummy_policy_prey(self):
+            Get forces (in 3 directions) for the target to move
+            Force = f_from_predators + f_from_arena_edge + f_from_obstacles
+
+    """
     def __init__(self, cfg, headless):
         super().__init__(cfg, headless)
         self.drone.initialize()
@@ -280,6 +336,7 @@ class PredatorPrey_cl(IsaacEnv):
         self.num_obstacles = self.cfg.num_obstacles
         self.num_capsules = self.cfg.capsules.num
         self.obstacle_size = self.cfg.obstacle_size
+        self.detect_range = self.cfg.detect_range
         self.size_min = self.cfg.size_min
         self.size_max = self.cfg.size_max
 
@@ -473,7 +530,7 @@ class PredatorPrey_cl(IsaacEnv):
         target_vel = self.target.get_velocities()
         self.target.set_velocities(2 * torch.rand_like(target_vel) - 1, self.env_ids)
 
-        # obstalces
+        # obstacles
         self.obstacles.set_world_poses(
             (obstacle_pos + self.envs_positions[env_ids].unsqueeze(1))[env_ids], env_indices=env_ids
         )
