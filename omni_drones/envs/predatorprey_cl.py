@@ -138,7 +138,7 @@ class PredatorPrey_cl(IsaacEnv):
 
         _compute_state_and_obs(self):
             Obtain the observations and states tensor from drone state data
-            Observations:
+            Observations:   ==> torch.Size([num_envs, num_drone, *, *]) ==> each of dim1 is sent to a separate drone
                 state_self:     [relative position of target,       ==> torch.Size([num_envs, num_drone, 1, obs_dim(35)])
                                  absolute velocity of target (expanded to n),
                                  states of all drones,
@@ -149,7 +149,7 @@ class PredatorPrey_cl(IsaacEnv):
                                  time progress] (expanded to n)     
                 obstacles:      [relative position of obstacles,    ==> torch.Size([num_envs, num_drone, num_obstacles, posvel_dim(6)])
                                  absolute velocity of obstacles (expanded to n)]
-            States:
+            States:         ==> torch.Size([num_envs, *, *])
                 state_drones:   "state_self" in Obs                 ==> torch.Size([num_envs, num_drone, obs_dim(35)])
                 state_frame:    "state_frame" in Obs (unexpanded)   ==> torch.Size([num_envs, 1, frame_dim(13)])
                 obstacles:      [absolute position of obstacles,    ==> torch.Size([num_envs, num_obstacles, posvel_dim(6)])
