@@ -66,7 +66,6 @@ def main(cfg):
     drone.initialize()
     drone.base_link.set_masses(torch.tensor([0.03785]).to(sim.device))
 
-    pdb.set_trace()
     controller = RateController(9.81, drone.params).to(sim.device)
     max_thrust = controller.max_thrusts.sum(-1)
 
@@ -116,10 +115,11 @@ def main(cfg):
         drone_state = drone.get_state()[..., :13]
         cmd_thrust = torch.tensor([current_state['cmd.thrust']]).to(device=sim.device).float()
         cmd_rate = torch.tensor([current_state['cmd.r_rate'], current_state['cmd.p_rate'], current_state['cmd.y_rate']]).to(device=sim.device).float()
+        pdb.set_trace()
         # print(cmd_thrust.unsqueeze(0) / (2**16) * max_thrust)
         action = controller(
             drone_state.squeeze(0), 
-            target_rate=cmd_rate.unsqueeze(0) / 180 * 3.1415,
+            target_rate=cmd_rate.unsqueeze(0) / 180 * torch.pi,
             target_thrust=cmd_thrust.unsqueeze(0) / (2**16) * max_thrust
         )
 

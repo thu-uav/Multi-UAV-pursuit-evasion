@@ -31,6 +31,7 @@ class RotorGroup(nn.Module):
         force_constants = torch.as_tensor(rotor_config["force_constants"])
         moment_constants = torch.as_tensor(rotor_config["moment_constants"])
         max_rot_vels = torch.as_tensor(rotor_config["max_rotation_velocities"]).float()
+        time_constant = torch.as_tensor(rotor_config["time_constant"]).float()
         self.num_rotors = len(force_constants)
 
         self.dt = dt
@@ -43,8 +44,8 @@ class RotorGroup(nn.Module):
         self.throttle = nn.Parameter(torch.zeros(self.num_rotors))
         self.directions = nn.Parameter(torch.as_tensor(rotor_config["directions"]).float())
 
-        self.tau_up = nn.Parameter(0.43 * torch.ones(self.num_rotors))
-        self.tau_down = nn.Parameter(0.43 * torch.ones(self.num_rotors))
+        self.tau_up = nn.Parameter(time_constant * torch.ones(self.num_rotors))
+        self.tau_down = nn.Parameter(time_constant * torch.ones(self.num_rotors))
 
         self.f = torch.square
         self.f_inv = torch.sqrt

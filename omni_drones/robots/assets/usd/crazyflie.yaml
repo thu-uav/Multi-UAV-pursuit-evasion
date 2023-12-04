@@ -1,3 +1,4 @@
+update_sim: True
 name: crazyflie
 inertia:
   xx: 1.4e-5
@@ -41,3 +42,4 @@ rotor_configuration:
   - 2.35619449
   - 3.92699082
   - 5.49778714
+  time_constant: 0.43
