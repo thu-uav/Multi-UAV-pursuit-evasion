@@ -7,13 +7,13 @@ env: ${task.env}
 
 total_frames: 300_000_000 #1000_000_000
 max_iters: -1
-eval_interval: -1
+eval_interval: 100
 save_interval: -1
 seed: 0
 
 viewer:
   resolution: [960, 720]
-  eye: [8, 0., 6.]
+  eye: [2., 0., 2.]
   lookat: [0., 0., 1.]
 
 wandb:
