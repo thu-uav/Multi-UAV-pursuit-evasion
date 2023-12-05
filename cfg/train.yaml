@@ -18,16 +18,16 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: ${oc.select:..task.name,test}-${oc.select:..task.target_vel,none}-${oc.select:..task.stage,none}
+  run_name: Hover_crazyflie_origin_withrandom
   job_type: train
-  entity: sapios
-  project: Track
-  mode: online # set to 'disabled' when debugging locally, online
+  entity: chenjy
+  project: Hover
+  mode: disabled # set to 'disabled' when debugging locally, online
   run_id: 
   monitor_gym: True
   tags: 
 
 defaults:
-  - task: Track
+  - task: Hover
   - algo: mappo
   - _self_
