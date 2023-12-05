@@ -18,11 +18,11 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: Hover_crazyflie_origin_withrandom
+  run_name: Hover_crazyflie_origin_withrandom_wolatency
   job_type: train
   entity: chenjy
   project: Hover
-  mode: disabled # set to 'disabled' when debugging locally, online
+  mode: online # set to 'disabled' when debugging locally, online
   run_id: 
   monitor_gym: True
   tags: 

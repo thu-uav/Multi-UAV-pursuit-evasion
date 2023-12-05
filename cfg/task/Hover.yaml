@@ -25,7 +25,7 @@ time_encoding: true
 # sim2real options
 add_noise: false
 action_filter: false
-latency: true
+latency: false
 action_noise: false
 
 randomization:
