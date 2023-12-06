@@ -28,11 +28,11 @@ action_filter: false
 latency: false
 action_noise: false
 
-randomization:
-  drone:
-    train:
-      mass_scale: [1., 1.3]
-      inertia_scale: [0.7, 1.3]
+# randomization:
+#   drone:
+#     train:
+#       mass_scale: [1., 1.3]
+#       inertia_scale: [0.7, 1.3]
       # t2w_scale: [0.7, 1.3]
       # f2m_scale: [0.7, 1.3]
       # drag_coef_scale: [0, 0.3]
