@@ -19,6 +19,7 @@ viewer:
 wandb:
   group: ${oc.select:..task.name}
   run_name: Hover_crazyflie_origin_withrandom_wolatency
+  # run_name: debug
   job_type: train
   entity: chenjy
   project: Hover
