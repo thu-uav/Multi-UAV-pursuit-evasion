@@ -28,7 +28,7 @@ def loss_function(obs_sim, obs_real) -> float:
     r"""Computes the distance between observations from sim and real."""
 
     # angles
-    e_rpy = obs_sim['quat'] - obs_real['quat']
+    e_rpy = 10 * (obs_sim['quat'] - obs_real['quat'])
 
     # angle rates
     err_rpy_dot = obs_sim['omega'] - obs_real['omega']
@@ -37,7 +37,7 @@ def loss_function(obs_sim, obs_real) -> float:
     e_xyz = 100 * (obs_sim['pos'] - obs_real['pos'])
 
     # linear velocity
-    e_xyz_dot = 10 * (obs_sim['vel'] - obs_real['vel'])
+    e_xyz_dot = obs_sim['vel'] - obs_real['vel']
 
     # Build norms of error vector:
     err = np.hstack((e_rpy.detach().cpu().numpy(), \
