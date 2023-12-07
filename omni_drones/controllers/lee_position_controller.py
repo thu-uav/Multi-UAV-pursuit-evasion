@@ -334,7 +334,7 @@ class RateController(nn.Module):
         gain = tunable_parameters['gain']
         I = torch.diag_embed(
             torch.tensor([inertia_xx, inertia_yy, inertia_zz, 1])
-        ).double()
+        )
 
         self.rotor_config['arm_lengths'] = [tunable_parameters['arm_lengths']] * 4
         self.rotor_config['force_constants'] = [tunable_parameters['force_constants']] * 4
@@ -346,7 +346,7 @@ class RateController(nn.Module):
         self.mixer = nn.Parameter(compute_parameters(self.rotor_config, I))
         # TODO: jiayu, only crazyflie
         self.gain_angular_rate = nn.Parameter(
-            torch.tensor(gain).double() @ I[:3, :3].inverse()
+            torch.tensor(gain).float() @ I[:3, :3].inverse()
         )
     
     def forward(

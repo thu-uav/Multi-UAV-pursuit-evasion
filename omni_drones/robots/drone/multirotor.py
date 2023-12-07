@@ -122,7 +122,7 @@ class MultirotorBase(RobotBase):
             Return all parameters of the quadrotor.
         """
         para_list = []
-        para_list.append(self.mass)
+        para_list.append(self.mass.double())
         para_list.append(self.inertia_xx)
         para_list.append(self.inertia_yy)
         para_list.append(self.inertia_zz)
