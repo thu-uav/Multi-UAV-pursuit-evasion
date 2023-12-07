@@ -18,7 +18,7 @@ import yaml
 from skopt import Optimizer
 
 rosbags = [
-    '/root/OmniDrones/realdata/crazyflie/takeoff.csv',
+    '/home/jiayu/OmniDrones/realdata/crazyflie/takeoff.csv',
     # '/home/cf/ros2_ws/rosbags/takeoff.csv',
     # '/home/cf/ros2_ws/rosbags/square.csv',
     # '/home/cf/ros2_ws/rosbags/rl.csv',
@@ -58,8 +58,10 @@ CRAZYFLIE_PARAMS = [
     'force_constants',
     'max_rotation_velocities',
     'moment_constants',
-    'rotor_angles',
+    # 'rotor_angles',
+    'drag_coef',
     'time_constant',
+    'gain',
 ]
 
 def init_sim(cfg, n_envs):
@@ -126,8 +128,9 @@ def evaluate(params, real_data, sim, drone, controller):
         'force_constants': params[5],
         'max_rotation_velocities': params[6],
         'moment_constants': params[7],
-        'rotor_angles': params[8:12],
-        'time_constant': params[12],
+        'drag_coef': params[8],
+        'time_constant': params[9],
+        'gain': params[10:]
     }
     drone.initialize_byTunablePara(tunable_parameters=tunable_parameters)
     controller.set_byTunablePara(tunable_parameters=tunable_parameters)

@@ -5,24 +5,25 @@ headless: true
 sim: ${task.sim}
 env: ${task.env}
 
-total_frames: 600_000_000 #1000_000_000
+total_frames: 3000_000_000 #1000_000_000
 max_iters: -1
-eval_interval: -1
+eval_interval: 200
 save_interval: -1
 seed: 0
 
 viewer:
   resolution: [960, 720]
-  eye: [8, 0., 6.]
+  eye: [2., 0., 2.]
   lookat: [0., 0., 1.]
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: ${oc.select:..task.name,test}-${oc.select:..task.target_vel,none}-${oc.select:..task.stage,none}
+  # run_name: Hover_crazyflie_origin_worandom_wolatency
+  run_name: debugs
   job_type: train
-  entity: nics_marl
+  entity: chenjy
   project: Hover
-  mode: online # set to 'disabled' when debugging locally, online
+  mode: disabled # set to 'disabled' when debugging locally, online
   run_id: 
   monitor_gym: True
   tags: 

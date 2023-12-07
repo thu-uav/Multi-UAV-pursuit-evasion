@@ -308,6 +308,7 @@ class RateController(nn.Module):
         inertia = uav_params["inertia"]
         force_constants = torch.as_tensor(rotor_config["force_constants"])
         max_rot_vel = torch.as_tensor(rotor_config["max_rotation_velocities"])
+        gain = uav_params['controller_configuration']['gain']
 
         self.g = nn.Parameter(torch.tensor(g))
         self.max_thrusts = nn.Parameter(max_rot_vel.square() * force_constants)
@@ -316,14 +317,9 @@ class RateController(nn.Module):
         )
 
         self.mixer = nn.Parameter(compute_parameters(rotor_config, I))
-        if uav_params["name"] == "crazyflie":
-            self.gain_angular_rate = nn.Parameter(
-                torch.tensor([0.0052, 0.0052, 0.00025]) @ I[:3, :3].inverse()
-            )
-        else:
-            self.gain_angular_rate = nn.Parameter(
-                torch.tensor([0.52, 0.52, 0.025]) @ I[:3, :3].inverse()
-            )
+        self.gain_angular_rate = nn.Parameter(
+            torch.tensor(gain) @ I[:3, :3].inverse()
+        )
 
     def set_byTunablePara(
         self,
@@ -335,6 +331,7 @@ class RateController(nn.Module):
         inertia_xx = tunable_parameters['inertia_xx']
         inertia_yy = tunable_parameters['inertia_yy']
         inertia_zz = tunable_parameters['inertia_zz']
+        gain = tunable_parameters['gain']
         I = torch.diag_embed(
             torch.tensor([inertia_xx, inertia_yy, inertia_zz, 1])
         ).double()
@@ -343,13 +340,13 @@ class RateController(nn.Module):
         self.rotor_config['force_constants'] = [tunable_parameters['force_constants']] * 4
         self.rotor_config['max_rotation_velocities'] = [tunable_parameters['max_rotation_velocities']] * 4
         self.rotor_config['moment_constants'] = [tunable_parameters['moment_constants']] * 4
-        self.rotor_config['rotor_angles'] = tunable_parameters['rotor_angles']
+        # self.rotor_config['rotor_angles'] = tunable_parameters['rotor_angles']
         self.rotor_config['time_constant'] = tunable_parameters['time_constant']
 
         self.mixer = nn.Parameter(compute_parameters(self.rotor_config, I))
         # TODO: jiayu, only crazyflie
         self.gain_angular_rate = nn.Parameter(
-            torch.tensor([0.0052, 0.0052, 0.00025]).double() @ I[:3, :3].inverse()
+            torch.tensor(gain).double() @ I[:3, :3].inverse()
         )
     
     def forward(
