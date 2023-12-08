@@ -5,6 +5,9 @@ headless: true
 sim: ${task.sim}
 env: ${task.env}
 
+model_dir: /home/chenjiayu/OmniDrones/scripts/outputs/Hover_crazyflie_origin_worandom_wolatency_little/12-07_16-38/wandb/run-20231207_163825-uvxd1nxx/files/checkpoint_final.pt
+# model_dir: null
+
 total_frames: 3000_000_000 #1000_000_000
 max_iters: -1
 eval_interval: 200
@@ -18,7 +21,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: Hover_crazyflie_origin_worandom_wolatency
+  run_name: Hover_crazyflie_origin_worandom_wolatency_load
   # run_name: debug
   job_type: train
   entity: chenjy

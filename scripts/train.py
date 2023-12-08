@@ -182,9 +182,10 @@ def main(cfg):
     eval_interval = cfg.get("eval_interval", -1)
     save_interval = cfg.get("save_interval", -1)
 
-    # ckpt_name = "/home/jingyihuang/isaac_ws/OmniDrones/scripts/wandb/offline-run-20231108_094102-df3vk969/files/checkpoint_final.pt"
-    # state_dict = torch.load(ckpt_name)
-    # policy.load_state_dict(state_dict)
+    if cfg.model_dir is not None:
+        # torch.save(policy.state_dict(), ckpt_path)
+        policy.load_state_dict(torch.load(cfg.model_dir))
+        print("Successfully load model!")
 
     stats_keys = [
         k for k in base_env.observation_spec.keys(True, True) 

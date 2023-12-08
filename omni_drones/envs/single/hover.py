@@ -115,6 +115,10 @@ class Hover(IsaacEnv):
             torch.tensor([-2.5, -2.5, 0.], device=self.device),
             torch.tensor([2.5, 2.5, 2.], device=self.device)
         )
+        # self.init_pos_dist = D.Uniform(
+        #     torch.tensor([-0.5, -0.5, 0.], device=self.device),
+        #     torch.tensor([0.5, 0.5, 2.], device=self.device)
+        # )
         self.init_rpy_dist = D.Uniform(
             torch.tensor([-.2, -.2, 0.], device=self.device) * torch.pi,
             torch.tensor([0.2, 0.2, 2.], device=self.device) * torch.pi
@@ -208,6 +212,7 @@ class Hover(IsaacEnv):
             "return": UnboundedContinuousTensorSpec(1),
             "pos_bonus": UnboundedContinuousTensorSpec(1),
             "head_bonus": UnboundedContinuousTensorSpec(1),
+            "reward_up": UnboundedContinuousTensorSpec(1),
             "episode_len": UnboundedContinuousTensorSpec(1),
             "pos_error": UnboundedContinuousTensorSpec(1),
             "heading_alignment": UnboundedContinuousTensorSpec(1),
@@ -307,18 +312,18 @@ class Hover(IsaacEnv):
         # check done
         distance = torch.norm(torch.cat([self.rpos, self.rheading], dim=-1), dim=-1)
 
-        reward_pose = - pos_error
-        reward_pose_bonus = ((pos_error <= 0.01) * 10).float()
+        reward_pos = - pos_error
+        reward_pos_bonus = ((pos_error <= 0.02) * 10).float()
         
-        reward_head = - head_error * (reward_pose_bonus > 0)
-        reward_head_bonus = ((head_error <= 0.01) * 10 * (reward_pose_bonus > 0)).float()
+        reward_head = - head_error * (reward_pos_bonus > 0)
+        reward_head_bonus = ((head_error <= 0.02) * 10 * (reward_pos_bonus > 0)).float()
 
         # uprightness
         reward_up = torch.square((self.drone.up[..., 2] + 1) / 2)
 
         reward = (
-            reward_pose
-            + reward_pose_bonus
+            reward_pos
+            + reward_pos_bonus
             + reward_head 
             + reward_head_bonus
             + reward_up
@@ -357,8 +362,9 @@ class Hover(IsaacEnv):
         self.stats["action_smoothness"].lerp_(-self.drone.throttle_difference, (1-self.alpha))
         self.stats["return"] += reward
         # bonus
-        self.stats["pos_bonus"] = reward_pose_bonus
+        self.stats["pos_bonus"] = reward_pos_bonus
         self.stats["head_bonus"] = reward_head_bonus
+        self.stats["reward_up"] = reward_up
         self.stats["episode_len"][:] = self.progress_buf.unsqueeze(1)
 
         return TensorDict(
