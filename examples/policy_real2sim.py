@@ -26,7 +26,7 @@ from typing import Sequence
 import pandas as pd
 
 rosbags = [
-    '/home/cf/ros2_ws/rosbags/goodrl.csv',
+    '/home/jiayu/OmniDrones/realdata/crazyflie/hover_rl_worandom_woopt.csv',
     # '/home/cf/ros2_ws/rosbags/takeoff.csv',
     # '/home/cf/ros2_ws/rosbags/square.csv',
     # '/home/cf/ros2_ws/rosbags/rl.csv',
@@ -42,13 +42,14 @@ def main(cfg):
         "mappo": MAPPOPolicy, 
     }
 
-    from fake import FakeHover
+    from scripts.fake import FakeHover
     base_env = FakeHover(cfg, headless=cfg.headless)
 
     agent_spec: AgentSpec = base_env.agent_spec["drone"]
+    import pdb; pdb.set_trace()
     policy = algos[cfg.algo.name.lower()](cfg.algo, agent_spec=agent_spec, device="cuda")
 
-    ckpt_name = '/home/cf/ros2_ws/src/crazyswarm2/crazyflie_examples/crazyflie_examples/model/1128_mlp.pt'
+    ckpt_name = '/home/jiayu/OmniDrones/scripts/outputs/hover_rl_worandom_woopt.pt'
     state_dict = torch.load(ckpt_name)
     policy.load_state_dict(state_dict)
 
@@ -260,23 +261,23 @@ def main(cfg):
     #             continue
 
 
-    # # plot trajectory
-    # import matplotlib.pyplot as plt
-    # import numpy as np
+    # plot trajectory
+    import matplotlib.pyplot as plt
+    import numpy as np
 
-    # real_poses = torch.stack(real_poses).detach().cpu().numpy()
-    # sim_poses = torch.stack(sim_poses).detach().cpu().numpy()
+    real_poses = torch.stack(real_poses).detach().cpu().numpy()
+    sim_poses = torch.stack(sim_poses).detach().cpu().numpy()
 
-    # fig = plt.figure()
-    # ax = fig.add_subplot(projection='3d')
-    # ax.scatter(sim_poses[:, 0], sim_poses[:, 1], sim_poses[:, 2], s=5, label='sim')
-    # ax.scatter(real_poses[:, 0], real_poses[:, 1], real_poses[:, 2], s=5, label='real')
-    # ax.set_xlabel('X')
-    # ax.set_ylabel('Y')
-    # ax.set_zlabel('Z')
-    # ax.legend()
+    fig = plt.figure()
+    ax = fig.add_subplot(projection='3d')
+    ax.scatter(sim_poses[:, 0], sim_poses[:, 1], sim_poses[:, 2], s=5, label='sim')
+    ax.scatter(real_poses[:, 0], real_poses[:, 1], real_poses[:, 2], s=5, label='real')
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    ax.legend()
 
-    # plt.savefig('cf_goodrl_rl')
+    plt.savefig('cf_goodrl_rl')
 
     simulation_app.close()
 
