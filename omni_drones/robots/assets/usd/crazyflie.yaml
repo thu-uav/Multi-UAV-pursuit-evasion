@@ -42,7 +42,7 @@ rotor_configuration:
   - 2.35619449
   - 3.92699082
   - 5.49778714
-  time_constant: 0.03869999945163727
+  time_constant: 0.43
 controller_configuration:
   gain:
   - 0.2220551101997332

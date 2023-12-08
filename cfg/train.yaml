@@ -18,7 +18,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: Hover_crazyflie_origin_worandom_wolatency_simopt
+  run_name: Hover_crazyflie_origin_worandom_wolatency_simopt_time043
   # run_name: debugs
   job_type: train
   entity: chenjy
