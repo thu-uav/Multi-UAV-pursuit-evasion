@@ -46,7 +46,6 @@ def main(cfg):
     base_env = FakeHover(cfg, headless=cfg.headless)
 
     agent_spec: AgentSpec = base_env.agent_spec["drone"]
-    import pdb; pdb.set_trace()
     policy = algos[cfg.algo.name.lower()](cfg.algo, agent_spec=agent_spec, device="cuda")
 
     ckpt_name = '/home/jiayu/OmniDrones/scripts/outputs/hover_rl_worandom_woopt.pt'
