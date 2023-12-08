@@ -301,13 +301,13 @@ class AttitudeController(nn.Module):
 
 
 class RateController(nn.Module):
-
     def __init__(self, g, uav_params) -> None:
         super().__init__()
         rotor_config = uav_params["rotor_configuration"]
         inertia = uav_params["inertia"]
         force_constants = torch.as_tensor(rotor_config["force_constants"])
         max_rot_vel = torch.as_tensor(rotor_config["max_rotation_velocities"])
+        gain = uav_params['controller_configuration']['gain']
 
         self.g = nn.Parameter(torch.tensor(g))
         self.max_thrusts = nn.Parameter(max_rot_vel.square() * force_constants)
@@ -316,15 +316,9 @@ class RateController(nn.Module):
         )
 
         self.mixer = nn.Parameter(compute_parameters(rotor_config, I))
-        if uav_params["name"] == "crazyflie":
-            self.gain_angular_rate = nn.Parameter(
-                torch.tensor([0.0052, 0.0052, 0.00025]) @ I[:3, :3].inverse()
-            )
-        else:
-            self.gain_angular_rate = nn.Parameter(
-                torch.tensor([0.52, 0.52, 0.025]) @ I[:3, :3].inverse()
-            )
-
+        self.gain_angular_rate = nn.Parameter(
+            torch.tensor(gain) @ I[:3, :3].inverse()
+        )
     
     def forward(
         self, 
