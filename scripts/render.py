@@ -76,6 +76,7 @@ def main(cfg):
 
     base_env.enable_render(True)
     base_env.eval()
+    env.reset()
     env.eval()
     env.set_seed(cfg.seed)
 
@@ -101,7 +102,7 @@ def main(cfg):
     if len(frames):
         from torchvision.io import write_video
         video_array = np.stack(frames)
-        write_video(f"render.mp4", video_array, fps=1/cfg.sim.dt)
+        write_video(f"render1.mp4", video_array, fps=1/cfg.sim.dt)
 
     simulation_app.close()
 

@@ -30,6 +30,60 @@ from .utils import create_obstacle
 import pdb
 import copy
 
+from omni.isaac.debug_draw import _debug_draw
+
+from carb import Float3
+from typing import Tuple, List
+
+_COLOR_T = Tuple[float, float, float, float]
+
+def _carb_float3_add(a: Float3, b: Float3) -> Float3:
+    return Float3(a.x + b.x, a.y + b.y, a.z + b.z)
+
+def draw_court(
+    W: float, L: float, H: float, color: _COLOR_T = (1.0, 1.0, 1.0, 1.0), line_size: float = 10.0
+):
+    point_list_1 = [
+        Float3(-L / 2, -W / 2, 0),
+        Float3(-L / 2, W / 2, 0),
+        Float3(-L / 2, -W / 2, 0),
+        Float3(L / 2, -W / 2, 0),
+
+        Float3(-L / 2, -W / 2, 0),
+        Float3(-L / 2, W / 2, 0),
+        Float3(L / 2, -W / 2, 0),
+        Float3(L / 2, W / 2, 0),
+        
+        Float3(-L / 2, -W / 2, H),
+        Float3(-L / 2, W / 2, H),
+        Float3(-L / 2, -W / 2, H),
+        Float3(L / 2, -W / 2, H),
+    ]
+    point_list_2 = [
+        Float3(L / 2, -W / 2, 0),
+        Float3(L / 2, W / 2, 0),
+        Float3(-L / 2, W / 2, 0),
+        Float3(L / 2, W / 2, 0),
+        
+        Float3(-L / 2, -W / 2, H),
+        Float3(-L / 2, W / 2, H),
+        Float3(L / 2, -W / 2, H),
+        Float3(L / 2, W / 2, H),
+        
+        Float3(L / 2, -W / 2, H),
+        Float3(L / 2, W / 2, H),
+        Float3(-L / 2, W / 2, H),
+        Float3(L / 2, W / 2, H),
+    ]
+
+    n = len(point_list_1)
+    assert n == len(point_list_2)
+    colors = [color for _ in range(n)]
+    sizes = [line_size for _ in range(n)]
+
+    return point_list_1, point_list_2, colors, sizes
+
+
 # drones on land by default
 # only cubes are available as walls
 
@@ -206,6 +260,10 @@ class HideAndSeek(IsaacEnv):
         self.v_obstacle_min = self.cfg.v_drone * self.cfg.v_obstacle_min
         self.v_obstacle_max = self.cfg.v_drone * self.cfg.v_obstacle_max
         self.obstacle_control_fre = self.cfg.obstacle_control_fre
+        
+        self.central_env_pos = Float3(
+            *self.envs_positions[self.central_env_idx].tolist()
+        )
 
         # CL
         self.curriculum_buffer = CurriculumBuffer()
@@ -243,6 +301,8 @@ class HideAndSeek(IsaacEnv):
         self.curriculum_buffer.update_states()
         weights = np.ones(len(self.curriculum_buffer._state_buffer), dtype=np.float32)
         self.curriculum_buffer.update_weights(weights)
+        
+        self.draw = _debug_draw.acquire_debug_draw_interface()
 
     def _set_specs(self):        
         drone_state_dim = self.drone.state_spec.shape.numel()
@@ -491,12 +551,26 @@ class HideAndSeek(IsaacEnv):
                 torch.tensor([size, size, 2 * size], device=self.device)
             )
             obstacle_pos_temp = obstacles_pos_dist.sample((1, self.num_obstacles - self.num_capsules))
-            for idx in range(self.num_capsules):
-                cap = self.cfg.capsules['cap{}'.format(idx)]
+            for cap_idx in range(self.num_capsules):
+                cap = self.cfg.capsules['cap{}'.format(cap_idx)]
                 translation = [[[cap.translation.x, cap.translation.y, cap.translation.z]]]
                 obstacle_pos_temp = torch.concat(
                     (obstacle_pos_temp, torch.tensor(translation, device=self.device)), dim=1)
             obstacle_pos.append(obstacle_pos_temp)
+
+            if idx == self.central_env_idx and self._should_render(0):
+                self.draw.clear_lines()
+
+                point_list_1, point_list_2, colors, sizes = draw_court(
+                    2*size, 2*size, 2*size, line_size=5.0
+                    )
+                point_list_1 = [
+                    _carb_float3_add(p, self.central_env_pos) for p in point_list_1
+                ]
+                point_list_2 = [
+                    _carb_float3_add(p, self.central_env_pos) for p in point_list_2
+                ]
+                self.draw.draw_lines(point_list_1, point_list_2, colors, sizes)     
 
         drone_pos = torch.concat(drone_pos, dim=0).type(torch.float32)
         target_pos = torch.stack(target_pos, dim=0).type(torch.float32)
@@ -534,7 +608,7 @@ class HideAndSeek(IsaacEnv):
         self.step_spec = 0
 
         # reset stats
-        self.stats[env_ids] = 0.        
+        self.stats[env_ids] = 0.   
 
     def _update_curriculum(self, capture):
         capture = capture.reshape(self.task_space_len,-1) # [eval_num_envs, task_space_len]

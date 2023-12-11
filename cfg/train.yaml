@@ -2,6 +2,7 @@
 num_agents: 3
 num_obstacles: 7 # total number of obstacles, including capsules
 obstacle_size: 0.05
+detect_range: 0.5
 
 capsules:
   num: 2
@@ -27,8 +28,8 @@ v_low: 1.3
 v_high: 5.0
 v_obstacle_min: 1.0
 v_obstacle_max: 5.0
-size_min: 0.5
-size_max: 1.0
+size_min: 1.5
+size_max: 2.0
 obstacle_control_fre: 20
 fixed_config: False # if True, only eval max_config
 # model_dir: /root/OmniDrones/scripts/outputs/5obstacle_size1_speed5_obstaclespeed5_decay0_cl_various/10-17_10-51/wandb/run-20231017_105104-ykhedgrr/files/checkpoint_15500_5079367680.pt
@@ -65,8 +66,8 @@ viewer:
   resolution: [960, 720]
   # eye: [8, 0., 6.]
   # lookat: [0., 0., 1.]
-  eye: [2, 2, 2]
-  lookat: [0., 0., 0.]
+  eye: [5., 0., 5.]
+  lookat: [0., 0., 1.]
 
 wandb:
   group: ${oc.select:..task.name}
@@ -80,6 +81,6 @@ wandb:
   tags: 
 
 defaults:
-  - task: PredatorPrey_cl
+  - task: HideAndSeek
   - algo: mappo
   - _self_
