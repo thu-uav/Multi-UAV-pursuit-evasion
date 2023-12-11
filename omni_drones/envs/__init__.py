@@ -34,6 +34,7 @@ from .payload import PayloadTrack, PayloadFlyThrough
 from .predatorprey import PredatorPrey
 from .predatorprey_debug import PredatorPrey_debug
 from .predatorprey_cl import PredatorPrey_cl
+from .hideandseek import HideAndSeek
 # from .multi_gate import MultiGate
 # from .rearrange import Rearrange
 # from .pinballV0 import PinballV0
