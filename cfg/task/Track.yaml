@@ -6,6 +6,7 @@ defaults:
   - /base/sim_base@_here_
 
 env:
+  num_envs: 4096
   max_episode_length: 600
 
 drone_model: Crazyflie
@@ -25,8 +26,8 @@ reward_distance_scale: 1.6
 
 action_transform: rate
 history: true
-randomization:
-  drone:
-    train:
-      mass_scale: [1., 1.15]
-      # inertia_scale: [0.7, 1.3]
+# randomization:
+#   drone:
+#     train:
+#       mass_scale: [1., 1.15]
+#       inertia_scale: [0.7, 1.3]

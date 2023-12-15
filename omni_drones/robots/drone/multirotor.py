@@ -68,6 +68,10 @@ class MultirotorBase(RobotBase):
             logging.info(f"Reading {self.name}'s params from {self.param_path}.")
             self.params = yaml.safe_load(f)
         self.num_rotors = self.params["rotor_configuration"]["num_rotors"]
+        self.mass = torch.tensor(self.params['mass']).to(self.device)
+        self.inertia_xx = torch.tensor(self.params['inertia']['xx']).to(self.device)
+        self.inertia_yy = torch.tensor(self.params['inertia']['yy']).to(self.device)
+        self.inertia_zz = torch.tensor(self.params['inertia']['zz']).to(self.device)
 
         self.action_spec = BoundedTensorSpec(-1, 1, self.num_rotors, device=self.device)
         self.intrinsics_spec = CompositeSpec({
@@ -173,9 +177,18 @@ class MultirotorBase(RobotBase):
         )
         self.rotor_pos_offset = torch.zeros(*self.shape, self.num_rotors, 3, device=self.device)
 
-        self.masses = self.base_link.get_masses().clone()
+        # self.masses = self.base_link.get_masses().clone()
+        self.masses = torch.ones_like(self.base_link.get_masses().clone()) * self.mass
+        self.base_link.set_masses(self.masses)
         self.gravity = self.masses * 9.81
-        self.inertias = self.base_link.get_inertias().reshape(*self.shape, 3, 3).diagonal(0, -2, -1)
+        self.inertias = torch.ones(self.shape).unsqueeze(-1).repeat(1,1,3).to(self.device)
+        self.inertias[...,0] = self.inertia_xx
+        self.inertias[...,1] = self.inertia_yy
+        self.inertias[...,2] = self.inertia_zz
+        # expand inertias as [1, batch, 3, 3]
+        setup_inertias = torch.diag(self.inertias[0,0,:]).unsqueeze(0).unsqueeze(0).repeat(1,self.shape[1],1,1)
+        self.base_link.set_inertias(setup_inertias)
+        # self.inertias = self.base_link.get_inertias().reshape(*self.shape, 3, 3).diagonal(0, -2, -1)
         # default/initial parameters
         self.MASS_0 = self.masses[0].clone()
         self.INERTIA_0 = (
