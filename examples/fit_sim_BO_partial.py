@@ -192,6 +192,7 @@ def evaluate(params, real_data, sim, drone, controller):
             target_rate=cmd_rate / 180 * torch.pi,
             target_thrust=cmd_thrust.unsqueeze(1) / (2**16) * max_thrust
         )
+        pdb.set_trace()
         
         drone.apply_action(action)
         sim.step(render=True)

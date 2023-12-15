@@ -259,25 +259,6 @@ def main(cfg):
     #         elif image_type == "distance_to_camera":
     #             continue
 
-
-    # plot trajectory
-    import matplotlib.pyplot as plt
-    import numpy as np
-
-    real_poses = torch.stack(real_poses).detach().cpu().numpy()
-    sim_poses = torch.stack(sim_poses).detach().cpu().numpy()
-
-    fig = plt.figure()
-    ax = fig.add_subplot(projection='3d')
-    ax.scatter(sim_poses[:, 0], sim_poses[:, 1], sim_poses[:, 2], s=5, label='sim')
-    ax.scatter(real_poses[:, 0], real_poses[:, 1], real_poses[:, 2], s=5, label='real')
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-    ax.legend()
-
-    plt.savefig('cf_goodrl_rl')
-
     simulation_app.close()
 
 
