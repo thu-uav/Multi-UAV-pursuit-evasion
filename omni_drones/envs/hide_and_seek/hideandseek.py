@@ -26,62 +26,13 @@ from pxr import UsdGeom, Usd, UsdPhysics
 import omni.isaac.core.utils.prims as prim_utils
 import omni.physx.scripts.utils as script_utils
 from omni_drones.utils.scene import design_scene
-from .utils import create_obstacle
+from ..utils import create_obstacle
 import pdb
 import copy
 
 from omni.isaac.debug_draw import _debug_draw
 
-from carb import Float3
-from typing import Tuple, List
-
-_COLOR_T = Tuple[float, float, float, float]
-
-def _carb_float3_add(a: Float3, b: Float3) -> Float3:
-    return Float3(a.x + b.x, a.y + b.y, a.z + b.z)
-
-def draw_court(
-    W: float, L: float, H: float, color: _COLOR_T = (1.0, 1.0, 1.0, 1.0), line_size: float = 10.0
-):
-    point_list_1 = [
-        Float3(-L / 2, -W / 2, 0),
-        Float3(-L / 2, W / 2, 0),
-        Float3(-L / 2, -W / 2, 0),
-        Float3(L / 2, -W / 2, 0),
-
-        Float3(-L / 2, -W / 2, 0),
-        Float3(-L / 2, W / 2, 0),
-        Float3(L / 2, -W / 2, 0),
-        Float3(L / 2, W / 2, 0),
-        
-        Float3(-L / 2, -W / 2, H),
-        Float3(-L / 2, W / 2, H),
-        Float3(-L / 2, -W / 2, H),
-        Float3(L / 2, -W / 2, H),
-    ]
-    point_list_2 = [
-        Float3(L / 2, -W / 2, 0),
-        Float3(L / 2, W / 2, 0),
-        Float3(-L / 2, W / 2, 0),
-        Float3(L / 2, W / 2, 0),
-        
-        Float3(-L / 2, -W / 2, H),
-        Float3(-L / 2, W / 2, H),
-        Float3(L / 2, -W / 2, H),
-        Float3(L / 2, W / 2, H),
-        
-        Float3(L / 2, -W / 2, H),
-        Float3(L / 2, W / 2, H),
-        Float3(-L / 2, W / 2, H),
-        Float3(L / 2, W / 2, H),
-    ]
-
-    n = len(point_list_1)
-    assert n == len(point_list_2)
-    colors = [color for _ in range(n)]
-    sizes = [line_size for _ in range(n)]
-
-    return point_list_1, point_list_2, colors, sizes
+from .draw import Float3, _COLOR_ACCENT, _carb_float3_add, draw_court, draw_point
 
 
 # drones on land by default
@@ -385,7 +336,7 @@ class HideAndSeek(IsaacEnv):
     def _design_scene(self):
         self.num_agents = self.cfg.num_agents
         self.num_obstacles = self.cfg.num_obstacles
-        self.num_capsules = self.cfg.capsules.num
+        self.num_cylinder = self.cfg.cylinder.num
         self.obstacle_size = self.cfg.obstacle_size
         self.detect_range = self.cfg.detect_range
         self.size_min = self.cfg.size_min
@@ -426,10 +377,10 @@ class HideAndSeek(IsaacEnv):
             torch.tensor([-size, -size, 0.0], device=self.device),
             torch.tensor([size, size, 0.0], device=self.device)
         )
-        obstacle_pos[:-self.num_capsules] = random_pos_dist.sample(
-            obstacle_pos[:-self.num_capsules].shape[:-1])
+        obstacle_pos[:-self.num_cylinder] = random_pos_dist.sample(
+            obstacle_pos[:-self.num_cylinder].shape[:-1])
 
-        for idx in range(self.num_obstacles - self.num_capsules):
+        for idx in range(self.num_obstacles - self.num_cylinder):
             objects.DynamicSphere(
                 prim_path="/World/envs/env_0/obstacle_{}".format(idx),
                 name="obstacle_{}".format(idx),
@@ -439,22 +390,22 @@ class HideAndSeek(IsaacEnv):
                 mass=1.0
             )
         
-        for idx in range(self.num_capsules):
-            cap = self.cfg.capsules['cap{}'.format(idx)]
+        for idx in range(self.num_cylinder):
+            cyl = self.cfg.cylinder['cyl{}'.format(idx)]
             translation = orientation = None
-            if 'translation' in cap:
-                translation = (cap.translation.x, cap.translation.y, cap.translation.z)
-            if 'orientation' in cap:
-                orientation = (cap.orientation.qw, cap.orientation.qx, cap.orientation.qy, cap.orientation.qz)
-            attributes = {'axis': cap.axis, 'radius': cap.radius, 'height': cap.height}
+            if 'translation' in cyl:
+                translation = (cyl.translation.x, cyl.translation.y, cyl.translation.z)
+            if 'orientation' in cyl:
+                orientation = (cyl.orientation.qw, cyl.orientation.qx, cyl.orientation.qy, cyl.orientation.qz)
+            attributes = {'axis': cyl.axis, 'radius': cyl.radius, 'height': cyl.height}
             create_obstacle(
                 "/World/envs/env_0/obstacle_0{}".format(idx), 
-                prim_type="Capsule",
+                prim_type="Cylinder",
                 translation=translation,
                 orientation=orientation,
                 attributes=attributes
             )
-            obstacle_pos[-self.num_capsules + idx] = torch.tensor(translation, device=self.device)
+            obstacle_pos[-self.num_cylinder + idx] = torch.tensor(translation, device=self.device)
                 
         objects.VisualCuboid(
             prim_path="/World/envs/env_0/ground",
@@ -550,10 +501,10 @@ class HideAndSeek(IsaacEnv):
                 torch.tensor([-size, -size, 0.0], device=self.device),
                 torch.tensor([size, size, 2 * size], device=self.device)
             )
-            obstacle_pos_temp = obstacles_pos_dist.sample((1, self.num_obstacles - self.num_capsules))
-            for cap_idx in range(self.num_capsules):
-                cap = self.cfg.capsules['cap{}'.format(cap_idx)]
-                translation = [[[cap.translation.x, cap.translation.y, cap.translation.z]]]
+            obstacle_pos_temp = obstacles_pos_dist.sample((1, self.num_obstacles - self.num_cylinder))
+            for cyl_idx in range(self.num_cylinder):
+                cyl = self.cfg.cylinder['cyl{}'.format(cyl_idx)]
+                translation = [[[cyl.translation.x, cyl.translation.y, cyl.translation.z]]]
                 obstacle_pos_temp = torch.concat(
                     (obstacle_pos_temp, torch.tensor(translation, device=self.device)), dim=1)
             obstacle_pos.append(obstacle_pos_temp)
@@ -563,7 +514,7 @@ class HideAndSeek(IsaacEnv):
 
                 point_list_1, point_list_2, colors, sizes = draw_court(
                     2*size, 2*size, 2*size, line_size=5.0
-                    )
+                )
                 point_list_1 = [
                     _carb_float3_add(p, self.central_env_pos) for p in point_list_1
                 ]
@@ -674,6 +625,17 @@ class HideAndSeek(IsaacEnv):
         self.drone_rpos = vmap(off_diag)(self.drone_rpos)
         drone_vel = self.drone.get_velocities()
         
+        # draw drone trajectory
+        if self._should_render(0):
+            # self.draw.clear_points()
+            point_list, colors, sizes = draw_point(
+                drone_pos[self.central_env_idx, :], size=4.0
+            )
+            point_list = [
+                _carb_float3_add(p, self.central_env_pos) for p in point_list
+            ]
+            self.draw.draw_points(point_list, colors, sizes) 
+
         drone_speed_norm = torch.norm(drone_vel[..., :3], dim=-1)
         if self.set_train:
             self.drone_sum_speed += drone_speed_norm

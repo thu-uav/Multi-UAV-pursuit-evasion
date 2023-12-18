@@ -4,32 +4,56 @@ num_obstacles: 7 # total number of obstacles, including capsules
 obstacle_size: 0.05
 detect_range: 0.5
 
-capsules:
-  num: 2
-  cap0:
+cylinder:
+  num: 5
+  cyl0:
     translation:
-      x: 0.5
+      x: 0.
       y: 0.
       z: 0.
     axis: 'Z'
-    radius: 0.06
-    height: 0.6
-  cap1:
+    radius: 0.3
+    height: 3.0
+  cyl1:
     translation: 
-      x: -0.2
-      y: -0.2
+      x: -0.8
+      y: 0.
       z: 0.
-    axis: 'Y'
+    axis: 'Z'
     radius: 0.1
-    height: 0.4
+    height: 2.0
+  cyl2:
+    translation: 
+      x: 0.8
+      y: 0.
+      z: 0.
+    axis: 'Z'
+    radius: 0.1
+    height: 2.0
+  cyl3:
+    translation: 
+      x: 0.
+      y: 0.8
+      z: 0.
+    axis: 'Z'
+    radius: 0.1
+    height: 2.0
+  cyl4:
+    translation: 
+      x: 0.
+      y: -0.8
+      z: 0.
+    axis: 'Z'
+    radius: 0.1
+    height: 2.0
 
 v_drone: 1.0
 v_low: 1.3
-v_high: 5.0
+v_high: 1.3
 v_obstacle_min: 1.0
-v_obstacle_max: 5.0
-size_min: 1.5
-size_max: 2.0
+v_obstacle_max: 1.0
+size_min: 1.0
+size_max: 1.0
 obstacle_control_fre: 20
 fixed_config: False # if True, only eval max_config
 # model_dir: /root/OmniDrones/scripts/outputs/5obstacle_size1_speed5_obstaclespeed5_decay0_cl_various/10-17_10-51/wandb/run-20231017_105104-ykhedgrr/files/checkpoint_15500_5079367680.pt
@@ -46,7 +70,7 @@ prob_decay: 2
 
 # hydra.job.chdir: false
 
-headless: false
+headless: true
 
 sim: ${task.sim}
 env: ${task.env}
@@ -66,15 +90,15 @@ viewer:
   resolution: [960, 720]
   # eye: [8, 0., 6.]
   # lookat: [0., 0., 1.]
-  eye: [5., 0., 5.]
+  eye: [4., 0., 4.]
   lookat: [0., 0., 1.]
 
 wandb:
   group: ${oc.select:..task.name}
   run_name: ${oc.select:..task.name,test}-${oc.select:..algo.name,none}
   job_type: train
-  entity: tangwh # nics_marl
-  project: omnidrones_render
+  entity: nics_marl
+  project: omnidrones
   mode: online # set to 'disabled' when debugging locally
   run_id: 
   monitor_gym: True
