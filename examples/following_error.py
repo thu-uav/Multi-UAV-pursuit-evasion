@@ -1,15 +1,30 @@
+import logging
 import os
-
-from typing import Dict, Optional
-import torch
-from functorch import vmap
+import time
 
 import hydra
+import torch
+import numpy as np
+from functorch import vmap
 from omegaconf import OmegaConf
-from omni_drones import init_simulation_app
-from tensordict import TensorDict
+
+from omni_drones import CONFIG_PATH, init_simulation_app
+from omni_drones.utils.torchrl import AgentSpec
+from omni_drones.learning import (
+    MAPPOPolicy, 
+)
+from omni_drones.utils.torch import quat_rotate_inverse
+
+from setproctitle import setproctitle
+from torchrl.envs.transforms import (
+    TransformedEnv, 
+    InitTracker, 
+    Compose,
+)
+
+from tensordict.tensordict import TensorDict, TensorDictBase
+from typing import Sequence
 import pandas as pd
-import pdb
 
 rosbags = [
     '/home/jiayu/OmniDrones/realdata/crazyflie/8_100hz_gt.csv',
@@ -18,15 +33,30 @@ rosbags = [
     # '/home/cf/ros2_ws/rosbags/rl.csv',
 ]
 
-@hydra.main(version_base=None, config_path=".", config_name="real2sim")
+@hydra.main(version_base=None, config_path=CONFIG_PATH, config_name="train")
 def main(cfg):
+    OmegaConf.register_new_resolver("eval", eval)
     OmegaConf.resolve(cfg)
-    simulation_app = init_simulation_app(cfg)
-    print(OmegaConf.to_yaml(cfg))
+    OmegaConf.set_struct(cfg, False)
+
+    algos = {
+        "mappo": MAPPOPolicy, 
+    }
+
+    from scripts.fake import FakeHover
+    base_env = FakeHover(cfg, headless=cfg.headless)
+
+    agent_spec: AgentSpec = base_env.agent_spec["drone"]
+    policy = algos[cfg.algo.name.lower()](cfg.algo, agent_spec=agent_spec, device="cuda")
+
+    ckpt_name = '/home/jiayu/OmniDrones/scripts/outputs/hover_rl_worandom_woopt.pt'
+    state_dict = torch.load(ckpt_name)
+    policy.load_state_dict(state_dict)
 
     average_dt = 0.01
     df = pd.read_csv(rosbags[0])
     episode_length = df.index.stop
+    simulation_app = init_simulation_app(cfg)
 
     import omni_drones.utils.scene as scene_utils
     from omni.isaac.core.simulation_context import SimulationContext
@@ -43,7 +73,7 @@ def main(cfg):
         backend="torch",
         device=cfg.sim.device,
     )
-    drone: MultirotorBase = MultirotorBase.REGISTRY[cfg.drone_model]()
+    drone: MultirotorBase = MultirotorBase.REGISTRY['crazyflie']()
     n = 1
     translations = torch.zeros(n, 3)
     translations[:, 1] = torch.arange(n)
@@ -80,6 +110,18 @@ def main(cfg):
         # returns up-to-date values
         sim._physics_sim_view.flush() 
 
+    # def _compute_traj(steps, env_ids=None, step_size: float=1.):
+    #     if env_ids is None:
+    #         env_ids = ...
+    #     t = self.progress_buf[env_ids].unsqueeze(1) + step_size * torch.arange(steps, device=self.device)
+    #     t = self.traj_t0 + scale_time(self.traj_w[env_ids].unsqueeze(1) * t * self.dt)
+    #     traj_rot = self.traj_rot[env_ids].unsqueeze(1).expand(-1, t.shape[1], 4)
+        
+    #     target_pos = vmap(lemniscate)(t, self.traj_c[env_ids])
+    #     target_pos = vmap(torch_utils.quat_rotate)(traj_rot, target_pos) * self.traj_scale[env_ids].unsqueeze(1)
+
+    #     return self.origin + target_pos
+
     frames_vis = []
 
     pos_error = []
@@ -95,35 +137,43 @@ def main(cfg):
     quat_abs_error = []
     omega_abs_error = []
     mse = torch.nn.functional.mse_loss
+    max_episode_length = 600
 
     sim_poses = []
     real_poses = []
 
-    for i in range(episode_length):
-        # set real drone state
+    real_hover_pos = []
+    sim_hover_pos = []
+
+    for i in range(max_episode_length):
+        # set real and initial drone state
         current_state = df.loc[i]
         pos = torch.tensor([current_state['pos.x'], current_state['pos.y'], current_state['pos.z']])
         quat = torch.tensor([current_state['quat.w'], current_state['quat.x'], current_state['quat.y'], current_state['quat.z']])
         vel = torch.tensor([current_state['vel.x'], current_state['vel.y'], current_state['vel.z']])
-        ang_vel = torch.tensor([current_state['target_rate.r'], current_state['target_rate.p'], current_state['target_rate.y']]) # in radius / s
+        ang_vel = torch.tensor([current_state['omega.r'], current_state['omega.p'], current_state['omega.y']]) # in radius / s
         if i == 0:
             set_drone_state(pos, quat, vel, ang_vel)
-        # else:
-        #     set_drone_state(pos, quat, vel, ang_vel)
 
+        root_state = drone.get_state().reshape(1,1,-1)
+        # TODO: target_pos = 
+        rpos = target_pos - root_state[..., :3]
+        obs = [rpos, root_state[..., 3:10], root_state[..., 13:19], (i / max_episode_length) * torch.ones([1,1,4]).to(sim.device)]
+        obs = torch.cat(obs, dim=-1)
+        input = TensorDict({
+            "agents": {
+                "observation": obs,
+            },
+        }, 1)
+        output = policy(input, deterministic=True)
         drone_state = drone.get_state()[..., :13]
-        root_state = root_state.reshape(-1, 13)
-        pos, rot, linvel, angvel = root_state.split([3, 4, 3, 3], dim=1)
-        current_body_rate = quat_rotate_inverse(sim_quat, sim_omega)
-
-        cmd_thrust = torch.tensor([current_state['cmd.thrust']]).to(device=sim.device).float()
-        cmd_rate = torch.tensor([current_state['cmd.r_rate'], current_state['cmd.p_rate'], current_state['cmd.y_rate']]).to(device=sim.device).float()
-        pdb.set_trace()
-        # print(cmd_thrust.unsqueeze(0) / (2**16) * max_thrust)
+        action = torch.tanh(output[('agents','action')])
+        target_rate, target_thrust = action.split([3, 1], -1)
+        target_thrust = ((target_thrust + 1) / 2).clip(0.) * max_thrust
         action = controller(
-            drone_state.squeeze(0), 
-            target_rate=cmd_rate.unsqueeze(0) / 180 * torch.pi,
-            target_thrust=cmd_thrust.unsqueeze(0) / (2**16) * max_thrust
+            drone_state, 
+            target_rate=target_rate * torch.pi / 6, 
+            target_thrust=target_thrust
         )
 
         drone.apply_action(action)
@@ -141,13 +191,8 @@ def main(cfg):
         sim_quat = sim_state[..., 3:7]
         sim_vel = sim_state[..., 7:10]
         sim_omega = sim_state[..., 10:13]
-
-        # get real state & compare
-        next_state = df.loc[i]
-        real_pos = torch.tensor([next_state['pos.x'], next_state['pos.y'], next_state['pos.z']])
-        real_quat = torch.tensor([next_state['quat.w'], next_state['quat.x'], next_state['quat.y'], next_state['quat.z']])
-        real_vel = torch.tensor([next_state['vel.x'], next_state['vel.y'], next_state['vel.z']])
-        real_omega = torch.tensor([next_state['omega.r'], next_state['omega.p'], next_state['omega.y']]) # in radius / s
+        # TODO, transfer to body rate
+        next_body_rate = quat_rotate_inverse(sim_quat, sim_omega)
 
         pos_error.append(torch.sqrt(mse(sim_pos, real_pos)).item())
         pos_change.append(torch.sum(torch.abs(pos - real_pos)))
@@ -200,6 +245,11 @@ def main(cfg):
 
     print(episode_length)
 
+    real_hover_pos = torch.concat(real_hover_pos)
+    print("real position error", "mean", torch.mean(real_hover_pos).item(), "std", torch.std(real_hover_pos).item())
+    sim_hover_pos = torch.concat(sim_hover_pos)
+    print("sim position error", "mean", torch.mean(sim_hover_pos).item(), "std", torch.std(sim_hover_pos).item())
+
     # from torchvision.io import write_video
 
     # for image_type, arrays in torch.stack(frames_vis).items():
@@ -211,26 +261,8 @@ def main(cfg):
     #         elif image_type == "distance_to_camera":
     #             continue
 
-
-    # # plot trajectory
-    # import matplotlib.pyplot as plt
-    # import numpy as np
-
-    # real_poses = torch.stack(real_poses).detach().cpu().numpy()
-    # sim_poses = torch.stack(sim_poses).detach().cpu().numpy()
-
-    # fig = plt.figure()
-    # ax = fig.add_subplot(projection='3d')
-    # ax.scatter(sim_poses[:, 0], sim_poses[:, 1], sim_poses[:, 2], s=5, label='sim')
-    # ax.scatter(real_poses[:, 0], real_poses[:, 1], real_poses[:, 2], s=5, label='real')
-    # ax.set_xlabel('X')
-    # ax.set_ylabel('Y')
-    # ax.set_zlabel('Z')
-    # ax.legend()
-
-    # plt.savefig('cf_goodrl')
-
     simulation_app.close()
+
 
 if __name__ == "__main__":
     main()

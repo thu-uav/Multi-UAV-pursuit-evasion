@@ -376,3 +376,29 @@ class RateController(nn.Module):
         cmd = cmd.reshape(*batch_shape, -1)
         return cmd
 
+    # only for simopt
+    def sim_step(
+        self, 
+        current_rate: torch.Tensor, 
+        target_rate: torch.Tensor,
+        target_thrust: torch.Tensor,
+    ):
+
+        batch_shape = current_rate.shape[:-1]
+        # root_state = root_state.reshape(-1, 13)
+        current_rate = current_rate.reshape(-1, 3)
+        target_rate = target_rate.reshape(-1, 3)
+        target_thrust = target_thrust.reshape(-1, 1)
+
+        # pos, rot, linvel, angvel = root_state.split([3, 4, 3, 3], dim=1)
+        # body_rate = quat_rotate_inverse(rot, angvel)
+
+        rate_error = current_rate - target_rate
+        acc_des = (
+            - rate_error * self.gain_angular_rate
+        )
+        angacc_thrust = torch.cat([acc_des, target_thrust], dim=1)
+        cmd = (self.mixer @ angacc_thrust.T).T
+        cmd = (cmd / self.max_thrusts) * 2 - 1
+        cmd = cmd.reshape(*batch_shape, -1)
+        return cmd
