@@ -15,9 +15,9 @@
 
 ## Installation (Local version)
 
-### 1. Isaac Sim
+#### 1. Download Isaac Sim (local version)
 
-Download the [Omniverse Isaac Sim (local version/in the cloud version)](https://developer.nvidia.com/isaac-sim) and install the desired Isaac Sim release **(version 2022.2.0)** following the [official document](https://docs.omniverse.nvidia.com/isaacsim/latest/installation/install_workstation.html). *Note that Omniverse Isaac Sim supports multi-user access, eliminating the need for repeated downloads and installations across different user accounts.*
+Download the [Omniverse Isaac Sim (local version)](https://developer.nvidia.com/isaac-sim) and install the desired Isaac Sim release **(version 2022.2.0)** following the [official document](https://docs.omniverse.nvidia.com/isaacsim/latest/installation/install_workstation.html). *Note that Omniverse Isaac Sim supports multi-user access, eliminating the need for repeated downloads and installations across different user accounts.*
 
 Set the following environment variables to your ``~/.bashrc`` or ``~/.zshrc`` files :
 
@@ -33,7 +33,7 @@ After adding the environment variable, apply the changes by running:
 source ~/.bashrc
 ```
 
-### 2. Conda
+#### 2. Conda
 
 Although Isaac Sim comes with a built-in Python environment, we recommend using a seperate conda environment which is more flexible. We provide scripts to automate environment setup when activating/deactivating a conda environment at ``OmniDrones/conda_setup``.
 
@@ -54,7 +54,7 @@ python -c "from omni.isaac.kit import SimulationApp"
 python -c "import torch; print(torch.__path__)"
 ```
 
-### 3. Third Party Packages
+#### 3. Third Party Packages
 OmniDrones requires specific versions of the `tensordict` and `torchrl` packages. For the ``deploy`` branch, it supports `tensordict` version 0.1.2+5e6205c and `torchrl` version 0.1.1+e39e701. 
 
 We manage these two packages using Git submodules to ensure that the correct versions are used. To initialize and update the submodules, follow these steps:
@@ -75,14 +75,14 @@ pip install -e .
 cd third_party/torchrl
 pip install -e .
 ```
-### 4. Verification
+#### 4. Verification
 ```
 # at OmniDrones/
 cd scripts
 python train.py headless=true wandb.mode=disabled total_frames=50000 task=Hover
 ```
 
-### 5. Working with VSCode
+#### 5. Working with VSCode
 
 To enable features like linting and auto-completion with VSCode Python Extension, we need to let the extension recognize the extra paths we added during the setup process.
 
@@ -105,6 +105,8 @@ and edit ``.vscode/settings.json`` as:
 
  
 ## Using Docker (Container version)
+The Container version is easier to set up compared to the Local version. However, it's important to note that the Container version does not support real-time rendering. Therefore, it only supports the command with ``headless=true``. You can save videos during training and upload them to Wandb. 
+
 First, make sure your computer has installed ``Docker``, ``NVIDIA Driver`` and ``NVIDIA Container Toolkit``. Then, you should successfully run: 
 
 ```
@@ -116,7 +118,7 @@ Download the image from Docker Hub:
 ```
 docker pull jimmyzhangruize/isaac-sim:2022.2.0_deploy
 ```
-You need to clone the OmniDrones repository to your local computer because we use OmniDrones mounted in the container.
+This image already includes Isaac sim, so you don't neet to download Isaac sim. However, you need to clone the OmniDrones repository to your local computer because we use OmniDrones mounted in the container.
 
 Then, run the image:
 ```
@@ -137,8 +139,8 @@ docker run -dit --gpus all -e "ACCEPT_EULA=Y" --net=host \
 ```
 
 Note that:
-1. You need to replace *** with the directory where OmniDrones is located in your local computer in -v ***:/root/OmniDrones:rw.
-2. You need to replace *** with your own WANDB_API_KEY in -e "WANDB_API_KEY=***" . If you do not need to use Wandb, you can omit this line.
+1. You need to replace *** with the directory where OmniDrones is locally located in ```-v ***:/root/OmniDrones:rw```.
+2. You need to replace *** with your own WANDB_API_KEY in ```-e "WANDB_API_KEY=***"``` . If you do not need to use Wandb, you can omit this line.
 3. In the container, OmniDrones is located at ``/root/OmniDrones`` and Isaac-sim is located at ``/isaac-sim``.
 
 
