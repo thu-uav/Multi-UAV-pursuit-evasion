@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import wandb
 import time
 from functorch import vmap
-from omni_drones.utils.torch import cpos, off_diag, others
+from omni_drones.utils.torch import cpos, off_diag, quat_axis, others
 import torch.distributions as D
 
 import omni.isaac.core.objects as objects
@@ -32,7 +32,7 @@ import copy
 
 from omni.isaac.debug_draw import _debug_draw
 
-from .draw import Float3, _COLOR_ACCENT, _carb_float3_add, draw_court, draw_point
+from .draw import Float3, _COLOR_ACCENT, _carb_float3_add, draw_court, draw_traj, draw_detection
 
 
 # drones on land by default
@@ -510,18 +510,7 @@ class HideAndSeek(IsaacEnv):
             obstacle_pos.append(obstacle_pos_temp)
 
             if idx == self.central_env_idx and self._should_render(0):
-                self.draw.clear_lines()
-
-                point_list_1, point_list_2, colors, sizes = draw_court(
-                    2*size, 2*size, 2*size, line_size=5.0
-                )
-                point_list_1 = [
-                    _carb_float3_add(p, self.central_env_pos) for p in point_list_1
-                ]
-                point_list_2 = [
-                    _carb_float3_add(p, self.central_env_pos) for p in point_list_2
-                ]
-                self.draw.draw_lines(point_list_1, point_list_2, colors, sizes)     
+                self._draw_court(size)
 
         drone_pos = torch.concat(drone_pos, dim=0).type(torch.float32)
         target_pos = torch.stack(target_pos, dim=0).type(torch.float32)
@@ -625,16 +614,10 @@ class HideAndSeek(IsaacEnv):
         self.drone_rpos = vmap(off_diag)(self.drone_rpos)
         drone_vel = self.drone.get_velocities()
         
-        # draw drone trajectory
+        # draw drone trajectory and detection range
         if self._should_render(0):
-            # self.draw.clear_points()
-            point_list, colors, sizes = draw_point(
-                drone_pos[self.central_env_idx, :], size=4.0
-            )
-            point_list = [
-                _carb_float3_add(p, self.central_env_pos) for p in point_list
-            ]
-            self.draw.draw_points(point_list, colors, sizes) 
+            self._draw_traj()
+            self._draw_detection()            
 
         drone_speed_norm = torch.norm(drone_vel[..., :3], dim=-1)
         if self.set_train:
@@ -809,4 +792,53 @@ class HideAndSeek(IsaacEnv):
 
         # set force_z to 0
         return force.type(torch.float32)
+    
+    # visualize functions
+    def _draw_court(self, size):
+        self.draw.clear_lines()
+
+        point_list_1, point_list_2, colors, sizes = draw_court(
+            2*size, 2*size, 2*size, line_size=5.0
+        )
+        point_list_1 = [
+            _carb_float3_add(p, self.central_env_pos) for p in point_list_1
+        ]
+        point_list_2 = [
+            _carb_float3_add(p, self.central_env_pos) for p in point_list_2
+        ]
+        self.draw.draw_lines(point_list_1, point_list_2, colors, sizes)   
+
+    def _draw_traj(self):
+        drone_pos = self.drone_states[..., :3]
+        drone_vel = self.drone.get_velocities()[..., :3]
+        point_list1, point_list2, colors, sizes = draw_traj(
+            drone_pos[self.central_env_idx, :], drone_vel[self.central_env_idx, :], dt=0.02, size=4.0
+        )
+        point_list1 = [
+            _carb_float3_add(p, self.central_env_pos) for p in point_list1
+        ]
+        point_list2 = [
+            _carb_float3_add(p, self.central_env_pos) for p in point_list2
+        ]
+        self.draw.draw_lines(point_list1, point_list2, colors, sizes)   
+    
+    def _draw_detection(self):
+        self.draw.clear_points()
+
+        drone_pos = self.drone_states[..., :3]
+        drone_ori = self.drone_states[..., 3:7]
+        drone_xaxis = quat_axis(drone_ori, 0)
+        drone_yaxis = quat_axis(drone_ori, 1)
+        drone_zaxis = quat_axis(drone_ori, 2)
+        point_list, colors, sizes = draw_detection(
+            pos=drone_pos[self.central_env_idx, :],
+            xaxis=drone_xaxis[self.central_env_idx, 0, :],
+            yaxis=drone_yaxis[self.central_env_idx, 0, :],
+            zaxis=drone_zaxis[self.central_env_idx, 0, :],
+            drange=self.detect_range,
+        )
+        point_list = [
+            _carb_float3_add(p, self.central_env_pos) for p in point_list
+        ]
+        self.draw.draw_points(point_list, colors, sizes)
     

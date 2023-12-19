@@ -1,5 +1,6 @@
 from carb import Float3
 from typing import Tuple, List
+import numpy as np
 
 _COLOR_T = Tuple[float, float, float, float]
 
@@ -120,13 +121,85 @@ def draw_court(
     return _draw_lines_args_merger(draw_wall(W, L, H, color=color_wall, line_size=line_size), 
                                    draw_edge(W, L, H, color=color_edge, line_size=line_size))
 
-def draw_point(
-    drone_states, color: _COLOR_T = _COLOR_ACCENT[4], size: float = 10
+def draw_traj(
+    drone_pos, drone_vel, dt: float = 0.01, color: _COLOR_T = _COLOR_ACCENT[4], size: float = 10.0
+):
+    drone_pos_dt = drone_pos + drone_vel * dt
+    point_list1 = []
+    point_list2 = []
+    for i in range(drone_pos.shape[0]):
+        point_list1.append(Float3(drone_pos[i, 0], drone_pos[i, 1], drone_pos[i, 2]))
+        point_list2.append(Float3(drone_pos_dt[i, 0], drone_pos_dt[i, 1], drone_pos_dt[i, 2]))
+    colors = [color for _ in range(drone_pos.shape[0])]
+    sizes = [size for _ in range(drone_pos.shape[0])]
+    return point_list1, point_list2, colors, sizes
+
+def draw_range(
+    pos, xaxis, yaxis, zaxis, drange: float,
+    color: _COLOR_T = (1.0, 1.0, 1.0, 0.05), size: float = 5.0, num: int = 100
 ):
     point_list = []
-    for i in range(drone_states.shape[0]):
-        point_list.append(Float3(drone_states[i, 0], drone_states[i, 1], drone_states[i, 2]))
-    colors = [color for _ in range(drone_states.shape[0])]
-    sizes = [size for _ in range(drone_states.shape[0])]
+    for i in range(xaxis.shape[0]):
+        posi = pos[i, :]
+        for j in range(1, num):
+            num_phi = round(num / 2 - abs(j - num / 2)) * 4
+            for k in range(num_phi):
+                theta = np.pi * j / num
+                phi = 2 * np.pi * k / num_phi
+                point1 = posi + drange * (np.sin(theta) * np.cos(phi) * xaxis + 
+                                          np.sin(theta) * np.sin(phi) * yaxis + 
+                                          np.cos(theta) * zaxis)
+                # point2 = posi + drange * (np.sin(theta) * np.cos(phi) * xaxis +
+                #                           np.sin(theta) * np.sin(phi) * yaxis + 
+                #                           np.cos(theta) * zaxis)
+                # breakpoint()
+                point_list.append(Float3(point1[0], point1[1], point1[2]))
+                # point_list.append(Float3(point2[0], point2[1], point2[2]))
+    n = len(point_list)
+    colors = [color for _ in range(n)]
+    sizes = [size for _ in range(n)]
+
     return point_list, colors, sizes
 
+def draw_axis(
+    pos, xaxis, yaxis, zaxis, drange: float, size: float = 5.0, num: int = 50
+):
+    point_list = []
+    for i in range(xaxis.shape[0]):
+        posi = pos[i, :]
+        for j in range(num):
+            pointx = posi + 0.5 * drange * j / num * xaxis
+            pointy = posi + 0.5 * drange * j / num * yaxis
+            pointz = posi + 0.5 * drange * j / num * zaxis
+            point_list.extend([Float3(pointx[0], pointx[1], pointx[2]),
+                               Float3(pointy[0], pointy[1], pointy[2]),
+                               Float3(pointz[0], pointz[1], pointz[2])])
+    n = len(point_list)
+    colors_axis = [(1.0, 0.0, 0.0, 1.0), (0.0, 1.0, 0.0, 1.0), (0.0, 0.0, 1.0, 1.0)]
+    colors = [color for _ in range(num) for color in colors_axis]
+    sizes = [size for _ in range(n)]
+
+    return point_list, colors, sizes
+
+def _draw_points_args_merger(*args):
+    buf = [[] for _ in range(4)]
+    for arg in args:
+        buf[0].extend(arg[0])
+        buf[1].extend(arg[1])
+        buf[2].extend(arg[2])
+
+    return (
+        buf[0],
+        buf[1],
+        buf[2],
+    )
+
+def draw_detection(
+    pos, xaxis, yaxis, zaxis, drange: float,
+    color: _COLOR_T = (1.0, 1.0, 1.0, 0.1), size_range: float = 20.0, num_range: int = 20,
+    size_axis: float = 5.0, num_axis: int = 20
+):
+    return _draw_points_args_merger(
+        draw_range(pos, xaxis, yaxis, zaxis, drange, color, size_range, num_range), 
+        draw_axis(pos, xaxis, yaxis, zaxis, drange, size_axis, num_axis)
+    )
