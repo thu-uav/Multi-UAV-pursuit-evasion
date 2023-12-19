@@ -13,7 +13,7 @@
 *OmniDrones* is an open-source platform designed for reinforcement learning research on multi-rotor drone systems. Built on [Nvidia Isaac Sim](https://docs.omniverse.nvidia.com/app_isaacsim/app_isaacsim/overview.html), *OmniDrones* features highly efficient and flxeible simulation that can be adopted for various research purposes. We also provide a suite of benchmark tasks and algorithm baselines to provide preliminary results for subsequent works.
 
 
-## Installation
+## Installation (Local version)
 
 ### 1. Isaac Sim
 
@@ -102,7 +102,62 @@ and edit ``.vscode/settings.json`` as:
     "python.envFile": "${workspaceFolder}/.vscode/.python.env",
 }
 ```
-    
+
+ 
+## Using Docker (Container version)
+First, make sure your computer has installed ``Docker``, ``NVIDIA Driver`` and ``NVIDIA Container Toolkit``. Then, you should successfully run: 
+
+```
+# Verification
+docker run --rm --runtime=nvidia --gpus all ubuntu nvidia-smi
+```
+
+Download the image from Docker Hub:
+```
+docker pull jimmyzhangruize/isaac-sim:2022.2.0_deploy
+```
+You need to clone the OmniDrones repository to your local computer because we use OmniDrones mounted in the container.
+
+Then, run the image:
+```
+docker run -dit --gpus all -e "ACCEPT_EULA=Y" --net=host \
+    -v ~/docker/isaac-sim/cache/kit:/isaac-sim/kit/cache/Kit:rw \
+    -v ~/docker/isaac-sim/cache/ov:/root/.cache/ov:rw \
+    -v ~/docker/isaac-sim/cache/pip:/root/.cache/pip:rw \
+    -v ~/docker/isaac-sim/cache/glcache:/root/.cache/nvidia/GLCache:rw \
+    -v ~/docker/isaac-sim/cache/computecache:/root/.nv/ComputeCache:rw \
+    -v ~/docker/isaac-sim/logs:/root/.nvidia-omniverse/logs:rw \
+    -v ~/docker/isaac-sim/data:/root/.local/share/ov/data:rw \
+    -v ~/docker/isaac-sim/documents:/root/Documents:rw \
+    -v ***:/root/OmniDrones:rw \
+    -v /data:/data \
+    -e "WANDB_API_KEY=***" \
+    --runtime=nvidia \
+    jimmyzhangruize/isaac-sim:2022.2.0_deploy /bin/bash
+```
+
+Note that:
+1. You need to replace *** with the directory where OmniDrones is located in your local computer in -v ***:/root/OmniDrones:rw.
+2. You need to replace *** with your own WANDB_API_KEY in -e "WANDB_API_KEY=***" . If you do not need to use Wandb, you can omit this line.
+3. In the container, OmniDrones is located at ``/root/OmniDrones`` and Isaac-sim is located at ``/isaac-sim``.
+
+
+Install OmniDrones in the container:
+```
+conda activate sim
+cd /root/OmniDrones
+cp -r conda_setup/etc $CONDA_PREFIX
+conda activate sim # re-activate the environment
+pip install -e . # install OmniDrones
+```
+
+Verify you can successfully run OmniDrones in the container (use ``deploy`` branch):
+
+```
+cd /root/OmniDrones/scripts
+python train.py headless=true wandb.mode=disabled total_frames=50000 task=Hover
+```
+
 ## Usage
 
 For usage and more details, please refer to the [documentation](https://omnidrones.readthedocs.io/en/latest/).
@@ -116,7 +171,7 @@ Note that for this ``deploy`` branch, it currently supports following environmen
 | InvPendulumHover  | Single                           |
 | InvPendulumTrack  | Single                           |
 | PayloadTrack      | Single                           |
- 
+
 
 ## Citation
 
