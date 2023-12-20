@@ -13,7 +13,7 @@
 *OmniDrones* is an open-source platform designed for reinforcement learning research on multi-rotor drone systems. Built on [Nvidia Isaac Sim](https://docs.omniverse.nvidia.com/app_isaacsim/app_isaacsim/overview.html), *OmniDrones* features highly efficient and flxeible simulation that can be adopted for various research purposes. We also provide a suite of benchmark tasks and algorithm baselines to provide preliminary results for subsequent works.
 
 
-## Installation (Local version)
+## Option 1: install local version
 
 #### 1. Download Isaac Sim (local version)
 
@@ -104,7 +104,7 @@ and edit ``.vscode/settings.json`` as:
 ```
 
  
-## Using Docker (Container version)
+## Option 2: install container version (using Docker)
 The Container version is easier to set up compared to the Local version. However, it's important to note that the Container version does not support real-time rendering. Therefore, it only supports the command with ``headless=true``. You can save videos during training and upload them to Wandb. 
 
 First, make sure your computer has installed ``Docker``, ``NVIDIA Driver`` and ``NVIDIA Container Toolkit``. Then, you should successfully run: 
