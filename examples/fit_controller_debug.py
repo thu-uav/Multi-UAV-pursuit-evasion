@@ -186,28 +186,21 @@ def evaluate(params, real_data, sim, drone, controller):
         pos = torch.tensor(shuffled_real_data[:, i, 1:4])
         quat = torch.tensor(shuffled_real_data[:, i, 5:9])
         vel = torch.tensor(shuffled_real_data[:, i, 10:13])
-        # body_rate = torch.tensor(shuffled_real_data[:, i, 14:17]) / 180 * torch.pi
-        real_rate = torch.tensor(shuffled_real_data[:, i, 18:21])
-        real_rate[:, 1] = -real_rate[:, 1]
-        # get angvel
-        ang_vel = quat_rotate(quat, real_rate)
+        ang_vel = torch.tensor(shuffled_real_data[:, i, 14:17]) / 180 * torch.pi
         if i == 0 :
             set_drone_state(pos, quat, vel, ang_vel)
 
-        # drone_state = drone.get_state()[..., :13].reshape(-1, 13)
-        # # get current_rate
-        # pos, rot, linvel, angvel = drone_state.split([3, 4, 3, 3], dim=1)
-        # current_rate = quat_rotate_inverse(rot, angvel)
+        drone_state = drone.get_state()[..., :13].reshape(-1, 13)
+        # get current_rate
+        pos, rot, linvel, angvel = drone_state.split([3, 4, 3, 3], dim=1)
+        current_rate = quat_rotate_inverse(rot, angvel)
         target_thrust = torch.tensor(shuffled_real_data[:, i, 26]).to(device=sim.device).float()
         target_rate = torch.tensor(shuffled_real_data[:, i, 23:26]).to(device=sim.device).float()
         # TODO: check error of current_rate and real_rate, why are they diff ?
-        # real_rate = torch.tensor(shuffled_real_data[:, i, 18:21]).to(device=sim.device).float()
-        # real_rate[:, 1] = -real_rate[:, 1]
-        real_rate = real_rate.to(device=sim.device).float()
-        target_rate[:, 1] = -target_rate[:, 1]
-        # pdb.set_trace()
+        real_rate = torch.tensor(shuffled_real_data[:, i, 18:21]).to(device=sim.device).float()
+        pdb.set_trace()
         action = controller.sim_step(
-            current_rate=real_rate,
+            current_rate=current_rate,
             target_rate=target_rate / 180 * torch.pi,
             target_thrust=target_thrust.unsqueeze(1) / (2**16) * max_thrust
         )
@@ -229,6 +222,7 @@ def evaluate(params, real_data, sim, drone, controller):
         sim_vel = sim_state[..., 7:10]
         sim_omega = sim_state[..., 10:13]
         next_body_rate = quat_rotate_inverse(sim_quat, sim_omega)
+        pdb.set_trace()
 
         # get body_rate and thrust & compare
         target_body_rate = (target_rate / 180 * torch.pi).cpu()
