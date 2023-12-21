@@ -52,20 +52,17 @@ controller_configuration:
   # gain: [5.2e-05, 5.2e-05, 0.025]
 
   # obj: body_rate, tunable: gain, kf, loss: 0.005412185098975897
-  # kf: 2.310088612641514e-06
+  # moment_constants: 2.310088612641514e-06
   # gain: [0.010428581332060781, 0.008974498698576762, 0.02111932814550382]
   
   # obj: body_rate, tunable: gain, kf, km loss: 0.007685973308980465
-  # km: 2.407660129164616e-06
-  # kf: 6.83986763225618e-08
+  # force_constants: 2.407660129164616e-06
+  # moment_constants: 6.83986763225618e-08
   # gain: [5.2e-05, 0.014772306598269377, 0.018230667535659984]
 
   # obj: body_rate, tunable: kf, fixed gain loss: 0.014446577057242393
-  # kf: 7.491028842190664e-07
+  # moment_constants: 7.491028842190664e-07
 
 
   # obj: motor_thrust, tunable: gain, loss: 0.22173520922660828
   # gain: [5.2e-05, 5.2e-05, 2.5e-06]
-  # obj: motor_thrust, tunable: gain, kf loss:
-  # kf:
-  # gain: 

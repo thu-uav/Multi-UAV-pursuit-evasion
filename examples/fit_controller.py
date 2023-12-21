@@ -233,8 +233,8 @@ def main(cfg):
                 target_thrust=target_thrust.unsqueeze(1) / (2**16) * max_thrust
             )
             
-            # drone.apply_action(action)
-            _, thrust, torques = drone.apply_action_foropt(action)
+            drone.apply_action(action)
+            # _, thrust, torques = drone.apply_action_foropt(action)
             sim.step(render=True)
 
             if sim.is_stopped():
@@ -309,7 +309,7 @@ def main(cfg):
         'gain': params[10:]
     """
     params_mask = np.array([0] * 13)
-    params_mask[5] = 1
+    # params_mask[5] = 1
     params_mask[7] = 1
     params_mask[10:] = 1
 
