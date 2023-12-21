@@ -29,5 +29,5 @@ history: true
 # randomization:
 #   drone:
 #     train:
-#       mass_scale: [1., 1.15]
+#       mass_scale: [1., 1.1]
 #       inertia_scale: [0.7, 1.3]
