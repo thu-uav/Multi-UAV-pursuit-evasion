@@ -170,8 +170,8 @@ class MultirotorBase(RobotBase):
                 shape=self.shape,
             )
             self.base_link.initialize()
-            print(self._view.dof_names)
-            print(self._view._dof_indices)
+            # print(self._view.dof_names)
+            # print(self._view._dof_indices)
             rotor_joint_indices = [
                 i for i, dof_name in enumerate(self._view._dof_names) 
                 if dof_name.startswith("rotor")

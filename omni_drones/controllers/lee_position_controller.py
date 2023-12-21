@@ -55,7 +55,7 @@ def compute_parameters(
             -directions * moment_constants / force_constants,
             torch.ones_like(rotor_angles),
         ]
-    )
+    ).float()
     mixer = A.T @ (A @ A.T).inverse() @ inertia_matrix
 
     return mixer
