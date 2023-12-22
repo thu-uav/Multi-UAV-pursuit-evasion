@@ -360,7 +360,7 @@ class RateController(Transform):
         cmds = self.controller(
             drone_state, 
             target_rate=target_rate * torch.pi / 6, # rate is between [-30, 30] degree/s
-            # target_rate=target_rate * torch.pi,
+            # target_rate=target_rate * torch.pi / 3,
             target_thrust=target_thrust
         )
         torch.nan_to_num_(cmds, 0.)

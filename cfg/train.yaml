@@ -11,7 +11,7 @@ model_dir: null
 total_frames: 3000_000_000 #1000_000_000
 max_iters: -1
 eval_interval: 200
-save_interval: -1
+save_interval: 100
 seed: 0
 
 viewer:
@@ -22,7 +22,9 @@ viewer:
 wandb:
   group: ${oc.select:..task.name}
   # run_name: Track_crazyflie_opt_worandom_wolatency_little_origingain_optothers
-  run_name: Track_8_worandom
+  # run_name: Track_8_worandom_simopt_moment_constants_gain
+  # run_name: Track_8_worandom_woopt_clip60
+  run_name: Track_8_origin_realmass
   job_type: train
   entity: chenjy
   project: Track
