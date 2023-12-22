@@ -315,8 +315,8 @@ def main(cfg):
     params_mask[10:] = 1
 
     params_range = []
-    lower_gain = 0.01
-    upper_gain = 100.0
+    lower_gain = 0.9
+    upper_gain = 1.1
     lower = 0.9
     upper = 1.1
     count = 0

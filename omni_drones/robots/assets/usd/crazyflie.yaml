@@ -56,6 +56,11 @@ controller_configuration:
   # moment_constants: 6.516e-10
   # gain: [5.2e-05, 0.009761479223729465, 0.012799196068990161]
 
+  # obj: body_rate, tunable: gain, kf, km(0.9-1.1) loss: 
+  # force_constants: 
+  # moment_constants: 
+  # gain: 
+
   # obj: body_rate, tunable: first kf, km, final gain loss: 0.014446603134274483->0.012447443790733814
   # force_constants: 3.0665997810545084e-08
   # moment_constants: 6.346179464813402e-10
