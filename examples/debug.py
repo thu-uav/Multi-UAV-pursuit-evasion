@@ -17,6 +17,9 @@ import numpy as np
 import yaml
 from skopt import Optimizer
 from omni_drones.utils.torch import quat_rotate, quat_rotate_inverse
+import numpy as np
+import matplotlib.pyplot as plt
+import copy
 
 rosbags = [
     '/home/jiayu/OmniDrones/realdata/crazyflie/8_100hz_cjy.csv',
@@ -26,7 +29,6 @@ rosbags = [
 ]    
 def main():
     df = pd.read_csv(rosbags[0], skip_blank_lines=True)
-    pdb.set_trace()
     df = np.array(df)
     # preprocess, motor > 0
     use_preprocess = True
@@ -65,10 +67,32 @@ def main():
     gyro_deg = torch.tensor(real_data[:, 0, 14:17])
     gyro_rad = gyro_deg * torch.pi / 180
     real_rate_rad = torch.tensor(real_data[:, 0, 18:21]) # body-axis
+    target_rate_deg = torch.tensor(real_data[:, 0, 23:26]) # body-axis
+    target_rate_rad = - target_rate_rad * torch.pi / 180 
+    # target_rate_rad = target_rate_deg * torch.pi / 180  # body-axis
     quat = torch.tensor(real_data[:, 0, 5:9])
     current_rate1 = quat_rotate_inverse(quat, gyro_rad)
     current_rate2 = quat_rotate(quat, gyro_rad)
-    pdb.set_trace()
+
+    x = np.arange(0, target_rate_deg.shape[0])
+    # plot
+    fig = plt.figure()
+    ax = fig.add_subplot()
+    # ax.scatter(x[1:], gyro_rad[1:, 0], s=5, label='gyro0')
+    # ax.scatter(x[1:], real_rate_rad[1:, 0], s=5, label='real0')
+    # ax.scatter(x, target_rate_rad[:, 0], s=5, label='target0')
+    # ax.scatter(x[1:], -gyro_rad[1:, 1], s=5, label='-gyro1')
+    # ax.scatter(x[1:], real_rate_rad[1:, 1], s=5, label='real1')
+    # ax.scatter(x, target_rate_rad[:, 1], s=5, label='target1')
+    # ax.scatter(x[1:], gyro_rad[1:, 2], s=5, label='gyro2')
+    ax.scatter(x[1:], real_rate_rad[1:, 2], s=5, label='real2')
+    ax.scatter(x, target_rate_rad[:, 2], s=5, label='target2')
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.legend()
+
+    # plt.savefig('gyro_real_rate1')
+    plt.savefig('real_target_rate2')
 
 if __name__ == "__main__":
     main()

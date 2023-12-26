@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 rosbags = [
-    '/home/jiayu/OmniDrones/realdata/crazyflie/8_100hz_cjy.csv',
+    '/home/jiayu/OmniDrones/realdata/crazyflie/8_100hz_light.csv',
     # '/home/cf/ros2_ws/rosbags/takeoff.csv',
     # '/home/cf/ros2_ws/rosbags/square.csv',
     # '/home/cf/ros2_ws/rosbags/rl.csv',
@@ -309,16 +309,17 @@ def main(cfg):
         'gain': params[10:]
     """
     params_mask = np.array([0] * 13)
-    params_mask[5] = 1
+    params_mask[0] = 1
+    # params_mask[5] = 1
     # params_mask[6] = 1
-    params_mask[7] = 1
-    params_mask[10:] = 1
+    # params_mask[7] = 1
+    # params_mask[10:] = 1
 
     params_range = []
     lower_gain = 0.9
     upper_gain = 1.1
-    lower = 0.9
-    upper = 1.1
+    lower = 0.8
+    upper = 1.2
     count = 0
     for param, mask in zip(params, params_mask):
         if mask == 1:
