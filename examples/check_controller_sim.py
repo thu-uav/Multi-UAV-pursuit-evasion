@@ -27,31 +27,6 @@ rosbags = [
     # '/home/cf/ros2_ws/rosbags/rl.csv',
 ]
 
-def loss_function(obs_sim, obs_real) -> float:
-    r"""Computes the distance between observations from sim and real."""
-
-    # angles
-    e_rpy = 10 * (obs_sim['quat'] - obs_real['quat'])
-
-    # angle rates
-    err_rpy_dot = obs_sim['omega'] - obs_real['omega']
-
-    # position - errors are smaller than angle errors
-    e_xyz = 100 * (obs_sim['pos'] - obs_real['pos'])
-
-    # linear velocity
-    e_xyz_dot = obs_sim['vel'] - obs_real['vel']
-
-    # Build norms of error vector:
-    err = np.hstack((e_rpy.detach().cpu().numpy(), \
-        e_xyz.detach().cpu().numpy(), \
-        e_xyz_dot.detach().cpu().numpy(), \
-        err_rpy_dot.detach().cpu().numpy()))
-    L1 = np.linalg.norm(err, ord=1)
-    L2 = np.linalg.norm(err, ord=2)
-    L = L1 + L2
-    return L
-
 CRAZYFLIE_PARAMS = [
     'mass',
     'inertia_xx',
@@ -73,8 +48,6 @@ def main(cfg):
         preprocess real data
         real_data: [batch_size, T, dimension]
     """
-    exp_name = 'lossThrust_tuneGain'
-    # exp_name = 'lossBodyrate_tuneGain_kf'
     df = pd.read_csv(rosbags[0], skip_blank_lines=True)
     df = np.array(df)
     # preprocess, motor > 0
@@ -133,6 +106,24 @@ def main(cfg):
         drone: crazyflie
         controller: the predefined controller
     """
+    # origin
+    # params = [
+    #     0.03,
+    #     1.4e-5,
+    #     1.4e-5,
+    #     2.17e-5,
+    #     0.043,
+    #     2.88e-8,
+    #     2315,
+    #     7.24e-10,
+    #     0.2,
+    #     0.43,
+    #     0.0052,
+    #     0.0052,
+    #     0.00025
+    # ]
+    
+    # simopt
     params = [
         0.03,
         1.4e-5,
@@ -148,6 +139,7 @@ def main(cfg):
         0.0052,
         0.00025
     ]
+    
     tunable_parameters = {
         'mass': params[0],
         'inertia_xx': params[1],
@@ -218,13 +210,15 @@ def main(cfg):
         real_rate[:, 1] = -real_rate[:, 1]
         # get angvel
         real_ang_vel = quat_rotate(real_quat, real_rate)
+        if i == 0:
+            set_drone_state(real_pos, real_quat, real_vel, real_ang_vel)
+        
+        # save
         real_pos_list.append(real_pos.numpy())
         real_quat_list.append(real_quat.numpy())
         real_vel_list.append(real_vel.numpy())
         real_body_rate_list.append(real_rate.numpy())
         real_angvel_list.append(real_ang_vel.numpy())
-        if i == 0:
-            set_drone_state(real_pos, real_quat, real_vel, real_ang_vel)
 
         drone_state = drone.get_state()[..., :13].reshape(-1, 13)
         # get current_rate
@@ -232,14 +226,12 @@ def main(cfg):
         current_rate = quat_rotate_inverse(rot, angvel)
         target_thrust = torch.tensor(real_data[i, :, 26]).to(device=sim.device).float()
         target_rate = torch.tensor(real_data[i, :, 23:26]).to(device=sim.device).float()
-        # TODO: check error of current_rate and real_rate, why are they diff ?
-        # real_rate = torch.tensor(shuffled_real_data[:, i, 18:21]).to(device=sim.device).float()
-        # real_rate[:, 1] = -real_rate[:, 1]
         real_rate = real_rate.to(device=sim.device).float()
         target_rate[:, 1] = -target_rate[:, 1]
         action = controller.sim_step(
             current_rate=current_rate,
-            target_rate=target_rate / 180 * torch.pi,
+            # target_rate=target_rate / 180 * torch.pi,
+            target_rate=real_rate,
             target_thrust=target_thrust.unsqueeze(1) / (2**16) * max_thrust
         )
         
@@ -285,44 +277,73 @@ def main(cfg):
     # plot trajectory
     fig_3d = plt.figure()
     ax_3d = fig_3d.add_subplot(projection='3d')
-    # ax_3d.scatter(sim_pos_list[:, 0, 0], sim_pos_list[:, 0, 1], sim_pos_list[:, 0, 2], s=5, label='sim')
-    ax_3d.scatter(real_pos_list[:, 0, 0], real_pos_list[:, 0, 1], real_pos_list[:, 0, 2], s=5, label='real')
+    ax_3d.scatter(sim_pos_list[:, 0, 0], sim_pos_list[:, 0, 1], sim_pos_list[:, 0, 2], s=5, label='sim')
+    # ax_3d.scatter(real_pos_list[:, 0, 0], real_pos_list[:, 0, 1], real_pos_list[:, 0, 2], s=5, label='real')
     ax_3d.set_xlabel('X')
     ax_3d.set_ylabel('Y')
     ax_3d.set_zlabel('Z')
     ax_3d.legend()
-    plt.savefig('real_trajectory')
+    plt.savefig('sim_track_real')
 
-    # plot
-    # fig = plt.figure()
+    # # sim track target
+    # fig, axs = plt.subplots(1, 3, figsize=(10, 6))  # 1 * 3    
+    # # sim
+    # axs[0].scatter(steps, sim_body_rate_list[:, 0, 0], s=5, c='red', label='sim')
+    # axs[0].scatter(steps, target_body_rate_list[:, 0, 0], s=5, c='green', label='target')
+    # axs[0].set_xlabel('steps')
+    # axs[0].set_ylabel('rad/s')
+    # axs[0].set_title('sim/target_body_rate_x')
+    # axs[0].legend()
+    
+    # axs[1].scatter(steps, sim_body_rate_list[:, 0, 1], s=5, c='red', label='sim')
+    # axs[1].scatter(steps, target_body_rate_list[:, 0, 1], s=5, c='green', label='target')
+    # axs[1].set_xlabel('steps')
+    # axs[1].set_ylabel('rad/s')
+    # axs[1].set_title('sim/target_body_rate_y')
+    # axs[1].legend()
+    
+    # axs[2].scatter(steps, sim_body_rate_list[:, 0, 2], s=5, c='red', label='sim')
+    # axs[2].scatter(steps, target_body_rate_list[:, 0, 2], s=5, c='green', label='target')
+    # axs[2].set_xlabel('steps')
+    # axs[2].set_ylabel('rad/s')
+    # axs[2].set_title('sim/target_body_rate_z')
+    # axs[2].legend()
+    
+    # error = np.square(sim_body_rate_list - target_body_rate_list)
+    # print('sim_target/body_rateX_error', np.mean(error, axis=0)[0,0])
+    # print('sim_target/body_rateY_error', np.mean(error, axis=0)[0,1])
+    # print('sim_target/body_rateZ_error', np.mean(error, axis=0)[0,2])
+    # print('sim_target/body_rate_error', np.mean(error))
+    
+    # sim track real
     fig, axs = plt.subplots(1, 3, figsize=(10, 6))  # 1 * 3    
-    # sim
     axs[0].scatter(steps, sim_body_rate_list[:, 0, 0], s=5, c='red', label='sim')
-    axs[0].scatter(steps, target_body_rate_list[:, 0, 0], s=5, c='green', label='target')
+    axs[0].scatter(steps, real_body_rate_list[:, 0, 0], s=5, c='green', label='real')
     axs[0].set_xlabel('steps')
     axs[0].set_ylabel('rad/s')
-    axs[0].set_title('sim/target_body_rate_x')
+    axs[0].set_title('sim/real_body_rate_x')
     axs[0].legend()
     
     axs[1].scatter(steps, sim_body_rate_list[:, 0, 1], s=5, c='red', label='sim')
-    axs[1].scatter(steps, target_body_rate_list[:, 0, 1], s=5, c='green', label='target')
+    axs[1].scatter(steps, real_body_rate_list[:, 0, 1], s=5, c='green', label='real')
     axs[1].set_xlabel('steps')
     axs[1].set_ylabel('rad/s')
-    axs[1].set_title('sim/target_body_rate_y')
+    axs[1].set_title('sim/real_body_rate_y')
     axs[1].legend()
     
     axs[2].scatter(steps, sim_body_rate_list[:, 0, 2], s=5, c='red', label='sim')
-    axs[2].scatter(steps, target_body_rate_list[:, 0, 2], s=5, c='green', label='target')
+    axs[2].scatter(steps, real_body_rate_list[:, 0, 2], s=5, c='green', label='real')
     axs[2].set_xlabel('steps')
     axs[2].set_ylabel('rad/s')
-    axs[2].set_title('sim/target_body_rate_z')
+    axs[2].set_title('sim/real_body_rate_z')
     axs[2].legend()
     
-    error = np.square(sim_body_rate_list - target_body_rate_list)
-    print('sim_target/body_rateX_error', np.mean(error, axis=0)[0,0])
-    print('sim_target/body_rateY_error', np.mean(error, axis=0)[0,1])
-    print('sim_target/body_rateZ_error', np.mean(error, axis=0)[0,2])
-    print('sim_target/body_rate_error', np.mean(error))
+    error = np.square(sim_body_rate_list - real_body_rate_list)
+    print('sim_real/body_rateX_error', np.mean(error, axis=0)[0,0])
+    print('sim_real/body_rateY_error', np.mean(error, axis=0)[0,1])
+    print('sim_real/body_rateZ_error', np.mean(error, axis=0)[0,2])
+    print('sim_real/body_rate_error', np.mean(error))
+    
     # # real
     # axs[1,0].scatter(steps, real_body_rate_list[:, 0, 0], s=5, c='red', label='real')
     # axs[1,0].scatter(steps, target_body_rate_list[:, 0, 0], s=5, c='green', label='target')
@@ -345,7 +366,7 @@ def main(cfg):
     # axs[1,2].set_title('real/target_body_rate_z')
     # axs[1,2].legend()
     
-    plt.savefig('origin_tracking')
+    plt.savefig('origin_tracking_trackreal')
     
     simulation_app.close()
 

@@ -73,7 +73,7 @@ def main(cfg):
         preprocess real data
         real_data: [batch_size, T, dimension]
     """
-    exp_name = 'lossThrust_tuneGain'
+    exp_name = 'lossBodyrate_tuneGain_trackreal'
     # exp_name = 'lossBodyrate_tuneGain_kf'
     df = pd.read_csv(rosbags[0], skip_blank_lines=True)
     df = np.array(df)
@@ -229,7 +229,8 @@ def main(cfg):
             # pdb.set_trace()
             action = controller.sim_step(
                 current_rate=real_rate,
-                target_rate=target_rate / 180 * torch.pi,
+                # target_rate=target_rate / 180 * torch.pi,
+                target_rate=real_rate,
                 target_thrust=target_thrust.unsqueeze(1) / (2**16) * max_thrust
             )
             
@@ -262,14 +263,21 @@ def main(cfg):
             # real_motor_thrust_no_nan = real_motor_thrust[mask]
             # loss += mse(thrust_no_nan.to('cpu'), real_motor_thrust_no_nan.to('cpu'))
             
-            # TODO: mask NaN, why?
-            # body rate error
+            # # TODO: mask NaN, why?
+            # # track target body rate
+            # mask = ~torch.isnan(next_body_rate)
+            # next_body_rate_no_nan = next_body_rate[mask]
+            # target_body_rate_no_nan = target_body_rate[mask]
+            # loss += mse(next_body_rate_no_nan.to('cpu'), target_body_rate_no_nan.to('cpu'))
+            
+            # track real body rate
             mask = ~torch.isnan(next_body_rate)
             next_body_rate_no_nan = next_body_rate[mask]
-            target_body_rate_no_nan = target_body_rate[mask]
-            loss += mse(next_body_rate_no_nan.to('cpu'), target_body_rate_no_nan.to('cpu'))
+            real_body_rate_no_nan = real_rate[mask]
+            loss += mse(next_body_rate_no_nan.to('cpu'), real_body_rate_no_nan.to('cpu'))
             
             # report
+            target_body_rate_no_nan = target_body_rate[mask]
             target_sim_rate_error += mse(next_body_rate_no_nan, target_body_rate_no_nan)
             # target_gt_thrust_error += mse(gt_thrust, target_thrust)
 
@@ -310,9 +318,9 @@ def main(cfg):
     """
     params_mask = np.array([0] * 13)
     # params_mask[0] = 1
-    params_mask[5] = 1
+    # params_mask[5] = 1
     # params_mask[6] = 1
-    params_mask[7] = 1
+    # params_mask[7] = 1
     params_mask[10:] = 1
 
     params_range = []
