@@ -309,17 +309,17 @@ def main(cfg):
         'gain': params[10:]
     """
     params_mask = np.array([0] * 13)
-    params_mask[0] = 1
-    # params_mask[5] = 1
+    # params_mask[0] = 1
+    params_mask[5] = 1
     # params_mask[6] = 1
-    # params_mask[7] = 1
-    # params_mask[10:] = 1
+    params_mask[7] = 1
+    params_mask[10:] = 1
 
     params_range = []
-    lower_gain = 0.9
-    upper_gain = 1.1
-    lower = 0.8
-    upper = 1.2
+    lower_gain = 0.01
+    upper_gain = 100.0
+    lower = 0.9
+    upper = 1.1
     count = 0
     for param, mask in zip(params, params_mask):
         if mask == 1:

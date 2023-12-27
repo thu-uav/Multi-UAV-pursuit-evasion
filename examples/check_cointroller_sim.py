@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 rosbags = [
-    '/home/jiayu/OmniDrones/realdata/crazyflie/8_100hz_light.csv',
+    '/home/chenjiayu/OmniDrones/realdata/crazyflie/8_100hz_light.csv',
     # '/home/cf/ros2_ws/rosbags/takeoff.csv',
     # '/home/cf/ros2_ws/rosbags/square.csv',
     # '/home/cf/ros2_ws/rosbags/rl.csv',
@@ -118,7 +118,7 @@ def main(cfg):
         device=cfg.sim.device,
     )
     drone: MultirotorBase = MultirotorBase.REGISTRY[cfg.drone_model]()
-    n = real_data.shape[0] # parrallel envs
+    n = 1 # parrallel envs
     translations = torch.zeros(n, 3)
     translations[:, 1] = torch.arange(n)
     translations[:, 2] = 0.5
@@ -211,18 +211,18 @@ def main(cfg):
     target_body_rate_list = []
     
     for i in range(real_data.shape[0]):
-        real_pos = torch.tensor(real_data[i, 1:4])
-        real_quat = torch.tensor(real_data[i, 5:9])
-        real_vel = torch.tensor(real_data[i, 10:13])
-        real_rate = torch.tensor(real_data[i, 18:21])
+        real_pos = torch.tensor(real_data[i, :, 1:4])
+        real_quat = torch.tensor(real_data[i, :, 5:9])
+        real_vel = torch.tensor(real_data[i, :, 10:13])
+        real_rate = torch.tensor(real_data[i, :, 18:21])
         real_rate[:, 1] = -real_rate[:, 1]
         # get angvel
         real_ang_vel = quat_rotate(real_quat, real_rate)
-        real_pos_list.append(real_pos)
-        real_quat_list.append(real_quat)
-        real_vel_list.append(real_vel)
-        real_body_rate_list.append(real_rate)
-        real_angvel_list.append(real_ang_vel)
+        real_pos_list.append(real_pos.numpy())
+        real_quat_list.append(real_quat.numpy())
+        real_vel_list.append(real_vel.numpy())
+        real_body_rate_list.append(real_rate.numpy())
+        real_angvel_list.append(real_ang_vel.numpy())
         if i == 0:
             set_drone_state(real_pos, real_quat, real_vel, real_ang_vel)
 
@@ -230,14 +230,13 @@ def main(cfg):
         # get current_rate
         pos, rot, linvel, angvel = drone_state.split([3, 4, 3, 3], dim=1)
         current_rate = quat_rotate_inverse(rot, angvel)
-        target_thrust = torch.tensor(real_data[i, 26]).to(device=sim.device).float()
-        target_rate = torch.tensor(real_data[i, 23:26]).to(device=sim.device).float()
+        target_thrust = torch.tensor(real_data[i, :, 26]).to(device=sim.device).float()
+        target_rate = torch.tensor(real_data[i, :, 23:26]).to(device=sim.device).float()
         # TODO: check error of current_rate and real_rate, why are they diff ?
         # real_rate = torch.tensor(shuffled_real_data[:, i, 18:21]).to(device=sim.device).float()
         # real_rate[:, 1] = -real_rate[:, 1]
         real_rate = real_rate.to(device=sim.device).float()
         target_rate[:, 1] = -target_rate[:, 1]
-        # pdb.set_trace()
         action = controller.sim_step(
             current_rate=current_rate,
             target_rate=target_rate / 180 * torch.pi,
@@ -255,23 +254,23 @@ def main(cfg):
             continue
 
         # get simulated drone state
-        sim_state = drone.get_state().squeeze().cpu()
+        sim_state = drone.get_state().squeeze(0).cpu()
         sim_pos = sim_state[..., :3]
         sim_quat = sim_state[..., 3:7]
         sim_vel = sim_state[..., 7:10]
         sim_omega = sim_state[..., 10:13]
         next_body_rate = quat_rotate_inverse(sim_quat, sim_omega)
 
-        sim_pos_list.append(sim_pos)
-        sim_quat_list.append(sim_quat)
-        sim_vel_list.append(sim_vel)
-        sim_body_rate_list.append(next_body_rate)
-        sim_angvel_list.append(sim_omega)
+        sim_pos_list.append(sim_pos.cpu().detach().numpy())
+        sim_quat_list.append(sim_quat.cpu().detach().numpy())
+        sim_vel_list.append(sim_vel.cpu().detach().numpy())
+        sim_body_rate_list.append(next_body_rate.cpu().detach().numpy())
+        sim_angvel_list.append(sim_omega.cpu().detach().numpy())
 
         # get body_rate and thrust & compare
         target_body_rate = (target_rate / 180 * torch.pi).cpu()
         target_thrust = target_thrust.unsqueeze(1) / (2**16) * max_thrust
-        target_body_rate_list.append(target_body_rate)
+        target_body_rate_list.append(target_body_rate.detach().numpy())
 
     # now run optimization
     print('*'*55)
@@ -280,33 +279,73 @@ def main(cfg):
     real_body_rate_list = np.array(real_body_rate_list)
     target_body_rate_list = np.array(target_body_rate_list)
     sim_body_rate_list = np.array(sim_body_rate_list)
+    
+    sim_pos_list = np.array(sim_pos_list)
+    real_pos_list = np.array(real_pos_list)
+    # plot trajectory
+    fig_3d = plt.figure()
+    ax_3d = fig_3d.add_subplot(projection='3d')
+    # ax_3d.scatter(sim_pos_list[:, 0, 0], sim_pos_list[:, 0, 1], sim_pos_list[:, 0, 2], s=5, label='sim')
+    ax_3d.scatter(real_pos_list[:, 0, 0], real_pos_list[:, 0, 1], real_pos_list[:, 0, 2], s=5, label='real')
+    ax_3d.set_xlabel('X')
+    ax_3d.set_ylabel('Y')
+    ax_3d.set_zlabel('Z')
+    ax_3d.legend()
+    plt.savefig('real_trajectory')
 
     # plot
-    fig = plt.figure()
-    ax1 = fig.add_subplot()
-    ax1.scatter(steps, sim_body_rate_list[:, 0], s=5, label='sim')
-    ax1.scatter(steps, target_body_rate_list[:, 0], s=5, label='target')
-    ax2 = fig.add_subplot()
-    ax2.scatter(steps, sim_body_rate_list[:, 1], s=5, label='sim')
-    ax2.scatter(steps, target_body_rate_list[:, 1], s=5, label='target')
-    ax3 = fig.add_subplot()
-    ax3.scatter(steps, sim_body_rate_list[:, 2], s=5, label='sim')
-    ax3.scatter(steps, target_body_rate_list[:, 2], s=5, label='target')
+    # fig = plt.figure()
+    fig, axs = plt.subplots(1, 3, figsize=(10, 6))  # 1 * 3    
+    # sim
+    axs[0].scatter(steps, sim_body_rate_list[:, 0, 0], s=5, c='red', label='sim')
+    axs[0].scatter(steps, target_body_rate_list[:, 0, 0], s=5, c='green', label='target')
+    axs[0].set_xlabel('steps')
+    axs[0].set_ylabel('rad/s')
+    axs[0].set_title('sim/target_body_rate_x')
+    axs[0].legend()
     
-    ax1.set_xlabel('steps')
-    ax1.set_ylabel('rad/s')
-    ax1.set_title('body_rate_x')
-    ax1.legend()
-    ax2.set_xlabel('steps')
-    ax2.set_ylabel('rad/s')
-    ax2.set_title('body_rate_y')
-    ax2.legend()
-    ax3.set_xlabel('steps')
-    ax3.set_ylabel('rad/s')
-    ax3.set_title('body_rate_z')
-    ax3.legend()
+    axs[1].scatter(steps, sim_body_rate_list[:, 0, 1], s=5, c='red', label='sim')
+    axs[1].scatter(steps, target_body_rate_list[:, 0, 1], s=5, c='green', label='target')
+    axs[1].set_xlabel('steps')
+    axs[1].set_ylabel('rad/s')
+    axs[1].set_title('sim/target_body_rate_y')
+    axs[1].legend()
     
-    plt.savefig('sim_tracking')
+    axs[2].scatter(steps, sim_body_rate_list[:, 0, 2], s=5, c='red', label='sim')
+    axs[2].scatter(steps, target_body_rate_list[:, 0, 2], s=5, c='green', label='target')
+    axs[2].set_xlabel('steps')
+    axs[2].set_ylabel('rad/s')
+    axs[2].set_title('sim/target_body_rate_z')
+    axs[2].legend()
+    
+    error = np.square(sim_body_rate_list - target_body_rate_list)
+    print('sim_target/body_rateX_error', np.mean(error, axis=0)[0,0])
+    print('sim_target/body_rateY_error', np.mean(error, axis=0)[0,1])
+    print('sim_target/body_rateZ_error', np.mean(error, axis=0)[0,2])
+    print('sim_target/body_rate_error', np.mean(error))
+    # # real
+    # axs[1,0].scatter(steps, real_body_rate_list[:, 0, 0], s=5, c='red', label='real')
+    # axs[1,0].scatter(steps, target_body_rate_list[:, 0, 0], s=5, c='green', label='target')
+    # axs[1,0].set_xlabel('steps')
+    # axs[1,0].set_ylabel('rad/s')
+    # axs[1,0].set_title('real/target_body_rate_x')
+    # axs[1,0].legend()
+    
+    # axs[1,1].scatter(steps, real_body_rate_list[:, 0, 1], s=5, c='red', label='real')
+    # axs[1,1].scatter(steps, target_body_rate_list[:, 0, 1], s=5, c='green', label='target')
+    # axs[1,1].set_xlabel('steps')
+    # axs[1,1].set_ylabel('rad/s')
+    # axs[1,1].set_title('real/target_body_rate_y')
+    # axs[1,1].legend()
+    
+    # axs[1,2].scatter(steps, real_body_rate_list[:, 0, 2], s=5, c='red', label='real')
+    # axs[1,2].scatter(steps, target_body_rate_list[:, 0, 2], s=5, c='green', label='target')
+    # axs[1,2].set_xlabel('steps')
+    # axs[1,2].set_ylabel('rad/s')
+    # axs[1,2].set_title('real/target_body_rate_z')
+    # axs[1,2].legend()
+    
+    plt.savefig('origin_tracking')
     
     simulation_app.close()
 
