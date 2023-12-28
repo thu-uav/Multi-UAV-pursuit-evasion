@@ -135,9 +135,9 @@ def main(cfg):
         7.24e-10,
         0.2,
         0.43,
-        0.0052,
-        0.0052,
-        0.00025
+        5.2e-07,
+        3.147753261141643e-05,
+        1.1214032970321934e-05
     ]
     
     tunable_parameters = {
@@ -202,12 +202,15 @@ def main(cfg):
     
     target_body_rate_list = []
     
-    for i in range(real_data.shape[0]):
+    # for i in range(real_data.shape[0]):
+    for i in range(real_data.shape[0] - 1):
         real_pos = torch.tensor(real_data[i, :, 1:4])
         real_quat = torch.tensor(real_data[i, :, 5:9])
         real_vel = torch.tensor(real_data[i, :, 10:13])
         real_rate = torch.tensor(real_data[i, :, 18:21])
+        real_next_rate = torch.tensor(real_data[i + 1, :, 18:21])
         real_rate[:, 1] = -real_rate[:, 1]
+        real_next_rate[:, 1] = -real_next_rate[:, 1]
         # get angvel
         real_ang_vel = quat_rotate(real_quat, real_rate)
         if i == 0:
@@ -227,11 +230,12 @@ def main(cfg):
         target_thrust = torch.tensor(real_data[i, :, 26]).to(device=sim.device).float()
         target_rate = torch.tensor(real_data[i, :, 23:26]).to(device=sim.device).float()
         real_rate = real_rate.to(device=sim.device).float()
+        real_next_rate = real_next_rate.to(device=sim.device).float()
         target_rate[:, 1] = -target_rate[:, 1]
         action = controller.sim_step(
             current_rate=current_rate,
             # target_rate=target_rate / 180 * torch.pi,
-            target_rate=real_rate,
+            target_rate=real_next_rate,
             target_thrust=target_thrust.unsqueeze(1) / (2**16) * max_thrust
         )
         
@@ -267,7 +271,7 @@ def main(cfg):
     # now run optimization
     print('*'*55)
     
-    steps = np.arange(0, real_data.shape[0])
+    steps = np.arange(0, real_data.shape[0]-1)
     real_body_rate_list = np.array(real_body_rate_list)
     target_body_rate_list = np.array(target_body_rate_list)
     sim_body_rate_list = np.array(sim_body_rate_list)
@@ -283,7 +287,7 @@ def main(cfg):
     ax_3d.set_ylabel('Y')
     ax_3d.set_zlabel('Z')
     ax_3d.legend()
-    plt.savefig('sim_track_real')
+    plt.savefig('sim_track_real_opt')
 
     # # sim track target
     # fig, axs = plt.subplots(1, 3, figsize=(10, 6))  # 1 * 3    
@@ -366,7 +370,7 @@ def main(cfg):
     # axs[1,2].set_title('real/target_body_rate_z')
     # axs[1,2].legend()
     
-    plt.savefig('origin_tracking_trackreal')
+    plt.savefig('simopt_tracking_trackreal')
     
     simulation_app.close()
 

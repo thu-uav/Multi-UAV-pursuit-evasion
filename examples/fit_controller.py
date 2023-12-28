@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 rosbags = [
-    '/home/jiayu/OmniDrones/realdata/crazyflie/8_100hz_light.csv',
+    '/home/chenjiayu/OmniDrones/realdata/crazyflie/8_100hz_light.csv',
     # '/home/cf/ros2_ws/rosbags/takeoff.csv',
     # '/home/cf/ros2_ws/rosbags/square.csv',
     # '/home/cf/ros2_ws/rosbags/rl.csv',
@@ -97,6 +97,10 @@ def main(cfg):
         _slice = slice(i, i+T)
         real_data.append(preprocess_df[_slice])
     real_data = np.array(real_data)
+    
+    # add real next_state
+    next_body_rate = real_data[1:,:,18:21]
+    real_data = np.concatenate([real_data[:-1],next_body_rate], axis=-1)
 
     # start sim
     OmegaConf.resolve(cfg)
@@ -199,7 +203,8 @@ def main(cfg):
             'real_rate.thrust', (18:22)
             'target_rate.time','target_rate.r', 'target_rate.p', 'target_rate.y', 
             'target_rate.thrust',(23:27)
-            'motor.time', 'motor.m1', 'motor.m2', 'motor.m3', 'motor.m4'],(28:32)
+            'motor.time', 'motor.m1', 'motor.m2', 'motor.m3', 'motor.m4',(28:32),
+            'next_real_rate.r', 'next_real_rate.p', 'next_real_rate.y']
             dtype='object')
         '''
         for i in range(max(1, real_data.shape[1]-1)):
@@ -208,7 +213,9 @@ def main(cfg):
             vel = torch.tensor(shuffled_real_data[:, i, 10:13])
             # body_rate = torch.tensor(shuffled_real_data[:, i, 14:17]) / 180 * torch.pi
             real_rate = torch.tensor(shuffled_real_data[:, i, 18:21])
+            next_real_rate = torch.tensor(shuffled_real_data[:, i, 32:])
             real_rate[:, 1] = -real_rate[:, 1]
+            next_real_rate[:, 1] = -next_real_rate[:, 1]
             # get angvel
             # ang_vel = quat_rotate(quat, body_rate)
             ang_vel = quat_rotate(quat, real_rate)
@@ -225,12 +232,13 @@ def main(cfg):
             # real_rate = torch.tensor(shuffled_real_data[:, i, 18:21]).to(device=sim.device).float()
             # real_rate[:, 1] = -real_rate[:, 1]
             real_rate = real_rate.to(device=sim.device).float()
+            next_real_rate = next_real_rate.to(device=sim.device).float()
             target_rate[:, 1] = -target_rate[:, 1]
             # pdb.set_trace()
             action = controller.sim_step(
                 current_rate=real_rate,
                 # target_rate=target_rate / 180 * torch.pi,
-                target_rate=real_rate,
+                target_rate=next_real_rate,
                 target_thrust=target_thrust.unsqueeze(1) / (2**16) * max_thrust
             )
             
@@ -298,9 +306,9 @@ def main(cfg):
         7.24e-10,
         0.2,
         0.43,
-        0.0052,
-        0.0052,
-        0.00025
+        5.2e-07,
+        3.147753261141643e-05,
+        1.1214032970321934e-05
     ]
 
     """
