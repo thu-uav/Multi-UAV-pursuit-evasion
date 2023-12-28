@@ -348,7 +348,7 @@ class Track(IsaacEnv):
             },
             self.batch_size,
         )
-    
+        
     def _compute_traj(self, steps: int, env_ids=None, step_size: float=1.):
         if env_ids is None:
             env_ids = ...
@@ -356,9 +356,17 @@ class Track(IsaacEnv):
         t = self.traj_t0 + scale_time(self.traj_w[env_ids].unsqueeze(1) * t * self.dt)
         traj_rot = self.traj_rot[env_ids].unsqueeze(1).expand(-1, t.shape[1], 4)
         
-        target_pos = vmap(lemniscate)(t, self.traj_c[env_ids])
+        # target_pos = vmap(lemniscate)(t, self.traj_c[env_ids])
+        target_pos = vmap(pentagram)(t, self.traj_c[env_ids])
         target_pos = vmap(torch_utils.quat_rotate)(traj_rot, target_pos) * self.traj_scale[env_ids].unsqueeze(1)
 
         return self.origin + target_pos
 
+def pentagram(t, c):
+    # TODO: use c
+    x = -1.5 * torch.sin(2 * t) - 0.5 * torch.sin(3 * t)
+    y = 1.5 * torch.cos(2 * t) - 0.5 * torch.cos(3 * t)
+    z = torch.zeros_like(t)
+
+    return torch.stack([x, y, z], dim=-1)
 
