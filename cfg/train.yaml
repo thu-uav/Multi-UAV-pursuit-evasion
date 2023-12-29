@@ -24,7 +24,7 @@ wandb:
   # run_name: Track_crazyflie_opt_worandom_wolatency_little_origingain_optothers
   # run_name: Track_8_worandom_simopt_moment_constants_gain
   # run_name: Track_8_worandom_woopt_clip60
-  run_name: Track_star_origin_realmass_bodyrate_woclip
+  run_name: Track_star_origin_realmass_bodyrate_clip60
   job_type: train
   entity: chenjy
   project: Track
