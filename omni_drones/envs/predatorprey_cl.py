@@ -187,10 +187,11 @@ class PredatorPrey_cl(IsaacEnv):
         self.curriculum_buffer.update_states()
         weights = np.ones(len(self.curriculum_buffer._state_buffer), dtype=np.float32)
         self.curriculum_buffer.update_weights(weights)
-        
+
+    def _set_specs(self):        
         drone_state_dim = self.drone.state_spec.shape.numel()
         frame_state_dim = 9 # target_pos_dim + target_vel
-        if self.time_encoding:
+        if self.cfg.task.time_encoding:
             self.time_encoding_dim = 4
             frame_state_dim += self.time_encoding_dim        
 
@@ -206,17 +207,33 @@ class PredatorPrey_cl(IsaacEnv):
             "obstacles": UnboundedContinuousTensorSpec((self.num_obstacles, 6)),
         }).to(self.device)
         
+        self.observation_spec = CompositeSpec({
+            "agents": CompositeSpec({
+                "observation": observation_spec.expand(self.drone.n),
+                "state": state_spec,
+            })
+        }).expand(self.num_envs).to(self.device)
+        self.action_spec = CompositeSpec({
+            "agents": CompositeSpec({
+                "action": torch.stack([self.drone.action_spec]*self.drone.n, dim=0),
+            })
+        }).expand(self.num_envs).to(self.device)
+        self.reward_spec = CompositeSpec({
+            "agents": CompositeSpec({
+                "reward": UnboundedContinuousTensorSpec((self.drone.n, 1)),                
+            })
+        }).expand(self.num_envs).to(self.device)
+
         self.agent_spec["drone"] = AgentSpec(
-            "drone",
-            self.drone.n,
-            observation_spec,
-            self.drone.action_spec.to(self.device),
-            UnboundedContinuousTensorSpec(1).to(self.device),
-            state_spec
-        )  
+            "drone", self.drone.n,
+            observation_key=("agents", "observation"),
+            action_key=("agents", "action"),
+            reward_key=("agents", "reward"),
+            state_key=("agents", "state")
+        )
         
         # infos
-        info_spec = CompositeSpec({
+        stats_spec = CompositeSpec({
             "capture": UnboundedContinuousTensorSpec(1),
             "capture_episode": UnboundedContinuousTensorSpec(1),
             "capture_per_step": UnboundedContinuousTensorSpec(1),
@@ -241,7 +258,12 @@ class PredatorPrey_cl(IsaacEnv):
             # "eval_drone2_max_speed": UnboundedContinuousTensorSpec(1),
             # "eval_drone3_max_speed": UnboundedContinuousTensorSpec(1),
         }).expand(self.num_envs).to(self.device)
+        info_spec = CompositeSpec({
+            "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13)),
+        }).expand(self.num_envs).to(self.device)
+        self.observation_spec["stats"] = stats_spec
         self.observation_spec["info"] = info_spec
+        self.stats = stats_spec.zero()
         self.info = info_spec.zero()
         
     def _design_scene(self):
@@ -328,7 +350,7 @@ class PredatorPrey_cl(IsaacEnv):
         if self.set_train:
             sample_p = max(0.0, self.prob_curriculum * (1 - self.prob_decay * self.update_iter / self.max_iters))
             # sample_p = self.prob_curriculum
-            self.info['p'] = sample_p * torch.ones(size=(self.num_envs,1)).to(self.device)
+            self.stats['p'] = sample_p * torch.ones(size=(self.num_envs,1)).to(self.device)
             use_curriculum = (np.random.uniform(size=self.num_envs) < sample_p)
             set_idx = np.arange(self.num_envs)[use_curriculum]
             initial_states = self.curriculum_buffer.sample(len(set_idx))
@@ -422,32 +444,33 @@ class PredatorPrey_cl(IsaacEnv):
         )
         
         # reset info
-        info_spec = CompositeSpec({
-            "capture": UnboundedContinuousTensorSpec(1),
-            "capture_episode": UnboundedContinuousTensorSpec(1),
-            "capture_per_step": UnboundedContinuousTensorSpec(1),
-            "cover_rate": UnboundedContinuousTensorSpec(1),
-            "p": UnboundedContinuousTensorSpec(1),
-            "return": UnboundedContinuousTensorSpec(1),
-            "drone1_speed_per_step": UnboundedContinuousTensorSpec(1),
-            "drone2_speed_per_step": UnboundedContinuousTensorSpec(1),
-            "drone3_speed_per_step": UnboundedContinuousTensorSpec(1),
-            "drone1_max_speed": UnboundedContinuousTensorSpec(1),
-            "drone2_max_speed": UnboundedContinuousTensorSpec(1),
-            "drone3_max_speed": UnboundedContinuousTensorSpec(1),
-            "prey_speed": UnboundedContinuousTensorSpec(1),
-            # "eval_capture": UnboundedContinuousTensorSpec(1),
-            # "eval_capture_episode": UnboundedContinuousTensorSpec(1),
-            # "eval_capture_per_step": UnboundedContinuousTensorSpec(1),
-            # "eval_cover_rate": UnboundedContinuousTensorSpec(1),
-            # "eval_drone1_speed_per_step": UnboundedContinuousTensorSpec(1),
-            # "eval_drone2_speed_per_step": UnboundedContinuousTensorSpec(1),
-            # "eval_drone3_speed_per_step": UnboundedContinuousTensorSpec(1),
-            # "eval_drone1_max_speed": UnboundedContinuousTensorSpec(1),
-            # "eval_drone2_max_speed": UnboundedContinuousTensorSpec(1),
-            # "eval_drone3_max_speed": UnboundedContinuousTensorSpec(1),
-        }).expand(self.num_envs).to(self.device)
-        self.info = info_spec.zero()
+        # info_spec = CompositeSpec({
+        #     "capture": UnboundedContinuousTensorSpec(1),
+        #     "capture_episode": UnboundedContinuousTensorSpec(1),
+        #     "capture_per_step": UnboundedContinuousTensorSpec(1),
+        #     "cover_rate": UnboundedContinuousTensorSpec(1),
+        #     "p": UnboundedContinuousTensorSpec(1),
+        #     "return": UnboundedContinuousTensorSpec(1),
+        #     "drone1_speed_per_step": UnboundedContinuousTensorSpec(1),
+        #     "drone2_speed_per_step": UnboundedContinuousTensorSpec(1),
+        #     "drone3_speed_per_step": UnboundedContinuousTensorSpec(1),
+        #     "drone1_max_speed": UnboundedContinuousTensorSpec(1),
+        #     "drone2_max_speed": UnboundedContinuousTensorSpec(1),
+        #     "drone3_max_speed": UnboundedContinuousTensorSpec(1),
+        #     "prey_speed": UnboundedContinuousTensorSpec(1),
+        #     # "eval_capture": UnboundedContinuousTensorSpec(1),
+        #     # "eval_capture_episode": UnboundedContinuousTensorSpec(1),
+        #     # "eval_capture_per_step": UnboundedContinuousTensorSpec(1),
+        #     # "eval_cover_rate": UnboundedContinuousTensorSpec(1),
+        #     # "eval_drone1_speed_per_step": UnboundedContinuousTensorSpec(1),
+        #     # "eval_drone2_speed_per_step": UnboundedContinuousTensorSpec(1),
+        #     # "eval_drone3_speed_per_step": UnboundedContinuousTensorSpec(1),
+        #     # "eval_drone1_max_speed": UnboundedContinuousTensorSpec(1),
+        #     # "eval_drone2_max_speed": UnboundedContinuousTensorSpec(1),
+        #     # "eval_drone3_max_speed": UnboundedContinuousTensorSpec(1),
+        # }).expand(self.num_envs).to(self.device)
+        # self.info = info_spec.zero()
+        self.stats[env_ids] = 0.
         self.step_spec = 0
 
     def _update_curriculum(self, capture):
@@ -474,7 +497,7 @@ class PredatorPrey_cl(IsaacEnv):
                 self.v_obstacle = torch.Tensor(np.array(self.v_obstacle)).to(self.device)
         
         self.step_spec += 1
-        actions = tensordict[("action", "drone.action")]
+        actions = tensordict[("agents", "action")]
         self.effort = self.drone.apply_action(actions)
         
         target_vel = self.target.get_velocities()
@@ -522,12 +545,12 @@ class PredatorPrey_cl(IsaacEnv):
             self.eval_drone_max_speed = torch.max(torch.stack([self.eval_drone_max_speed, drone_speed_norm], dim=-1), dim=-1).values
             
         if self.set_train:
-            self.info['drone1_speed_per_step'].set_(self.drone_sum_speed[:,0].unsqueeze(-1) / self.step_spec)
-            self.info['drone2_speed_per_step'].set_(self.drone_sum_speed[:,1].unsqueeze(-1) / self.step_spec)
-            self.info['drone3_speed_per_step'].set_(self.drone_sum_speed[:,2].unsqueeze(-1) / self.step_spec)
-            self.info['drone1_max_speed'].set_(self.drone_max_speed[:,0].unsqueeze(-1))
-            self.info['drone2_max_speed'].set_(self.drone_max_speed[:,1].unsqueeze(-1))
-            self.info['drone3_max_speed'].set_(self.drone_max_speed[:,2].unsqueeze(-1))
+            self.stats['drone1_speed_per_step'].set_(self.drone_sum_speed[:,0].unsqueeze(-1) / self.step_spec)
+            self.stats['drone2_speed_per_step'].set_(self.drone_sum_speed[:,1].unsqueeze(-1) / self.step_spec)
+            self.stats['drone3_speed_per_step'].set_(self.drone_sum_speed[:,2].unsqueeze(-1) / self.step_spec)
+            self.stats['drone1_max_speed'].set_(self.drone_max_speed[:,0].unsqueeze(-1))
+            self.stats['drone2_max_speed'].set_(self.drone_max_speed[:,1].unsqueeze(-1))
+            self.stats['drone3_max_speed'].set_(self.drone_max_speed[:,2].unsqueeze(-1))
         # else:
         #     self.info['eval_drone1_speed_per_step'].set_(self.eval_drone_sum_speed[:,0].unsqueeze(-1) / self.step_spec)
         #     self.info['eval_drone2_speed_per_step'].set_(self.eval_drone_sum_speed[:,1].unsqueeze(-1) / self.step_spec)
@@ -539,7 +562,7 @@ class PredatorPrey_cl(IsaacEnv):
         target_pos, _ = self.get_env_poses(self.target.get_world_poses())
         target_pos = target_pos.unsqueeze(1)
         target_vel = self.target.get_velocities()
-        self.info["prey_speed"].set_(torch.norm(target_vel[:, :3], dim=-1).unsqueeze(-1))
+        self.stats["prey_speed"].set_(torch.norm(target_vel[:, :3], dim=-1).unsqueeze(-1))
         target_rpos = target_pos - self.drone_states[..., :3]
         if self.time_encoding:
             t = (self.progress_buf / self.max_episode_length).unsqueeze(-1)
@@ -572,14 +595,14 @@ class PredatorPrey_cl(IsaacEnv):
         state["state_drones"] = obs["state_self"].squeeze(2)    # [num_envs, drone.n, drone_state_dim]
         state["state_frame"] = target_state                # [num_envs, 1, target_rpos_dim]
         state["obstacles"] = torch.concat([obstacle_pos, obstacles_vel], dim=-1)            # [num_envs, num_obstacles, obstacles_dim]
-        return TensorDict(
-            {
-                "drone.obs": obs,
-                "drone.state": state,
-                "info": self.info,
+        return TensorDict({
+            "agents":{
+                "observation": obs,    # input for the network
+                "state": state,
             },
-            self.batch_size,
-        )
+            "stats": self.stats,
+            "info": self.info
+        }, self.batch_size)
 
     def _compute_reward_and_done(self):
         drone_pos, _ = self.drone.get_world_poses()
@@ -589,12 +612,12 @@ class PredatorPrey_cl(IsaacEnv):
         target_dist = torch.norm(target_pos - drone_pos, dim=-1)
 
         capture_flag = (target_dist < self.catch_radius)
-        self.info['capture_episode'].add_(torch.sum(capture_flag, dim=1).unsqueeze(-1))
-        self.info['capture'].set_(torch.from_numpy(self.info['capture_episode'].to('cpu').numpy() > 0.0).type(torch.float32).to(self.device))
-        capture_eval = self.info['capture'].reshape(self.task_space_len, self.eval_num_envs, -1)
+        self.stats['capture_episode'].add_(torch.sum(capture_flag, dim=1).unsqueeze(-1))
+        self.stats['capture'].set_(torch.from_numpy(self.stats['capture_episode'].to('cpu').numpy() > 0.0).type(torch.float32).to(self.device))
+        capture_eval = self.stats['capture'].reshape(self.task_space_len, self.eval_num_envs, -1)
         capture_eval = capture_eval.mean(dim=1)
-        self.info['cover_rate'].set_((torch.sum(capture_eval >= 0.95) / self.task_space_len).unsqueeze(-1).expand_as(self.info['capture']))
-        self.info['capture_per_step'].set_(self.info['capture_episode'] / self.step_spec)
+        self.stats['cover_rate'].set_((torch.sum(capture_eval >= 0.95) / self.task_space_len).unsqueeze(-1).expand_as(self.stats['capture']))
+        self.stats['capture_per_step'].set_(self.stats['capture_episode'] / self.step_spec)
         catch_reward = 10 * capture_flag.sum(-1).unsqueeze(-1).expand_as(capture_flag)
 
         # speed penalty
@@ -627,7 +650,7 @@ class PredatorPrey_cl(IsaacEnv):
         
         self._tensordict["return"] += reward.unsqueeze(-1)
         self.returns = self._tensordict["return"].sum(1)
-        self.info["return"].set_(self.returns)
+        self.stats["return"].set_(self.returns)
 
         done  = (
             (self.progress_buf >= self.max_episode_length).unsqueeze(-1)
@@ -640,12 +663,15 @@ class PredatorPrey_cl(IsaacEnv):
         
         self.progress_std = torch.std(self.progress_buf)
 
-        return TensorDict({
-            "reward": {
-                "drone.reward": reward.unsqueeze(-1)
+        return TensorDict(
+            {
+                "agents": {
+                    "reward": reward
+                },
+                "done": done,
             },
-            "done": done,
-        }, self.batch_size)
+            self.batch_size
+        )
 
     def _get_dummy_policy_prey(self):
         pos, _ = self.drone.get_world_poses(False)

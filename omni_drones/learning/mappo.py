@@ -139,14 +139,11 @@ class MAPPOPolicy(object):
 
         if self.cfg.share_actor:
             self.actor = create_actor_fn()
-            self.actor_params = TensorDictParams(make_functional(self.actor))
+            self.actor_opt = torch.optim.Adam(self.actor.parameters(), lr=cfg.lr)
         else:
             actors = nn.ModuleList([create_actor_fn() for _ in range(self.agent_spec.n)])
             self.actor = actors[0]
-            stacked_params = torch.stack([make_functional(actor) for actor in actors])
-            self.actor_params = TensorDictParams(stacked_params.to_tensordict())
-        
-        self.actor_opt = torch.optim.Adam(self.actor_params.parameters(), lr=cfg.lr)
+            self.actor_opt = torch.optim.Adam(actors.parameters(), lr=cfg.lr)
 
     def make_critic(self):
         cfg = self.cfg.critic
@@ -232,14 +229,12 @@ class MAPPOPolicy(object):
             actor_input["is_init"], (*actor_input.batch_size, self.agent_spec.n)
         )
         actor_input.batch_size = [*actor_input.batch_size, self.agent_spec.n] # [env_num, drone_num]
-        if self.cfg.share_actor:
-            actor_output = self.actor(actor_input, self.actor_params, deterministic=deterministic)
-        else:
-            actor_output = vmap(self.actor, in_dims=(1, 0), out_dims=1, randomness="different")(
-                actor_input, self.actor_params, deterministic=deterministic
-            )
+        actor_output = vmap(self.actor, in_dims=1, out_dims=1, randomness="different")(
+            actor_input, deterministic=deterministic
+        )
 
         tensordict.update(actor_output)
+        tensordict[("agents", "action")].batch_size = tensordict.shape
         tensordict.update(self.value_op(tensordict))
         return tensordict
 
@@ -258,12 +253,9 @@ class MAPPOPolicy(object):
                 actor_input, self.actor_params, eval_action=True
             )
         else: # [N, A, *]
-            if self.cfg.share_actor:
-                actor_output = self.actor(actor_input, self.actor_params, eval_action=True)
-            else:
-                actor_output = vmap(self.actor, in_dims=(1, 0), out_dims=1)(
-                    actor_input, self.actor_params, eval_action=True
-                )
+            actor_output = vmap(self.actor, in_dims=0, out_dims=0, randomness="different")(
+                actor_input, eval_action=True
+            )
 
         log_probs_new = actor_output[self.act_logps_name]
         if not self.cfg.actor.tanh:
@@ -407,14 +399,13 @@ class MAPPOPolicy(object):
     def state_dict(self):
         state_dict = {
             "critic": self.critic.state_dict(),
-            "actor_params": self.actor_params,
+            "actor": self.actor.state_dict(),
             "value_normalizer": self.value_normalizer.state_dict()
         }
         return state_dict
     
     def load_state_dict(self, state_dict):
-        self.actor_params = TensorDictParams(state_dict["actor_params"].to_tensordict())
-        self.actor_opt = torch.optim.Adam(self.actor_params.parameters(), lr=self.cfg.actor.lr)
+        self.actor.load_state_dict(state_dict["actor"])
         self.critic.load_state_dict(state_dict["critic"])
         self.value_normalizer.load_state_dict(state_dict["value_normalizer"])
 

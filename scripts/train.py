@@ -220,6 +220,7 @@ def main(cfg):
         base_env.enable_render(True)
         base_env.eval()
         env.eval()
+        base_env.set_train = False
         env.set_seed(seed)
 
         from tqdm import tqdm
@@ -275,6 +276,7 @@ def main(cfg):
 
     pbar = tqdm(collector)
     env.train() # set env into training mode
+    base_env.set_train = True
     fps = []
     
     # for each iteration, the collector perform one step in the env
@@ -303,6 +305,7 @@ def main(cfg):
             logging.info(f"Eval at {collector._frames} steps.")
             info.update(evaluate())
             env.train() # set env back to training mode after evaluation
+            base_env.set_train = True
 
         # save policy model every certain step
         if save_interval > 0 and i % save_interval == 0:

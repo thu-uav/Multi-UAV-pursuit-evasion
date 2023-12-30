@@ -201,5 +201,5 @@ def draw_detection(
 ):
     return _draw_points_args_merger(
         draw_range(pos, xaxis, yaxis, zaxis, drange, color, size_range, num_range), 
-        draw_axis(pos, xaxis, yaxis, zaxis, drange, size_axis, num_axis)
+        # draw_axis(pos, xaxis, yaxis, zaxis, drange, size_axis, num_axis)
     )

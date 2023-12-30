@@ -18,6 +18,6 @@ time_encoding: true
 # reward_motion_smoothness_weight: 0.0
 # reward_distance_scale: 1.2
 
-flatten_state: true
+# flatten_state: true
 
 action_transform: multidiscrete:4

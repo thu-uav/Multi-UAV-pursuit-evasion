@@ -338,7 +338,7 @@ class HideAndSeek(IsaacEnv):
         self.num_obstacles = self.cfg.num_obstacles
         self.num_cylinder = self.cfg.cylinder.num
         self.obstacle_size = self.cfg.obstacle_size
-        self.detect_range = self.cfg.detect_range
+        # self.detect_range = self.cfg.detect_range
         self.size_min = self.cfg.size_min
         self.size_max = self.cfg.size_max
 
@@ -835,7 +835,8 @@ class HideAndSeek(IsaacEnv):
             xaxis=drone_xaxis[self.central_env_idx, 0, :],
             yaxis=drone_yaxis[self.central_env_idx, 0, :],
             zaxis=drone_zaxis[self.central_env_idx, 0, :],
-            drange=self.detect_range,
+            # drange=self.detect_range,
+            drange=0.5,
         )
         point_list = [
             _carb_float3_add(p, self.central_env_pos) for p in point_list

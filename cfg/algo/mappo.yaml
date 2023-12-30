@@ -12,8 +12,8 @@ max_grad_norm: 10.0
 normalize_advantages: True
 
 reward_weights: null # null means all 1.0
-share_actor: false
-critic_input: state # `obs` or `state`
+share_actor: True
+critic_input: obs # `obs` or `state`
 
 actor:
   lr: 0.0005

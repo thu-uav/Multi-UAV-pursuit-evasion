@@ -13,12 +13,12 @@ import pdb
 
 from omni_drones import CONFIG_PATH, init_simulation_app
 from omni_drones.utils.torchrl import SyncDataCollector, AgentSpec
-from omni_drones.utils.envs.transforms import (
+from omni_drones.utils.torchrl.transforms import (
     DepthImageNorm,
     LogOnEpisode, 
     FromMultiDiscreteAction, 
     FromDiscreteAction,
-    flatten_composite,
+    ravel_composite,
     VelController,
     History
 )
@@ -31,7 +31,6 @@ from omni_drones.learning import (
     SACPolicy,
     TD3Policy,
     MATD3Policy,
-    DreamerPolicy,
     TDMPCPolicy
 )
 
@@ -58,7 +57,7 @@ class Every:
             self.func(*args, **kwargs)
         self.i += 1
 
-@hydra.main(version_base=None, config_path=CONFIG_PATH, config_name="config")
+@hydra.main(version_base=None, config_path=CONFIG_PATH, config_name="train")
 def main(cfg):
     OmegaConf.register_new_resolver("eval", eval)
     OmegaConf.resolve(cfg)
@@ -78,7 +77,6 @@ def main(cfg):
         "sac": SACPolicy,
         "td3": TD3Policy,
         "matd3": MATD3Policy,
-        "dreamer": DreamerPolicy,
         "tdmpc": TDMPCPolicy
     }
     env_class = IsaacEnv.REGISTRY[cfg.task.name]
@@ -110,9 +108,9 @@ def main(cfg):
     # a CompositeSpec is by deafault processed by a entity-based encoder
     # flatten it to use a MLP encoder instead
     if cfg.task.get("flatten_obs", False):
-        transforms.append(flatten_composite(base_env.observation_spec, "drone.obs"))
+        transforms.append(ravel_composite(base_env.observation_spec, ("agents", "observation")))
     if cfg.task.get("flatten_state", False):
-        transforms.append(flatten_composite(base_env.observation_spec, "drone.state"))
+        transforms.append(ravel_composite(base_env.observation_spec, ("agents", "state")))
     if cfg.task.get("visual_obs", False):
         min_depth = cfg.task.camera.get("min_depth", 0.1)
         max_depth = cfg.task.camera.get("max_depth", 5)
@@ -126,11 +124,11 @@ def main(cfg):
     if action_transform is not None:
         if action_transform.startswith("multidiscrete"):
             nbins = int(action_transform.split(":")[1])
-            transform = FromMultiDiscreteAction(("action", "drone.action"), nbins=nbins)
+            transform = FromMultiDiscreteAction(nbins=nbins)
             transforms.append(transform)
         elif action_transform.startswith("discrete"):
             nbins = int(action_transform.split(":")[1])
-            transform = FromDiscreteAction(("action", "drone.action"), nbins=nbins)
+            transform = FromDiscreteAction(nbins=nbins)
             transforms.append(transform)
         elif action_transform == "controller":
             controller_cls = base_env.drone.DEFAULT_CONTROLLER
@@ -167,17 +165,8 @@ def main(cfg):
     camera.initialize("/World/Camera")
 
     # TODO: create a agent_spec view for TransformedEnv
-    agent_spec = AgentSpec(
-        name=base_env.agent_spec["drone"].name,
-        n=base_env.agent_spec["drone"].n,
-        observation_spec=env.observation_spec["drone.obs"],
-        action_spec=env.action_spec["drone.action"],
-        reward_spec=env.reward_spec["drone.reward"],
-        state_spec=env.observation_spec["drone.state"] if base_env.agent_spec["drone"].state_spec is not None else None,
-    )
-    policy = algos[cfg.algo.name.lower()](
-        cfg.algo, agent_spec=agent_spec, device="cuda"
-    )
+    agent_spec: AgentSpec = env.agent_spec["drone"]
+    policy = algos[cfg.algo.name.lower()](cfg.algo, agent_spec=agent_spec, device="cuda")
     
     if cfg.model_dir is not None:
         # torch.save(policy.state_dict(), ckpt_path)
