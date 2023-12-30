@@ -31,8 +31,6 @@ from .transport import TransportHover, TransportFlyThrough, TransportTrack
 # from .forest import Forest
 from .payload import PayloadTrack, PayloadFlyThrough
 # from .dragon import DragonHover
-from .predatorprey import PredatorPrey
-from .predatorprey_debug import PredatorPrey_debug
 from .predatorprey_cl import PredatorPrey_cl
 from .hide_and_seek import HideAndSeek
 # from .hideandseek import HideAndSeek

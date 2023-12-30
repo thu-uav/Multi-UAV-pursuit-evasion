@@ -16,7 +16,7 @@ import omni.isaac.core.objects as objects
 # from omni.isaac.core.objects import VisualSphere, DynamicSphere, FixedCuboid, VisualCylinder, FixedCylinder, DynamicCylinder
 # from omni.isaac.core.prims import RigidPrimView, GeometryPrimView
 import omni.isaac.core.prims as prims
-from omni_drones.views import RigidPrimView, GeometryPrimView
+from omni_drones.views import RigidPrimView
 from omni_drones.envs.isaac_env import IsaacEnv, AgentSpec
 from omni_drones.robots.config import RobotCfg
 from omni_drones.robots.drone import MultirotorBase
