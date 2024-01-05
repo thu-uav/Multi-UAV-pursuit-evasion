@@ -26,8 +26,8 @@ reward_distance_scale: 1.6
 
 action_transform: rate
 history: true
-# randomization:
-#   drone:
-#     train:
-#       mass_scale: [1., 1.1]
+randomization:
+  drone:
+    train:
+      mass_scale: [1., 1.1]
 #       inertia_scale: [0.7, 1.3]

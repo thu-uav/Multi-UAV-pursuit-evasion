@@ -315,13 +315,15 @@ class Track(IsaacEnv):
         reward_effort = self.reward_effort_weight * torch.exp(-self.effort)
         reward_action_smoothness = self.reward_action_smoothness_weight * torch.exp(-self.drone.throttle_difference)
 
-        # spin reward
+        # spin reward, fixed z
         spin = torch.square(self.drone.vel[..., -1])
         reward_spin = 0.5 / (1.0 + torch.square(spin))
+        not_spin_bonus = torch.abs(torch.square(self.drone.vel[..., -1])) < 1e-5
 
         reward = (
             reward_pose 
-            + reward_pose * (reward_up + reward_spin) 
+            + reward_pose * (reward_up + reward_spin)
+            + not_spin_bonus
             + reward_effort
             + reward_action_smoothness
         )

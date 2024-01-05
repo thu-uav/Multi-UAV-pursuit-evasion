@@ -21,10 +21,8 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: Track_crazyflie_opt_worandom_wolatency_little_origingain_optothers
-  # run_name: Track_8_worandom_simopt_moment_constants_gain
-  # run_name: Track_8_worandom_woopt_clip60
-  run_name: Track_star_simopt2_realmass_bodyrate_clip60
+  run_name: Track_star_origin_randommass_bodyrate_clip60_fixedz
+  # run_name: debug
   job_type: train
   entity: chenjy
   project: Track
