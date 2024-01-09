@@ -313,17 +313,7 @@ class HideAndSeek(IsaacEnv):
             "drone1_max_speed": UnboundedContinuousTensorSpec(1),
             "drone2_max_speed": UnboundedContinuousTensorSpec(1),
             "drone3_max_speed": UnboundedContinuousTensorSpec(1),
-            "prey_speed": UnboundedContinuousTensorSpec(1),
-            # "eval_capture": UnboundedContinuousTensorSpec(1),
-            # "eval_capture_episode": UnboundedContinuousTensorSpec(1),
-            # "eval_capture_per_step": UnboundedContinuousTensorSpec(1),
-            # "eval_cover_rate": UnboundedContinuousTensorSpec(1),
-            # "eval_drone1_speed_per_step": UnboundedContinuousTensorSpec(1),
-            # "eval_drone2_speed_per_step": UnboundedContinuousTensorSpec(1),
-            # "eval_drone3_speed_per_step": UnboundedContinuousTensorSpec(1),
-            # "eval_drone1_max_speed": UnboundedContinuousTensorSpec(1),
-            # "eval_drone2_max_speed": UnboundedContinuousTensorSpec(1),
-            # "eval_drone3_max_speed": UnboundedContinuousTensorSpec(1),
+            "prey_speed": UnboundedContinuousTensorSpec(1)
         }).expand(self.num_envs).to(self.device)
         info_spec = CompositeSpec({
             "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13)),
@@ -332,13 +322,14 @@ class HideAndSeek(IsaacEnv):
         self.observation_spec["info"] = info_spec
         self.stats = stats_spec.zero()
         self.info = info_spec.zero()
+        # breakpoint()
         
     def _design_scene(self):
         self.num_agents = self.cfg.num_agents
         self.num_obstacles = self.cfg.num_obstacles
         self.num_cylinder = self.cfg.cylinder.num
         self.obstacle_size = self.cfg.obstacle_size
-        # self.detect_range = self.cfg.detect_range
+        self.detect_range = self.cfg.detect_range
         self.size_min = self.cfg.size_min
         self.size_max = self.cfg.size_max
 
@@ -610,9 +601,15 @@ class HideAndSeek(IsaacEnv):
         self.drone_states = self.drone.get_state()
         self.info["drone_state"][:] = self.drone_states[..., :13]
         drone_pos = self.drone_states[..., :3]
+        drone_vel = self.drone.get_velocities()
         self.drone_rpos = vmap(cpos)(drone_pos, drone_pos)
         self.drone_rpos = vmap(off_diag)(self.drone_rpos)
-        drone_vel = self.drone.get_velocities()
+
+        # get masked drone relative position
+        drone_mask = torch.norm(self.drone_rpos, dim=-1) > self.detect_range
+        drone_pmask = drone_mask.unsqueeze(-1).expand(-1, -1, -1, 3)
+        drone_rpos_masked = self.drone_rpos.clone()
+        drone_rpos_masked[drone_pmask] = 0.0
         
         # draw drone trajectory and detection range
         if self._should_render(0):
@@ -626,58 +623,98 @@ class HideAndSeek(IsaacEnv):
         else:
             self.eval_drone_sum_speed += drone_speed_norm
             self.eval_drone_max_speed = torch.max(torch.stack([self.eval_drone_max_speed, drone_speed_norm], dim=-1), dim=-1).values
-            
-        if self.set_train:
-            self.stats['drone1_speed_per_step'].set_(self.drone_sum_speed[:,0].unsqueeze(-1) / self.step_spec)
-            self.stats['drone2_speed_per_step'].set_(self.drone_sum_speed[:,1].unsqueeze(-1) / self.step_spec)
-            self.stats['drone3_speed_per_step'].set_(self.drone_sum_speed[:,2].unsqueeze(-1) / self.step_spec)
-            self.stats['drone1_max_speed'].set_(self.drone_max_speed[:,0].unsqueeze(-1))
-            self.stats['drone2_max_speed'].set_(self.drone_max_speed[:,1].unsqueeze(-1))
-            self.stats['drone3_max_speed'].set_(self.drone_max_speed[:,2].unsqueeze(-1))
-        # else:
-        #     self.stats['eval_drone1_speed_per_step'].set_(self.eval_drone_sum_speed[:,0].unsqueeze(-1) / self.step_spec)
-        #     self.stats['eval_drone2_speed_per_step'].set_(self.eval_drone_sum_speed[:,1].unsqueeze(-1) / self.step_spec)
-        #     self.stats['eval_drone3_speed_per_step'].set_(self.eval_drone_sum_speed[:,2].unsqueeze(-1) / self.step_spec)
-        #     self.stats['eval_drone1_max_speed'].set_(self.eval_drone_max_speed[:,0].unsqueeze(-1))
-        #     self.stats['eval_drone2_max_speed'].set_(self.eval_drone_max_speed[:,1].unsqueeze(-1))
-        #     self.stats['eval_drone3_max_speed'].set_(self.eval_drone_max_speed[:,2].unsqueeze(-1))
         
+        # record stats
+        self.stats['drone1_speed_per_step'].set_(self.drone_sum_speed[:,0].unsqueeze(-1) / self.step_spec)
+        self.stats['drone2_speed_per_step'].set_(self.drone_sum_speed[:,1].unsqueeze(-1) / self.step_spec)
+        self.stats['drone3_speed_per_step'].set_(self.drone_sum_speed[:,2].unsqueeze(-1) / self.step_spec)
+        self.stats['drone1_max_speed'].set_(self.drone_max_speed[:,0].unsqueeze(-1))
+        self.stats['drone2_max_speed'].set_(self.drone_max_speed[:,1].unsqueeze(-1))
+        self.stats['drone3_max_speed'].set_(self.drone_max_speed[:,2].unsqueeze(-1))
+
+        # get target position and velocity        
         target_pos, _ = self.get_env_poses(self.target.get_world_poses())
-        target_pos = target_pos.unsqueeze(1)
+        target_pos = target_pos.unsqueeze(1) # [N, 1, 3]
         target_vel = self.target.get_velocities()
-        self.stats["prey_speed"].set_(torch.norm(target_vel[:, :3], dim=-1).unsqueeze(-1))
-        target_rpos = target_pos - self.drone_states[..., :3]
+        target_vel = target_vel.unsqueeze(1) # [N, 1, 6]
+        self.stats["prey_speed"].set_(torch.norm(target_vel.squeeze(1)[:, :3], dim=-1).unsqueeze(-1))
+
+        # get masked target relative position and velocity
+        target_rpos = target_pos - drone_pos # [N, n, 3]
+        target_rvel = target_vel - drone_vel # [N, n, 6]
+        target_mask = torch.norm(target_rpos, dim=-1) > self.detect_range # [N, n]
+        target_pmask = target_mask.unsqueeze(-1).expand(-1, -1, 3)
+        target_vmask = target_mask.unsqueeze(-1).expand(-1, -1, 6)
+        target_rpos_masked = target_rpos.clone()
+        target_rpos_masked[target_pmask] = 0.0
+        target_rvel_masked = target_rvel.clone()
+        target_rvel_masked[target_vmask] = 0.0
+        
+        # get full target state
         if self.time_encoding:
             t = (self.progress_buf / self.max_episode_length).unsqueeze(-1)
             target_state = torch.cat([
                 target_pos,
-                target_vel.unsqueeze(1),
+                target_vel,
                 t.expand(-1, self.time_encoding_dim).unsqueeze(1)
-            ], dim=-1) # [num_envs, 1, 25+time_encoding_dim]
+            ], dim=-1) # [num_envs, 1, 9+time_encoding_dim]
         else:
             target_state = torch.cat([
                 target_pos,
-                target_vel.unsqueeze(1)
-            ], dim=-1) # [num_envs, 1, 25]
+                target_vel
+            ], dim=-1) # [num_envs, 1, 9]
 
         identity = torch.eye(self.drone.n, device=self.device).expand(self.num_envs, -1, -1)
 
         obs = TensorDict({}, [self.num_envs, self.drone.n])
         obs["state_self"] = torch.cat(
-            [-target_rpos, target_vel.unsqueeze(1).expand(-1, self.drone.n, -1), self.drone_states, identity], dim=-1
+            [-target_rpos_masked,
+            #  target_vel.unsqueeze(1).expand(-1, self.drone.n, -1), 
+             -target_rvel_masked,
+             self.drone_states, 
+             identity], dim=-1
         ).unsqueeze(2)
-        obs["state_others"] = self.drone_rpos
-        obs["state_frame"] = target_state.unsqueeze(1).expand(-1, self.drone.n, 1, -1)
+
+        # obs["state_others"] = self.drone_rpos
+        obs["state_others"] = drone_rpos_masked
+
+        frame_state = target_state.unsqueeze(1).expand(-1, self.drone.n, 1, -1)
+        target_smask = target_mask.unsqueeze(-1).unsqueeze(-1).expand(-1, -1, 1, 13)
+        frame_state_masked = frame_state.clone()
+        frame_state_masked[target_smask] = 0.0
+        obs["state_frame"] = frame_state_masked
         
-        obstacle_pos, _ = self.get_env_poses(self.obstacles.get_world_poses())
-        obstacles_vel = self.obstacles.get_velocities()[...,:3]
+        # get masked obstacle relative position and velocity
+        obstacles_pos, _ = self.get_env_poses(self.obstacles.get_world_poses())
+        obstacles_rpos = vmap(cpos)(drone_pos, obstacles_pos)
+        obstacles_mask = torch.norm(obstacles_rpos, dim=-1) > self.detect_range
+        obstacles_pmask = obstacles_mask.unsqueeze(-1).expand(-1, -1, -1, 3)
+        obstacles_rpos_masked = obstacles_rpos.clone()
+        obstacles_rpos_masked[obstacles_pmask] = 0.0
+
+        obstacles_vel = self.obstacles.get_velocities()[..., :3]
+        obstacles_rvel = vmap(cpos)(drone_vel[..., :3], obstacles_vel)
+        obstacles_vmask = obstacles_mask.unsqueeze(-1).expand(-1, -1, -1, 3)
+        obstacles_rvel_masked = obstacles_rvel.clone()
+        obstacles_rvel_masked[obstacles_vmask] = 0.0
         # obstacle_rpos + vel
-        obs["obstacles"] = torch.concat([vmap(cpos)(drone_pos, obstacle_pos), obstacles_vel.unsqueeze(1).expand(-1, self.drone.n, -1, -1)], dim=-1)
+        obs["obstacles"] = torch.concat([
+            # vmap(cpos)(drone_pos, obstacle_pos), 
+            # obstacles_vel.unsqueeze(1).expand(-1, self.drone.n, -1, -1)
+            obstacles_rpos,
+            obstacles_rvel
+        ], dim=-1)
 
         state = TensorDict({}, [self.num_envs])
-        state["state_drones"] = obs["state_self"].squeeze(2)    # [num_envs, drone.n, drone_state_dim]
+        state["state_drones"] = torch.cat(
+            [-target_rpos,
+             -target_rvel,
+             self.drone_states, 
+             identity], dim=-1
+        )   # [num_envs, drone.n, drone_state_dim]
         state["state_frame"] = target_state                # [num_envs, 1, target_rpos_dim]
-        state["obstacles"] = torch.concat([obstacle_pos, obstacles_vel], dim=-1)            # [num_envs, num_obstacles, obstacles_dim]
+        state["obstacles"] = torch.concat([obstacles_pos, obstacles_vel], dim=-1)            # [num_envs, num_obstacles, obstacles_dim]
+        # breakpoint()
         return TensorDict(
             {
                 "agents": {
@@ -704,7 +741,8 @@ class HideAndSeek(IsaacEnv):
         capture_eval = capture_eval.mean(dim=1)
         self.stats['cover_rate'].set_((torch.sum(capture_eval >= 0.95) / self.task_space_len).unsqueeze(-1).expand_as(self.stats['capture']))
         self.stats['capture_per_step'].set_(self.stats['capture_episode'] / self.step_spec)
-        catch_reward = 10 * capture_flag.sum(-1).unsqueeze(-1).expand_as(capture_flag)
+        # catch_reward = 10 * capture_flag.sum(-1).unsqueeze(-1).expand_as(capture_flag)
+        catch_reward = 10 * capture_flag.type(torch.float32)
 
         # speed penalty
         if self.cfg.use_speed_penalty:
@@ -725,10 +763,10 @@ class HideAndSeek(IsaacEnv):
             coll_reward -= if_coll # sparse
 
         # distance reward
-        min_dist = (torch.min(target_dist, dim=-1)[0].unsqueeze(-1).expand_as(target_dist))
+        # min_dist = (torch.min(target_dist, dim=-1)[0].unsqueeze(-1).expand_as(target_dist))
+        min_dist = target_dist
         dist_reward_mask = (min_dist > self.catch_radius)
         distance_reward = - 1.0 * min_dist * dist_reward_mask
-
         if self.cfg.use_collision:
             reward = speed_reward + 1.0 * catch_reward + 1.0 * distance_reward + 5 * coll_reward
         else:

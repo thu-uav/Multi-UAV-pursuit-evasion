@@ -285,19 +285,23 @@ class PartialAttentionEncoder(nn.Module):
             x: (batch, N, dim)
             padding_mask: (batch, N)
         """
-        x = self.split_embed(x)
+        # breakpoint()
+        x = self.split_embed(x) # (num_batch, num_drone, num_entity, embed_dim)
+        original_shape = x.shape[:-2]
+        x = x.reshape(-1, x.shape[-2], x.shape[-1]) # (num_batch * num_drone, num_entity, embed_dim)
         if self.norm_first:
             x = x[:, self.query_index] + self._pa_block(self.norm1(x), key_padding_mask)
             x = x + self._ff_block(self.norm2(x))
         else:
             x = self.norm1(x[:, self.query_index] + self._pa_block(x, key_padding_mask))
             x = self.norm2(x + self._ff_block(x))
-
-        return x.mean(-2)
+        # x: (num_batch * num_drone, 1, embed_dim)
+        return x.reshape(*original_shape, -1) # (num_batch, num_drone, embed_dim)
 
     def _pa_block(self, x: Tensor, key_padding_mask: Optional[Tensor] = None):
+        # breakpoint()
         x = self.attn(
-            x[:, self.query_index],
+            x[:, self.query_index], # (num_batch * num_drone, 1, embed_dim)
             x,
             x,
             key_padding_mask=key_padding_mask,
