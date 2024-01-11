@@ -347,10 +347,12 @@ class RateController(nn.Module):
         cmd = cmd.reshape(*batch_shape, -1)
         return cmd
 
+
 class PIDRateController(nn.Module):
     def __init__(self, g, uav_params) -> None:
         super().__init__()
         rotor_config = uav_params["rotor_configuration"]
+        self.rotor_config = rotor_config
         inertia = uav_params["inertia"]
         force_constants = torch.as_tensor(rotor_config["force_constants"])
         max_rot_vel = torch.as_tensor(rotor_config["max_rotation_velocities"])
@@ -398,7 +400,7 @@ class PIDRateController(nn.Module):
         pos, rot, linvel, angvel = root_state.split([3, 4, 3, 3], dim=1)
         body_rate = quat_rotate_inverse(rot, angvel)
 
-        rate_error = body_rate - target_rate
+        rate_error = target_rate - body_rate
         
         # P
         outputP = rate_error * self.kp.view(1, -1)
