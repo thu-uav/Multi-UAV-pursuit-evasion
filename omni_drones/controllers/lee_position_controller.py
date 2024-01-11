@@ -402,3 +402,163 @@ class RateController(nn.Module):
         cmd = (cmd / self.max_thrusts) * 2 - 1
         cmd = cmd.reshape(*batch_shape, -1)
         return cmd
+
+class PIDRateController(nn.Module):
+    def __init__(self, g, uav_params) -> None:
+        super().__init__()
+        rotor_config = uav_params["rotor_configuration"]
+        self.rotor_config = rotor_config
+        inertia = uav_params["inertia"]
+        force_constants = torch.as_tensor(rotor_config["force_constants"])
+        max_rot_vel = torch.as_tensor(rotor_config["max_rotation_velocities"])
+        gain = uav_params['controller_configuration']['gain']
+
+        self.g = nn.Parameter(torch.tensor(g))
+        self.max_thrusts = nn.Parameter(max_rot_vel.square() * force_constants)
+        I = torch.diag_embed(
+            torch.tensor([inertia["xx"], inertia["yy"], inertia["zz"], 1])
+        )
+
+        self.mixer = nn.Parameter(compute_parameters(rotor_config, I))
+        self.gain_angular_rate = nn.Parameter(
+            torch.tensor(gain) @ I[:3, :3].inverse()
+        )
+        
+        # PID param
+        self.dt = nn.Parameter(torch.tensor(0.02))
+        self.kp = nn.Parameter(torch.tensor([250.0, 250.0, 120.0]))
+        self.kd = nn.Parameter(torch.tensor([2.5, 2.5, 0.0]))
+        self.ki = nn.Parameter(torch.tensor([500.0, 500.0, 16.7]))
+        self.kff = nn.Parameter(torch.tensor([0.0, 0.0, 0.0]))
+        self.count = 0 # if = 0, integ, last_rate_error = 0.0
+        self.iLimit = nn.Parameter(torch.tensor([33.3, 33.3, 166.7]))
+        self.outputLimit = 0.0
+
+    def set_byTunablePara(
+        self,
+        tunable_parameters: dict = {},
+    ):        
+        force_constants = torch.as_tensor(self.rotor_config["force_constants"])
+        max_rot_vel = torch.as_tensor(self.rotor_config["max_rotation_velocities"])
+        self.max_thrusts = nn.Parameter(max_rot_vel.square() * force_constants)
+        inertia_xx = tunable_parameters['inertia_xx']
+        inertia_yy = tunable_parameters['inertia_yy']
+        inertia_zz = tunable_parameters['inertia_zz']
+        gain = tunable_parameters['gain']
+        I = torch.diag_embed(
+            torch.tensor([inertia_xx, inertia_yy, inertia_zz, 1])
+        )
+
+        self.rotor_config['arm_lengths'] = [tunable_parameters['arm_lengths']] * 4
+        self.rotor_config['force_constants'] = [tunable_parameters['force_constants']] * 4
+        self.rotor_config['max_rotation_velocities'] = [tunable_parameters['max_rotation_velocities']] * 4
+        self.rotor_config['moment_constants'] = [tunable_parameters['moment_constants']] * 4
+        # self.rotor_config['rotor_angles'] = tunable_parameters['rotor_angles']
+        self.rotor_config['time_constant'] = tunable_parameters['time_constant']
+
+        self.mixer = nn.Parameter(compute_parameters(self.rotor_config, I))
+        # TODO: jiayu, only crazyflie
+        self.gain_angular_rate = nn.Parameter(
+            torch.tensor(gain).float() @ I[:3, :3].inverse()
+        )
+    
+    def forward(
+        self, 
+        root_state: torch.Tensor, 
+        target_rate: torch.Tensor,
+        target_thrust: torch.Tensor,
+    ):
+        assert root_state.shape[:-1] == target_rate.shape[:-1]
+
+        batch_shape = root_state.shape[:-1]
+        root_state = root_state.reshape(-1, 13)
+        target_rate = target_rate.reshape(-1, 3)
+        target_thrust = target_thrust.reshape(-1, 1)
+        device = root_state.device
+        if self.count == 0:
+            self.last_rate_error = torch.zeros(size=(batch_shape[0], 3)).to(device)
+            self.integ = torch.zeros(size=(batch_shape[0], 3)).to(device)
+        self.count += 1
+
+        pos, rot, linvel, angvel = root_state.split([3, 4, 3, 3], dim=1)
+        body_rate = quat_rotate_inverse(rot, angvel)
+
+        rate_error = body_rate - target_rate
+        
+        # P
+        outputP = rate_error * self.kp.view(1, -1)
+        # D
+        deriv = (rate_error - self.last_rate_error) / self.dt
+        # TODO, w.o.lpf2pApply filter to deriv
+        deriv[torch.isnan(deriv)] = 0.0
+        outputD = deriv * self.kd.view(1, -1)
+        # I
+        self.integ += rate_error * self.dt
+        self.integ = torch.clip(self.integ, -self.iLimit, self.iLimit)
+        outputI = self.integ * self.ki.view(1, -1)
+        # kff
+        outputFF = body_rate * self.kff.view(1, -1)
+        
+        output = outputP + outputD + outputI + outputFF
+        # TODO, w.o.lpf2pApply filter to output
+        output[torch.isnan(output)] = 0.0
+        
+        angacc_thrust = torch.cat([output, target_thrust], dim=1)
+        cmd = (self.mixer @ angacc_thrust.T).T
+        cmd = (cmd / self.max_thrusts) * 2 - 1
+        cmd = cmd.reshape(*batch_shape, -1)
+        
+        # set last error
+        self.last_rate_error = rate_error.clone()
+        return cmd
+
+    def sim_step(
+        self, 
+        current_rate: torch.Tensor, 
+        target_rate: torch.Tensor,
+        target_thrust: torch.Tensor,
+    ):
+        # assert root_state.shape[:-1] == target_rate.shape[:-1]
+
+        batch_shape = current_rate.shape[:-1]
+        # root_state = root_state.reshape(-1, 13)
+        current_rate = current_rate.reshape(-1, 3)
+        target_rate = target_rate.reshape(-1, 3)
+        target_thrust = target_thrust.reshape(-1, 1)
+        device = current_rate.device
+        if self.count == 0:
+            self.last_rate_error = torch.zeros(size=(batch_shape[0], 3)).to(device)
+            self.integ = torch.zeros(size=(batch_shape[0], 3)).to(device)
+        self.count += 1
+
+        # pos, rot, linvel, angvel = root_state.split([3, 4, 3, 3], dim=1)
+        # body_rate = quat_rotate_inverse(rot, angvel)
+
+        rate_error = target_rate - current_rate
+        
+        # P
+        outputP = rate_error * self.kp.view(1, -1)
+        # D
+        deriv = (rate_error - self.last_rate_error) / self.dt
+        # TODO, w.o.lpf2pApply filter to deriv
+        deriv[torch.isnan(deriv)] = 0.0
+        outputD = deriv * self.kd.view(1, -1)
+        # I
+        self.integ += rate_error * self.dt
+        self.integ = torch.clip(self.integ, -self.iLimit, self.iLimit)
+        outputI = self.integ * self.ki.view(1, -1)
+        # kff
+        outputFF = current_rate * self.kff.view(1, -1)
+        
+        output = outputP + outputD + outputI + outputFF
+        # TODO, w.o.lpf2pApply filter to output
+        output[torch.isnan(output)] = 0.0
+        
+        angacc_thrust = torch.cat([output, target_thrust], dim=1)
+        cmd = (self.mixer @ angacc_thrust.T).T
+        cmd = (cmd / self.max_thrusts) * 2 - 1
+        cmd = cmd.reshape(*batch_shape, -1)
+        
+        # set last error
+        self.last_rate_error = rate_error.clone()
+        return cmd

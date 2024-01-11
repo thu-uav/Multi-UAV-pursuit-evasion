@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 rosbags = [
-    '/home/chenjiayu/OmniDrones/realdata/crazyflie/8_100hz_light.csv',
+    '/home/jiayu/OmniDrones/realdata/crazyflie/8_100hz_light.csv',
     # '/home/cf/ros2_ws/rosbags/takeoff.csv',
     # '/home/cf/ros2_ws/rosbags/square.csv',
     # '/home/cf/ros2_ws/rosbags/rl.csv',
@@ -76,7 +76,7 @@ def main(cfg):
     simulation_app = init_simulation_app(cfg)
     import omni_drones.utils.scene as scene_utils
     from omni.isaac.core.simulation_context import SimulationContext
-    from omni_drones.controllers import RateController
+    from omni_drones.controllers import RateController, PIDRateController
     from omni_drones.robots.drone import MultirotorBase
     from omni_drones.utils.torch import euler_to_quaternion, quaternion_to_euler
     from omni_drones.sensors.camera import Camera, PinholeCameraCfg
@@ -107,23 +107,6 @@ def main(cfg):
         controller: the predefined controller
     """
     # origin
-    # params = [
-    #     0.03,
-    #     1.4e-5,
-    #     1.4e-5,
-    #     2.17e-5,
-    #     0.043,
-    #     2.88e-8,
-    #     2315,
-    #     7.24e-10,
-    #     0.2,
-    #     0.43,
-    #     0.0052,
-    #     0.0052,
-    #     0.00025
-    # ]
-    
-    # simopt
     params = [
         0.03,
         1.4e-5,
@@ -135,9 +118,9 @@ def main(cfg):
         7.24e-10,
         0.2,
         0.43,
-        5.2e-07,
-        3.147753261141643e-05,
-        1.1214032970321934e-05
+        0.0052,
+        0.0052,
+        0.00025
     ]
     
     tunable_parameters = {
@@ -157,7 +140,8 @@ def main(cfg):
     # reset sim
     sim.reset()
     drone.initialize_byTunablePara(tunable_parameters=tunable_parameters)
-    controller = RateController(9.81, drone.params).to(sim.device)
+    # controller = RateController(9.81, drone.params).to(sim.device)
+    controller = PIDRateController(9.81, drone.params).to(sim.device)
     controller.set_byTunablePara(tunable_parameters=tunable_parameters)
     controller = controller.to(sim.device)
     
@@ -234,8 +218,8 @@ def main(cfg):
         target_rate[:, 1] = -target_rate[:, 1]
         action = controller.sim_step(
             current_rate=current_rate,
-            # target_rate=target_rate / 180 * torch.pi,
-            target_rate=real_next_rate,
+            target_rate=target_rate / 180 * torch.pi,
+            # target_rate=real_next_rate,
             target_thrust=target_thrust.unsqueeze(1) / (2**16) * max_thrust
         )
         
@@ -287,66 +271,67 @@ def main(cfg):
     ax_3d.set_ylabel('Y')
     ax_3d.set_zlabel('Z')
     ax_3d.legend()
-    plt.savefig('sim_track_real_opt')
+    # plt.savefig('RateController_tracktarget_trajectory')
+    plt.savefig('PIDController_tracktarget_trajectory')
 
-    # # sim track target
-    # fig, axs = plt.subplots(1, 3, figsize=(10, 6))  # 1 * 3    
-    # # sim
-    # axs[0].scatter(steps, sim_body_rate_list[:, 0, 0], s=5, c='red', label='sim')
-    # axs[0].scatter(steps, target_body_rate_list[:, 0, 0], s=5, c='green', label='target')
-    # axs[0].set_xlabel('steps')
-    # axs[0].set_ylabel('rad/s')
-    # axs[0].set_title('sim/target_body_rate_x')
-    # axs[0].legend()
-    
-    # axs[1].scatter(steps, sim_body_rate_list[:, 0, 1], s=5, c='red', label='sim')
-    # axs[1].scatter(steps, target_body_rate_list[:, 0, 1], s=5, c='green', label='target')
-    # axs[1].set_xlabel('steps')
-    # axs[1].set_ylabel('rad/s')
-    # axs[1].set_title('sim/target_body_rate_y')
-    # axs[1].legend()
-    
-    # axs[2].scatter(steps, sim_body_rate_list[:, 0, 2], s=5, c='red', label='sim')
-    # axs[2].scatter(steps, target_body_rate_list[:, 0, 2], s=5, c='green', label='target')
-    # axs[2].set_xlabel('steps')
-    # axs[2].set_ylabel('rad/s')
-    # axs[2].set_title('sim/target_body_rate_z')
-    # axs[2].legend()
-    
-    # error = np.square(sim_body_rate_list - target_body_rate_list)
-    # print('sim_target/body_rateX_error', np.mean(error, axis=0)[0,0])
-    # print('sim_target/body_rateY_error', np.mean(error, axis=0)[0,1])
-    # print('sim_target/body_rateZ_error', np.mean(error, axis=0)[0,2])
-    # print('sim_target/body_rate_error', np.mean(error))
-    
-    # sim track real
+    # sim track target
     fig, axs = plt.subplots(1, 3, figsize=(10, 6))  # 1 * 3    
+    # sim
     axs[0].scatter(steps, sim_body_rate_list[:, 0, 0], s=5, c='red', label='sim')
-    axs[0].scatter(steps, real_body_rate_list[:, 0, 0], s=5, c='green', label='real')
+    axs[0].scatter(steps, target_body_rate_list[:, 0, 0], s=5, c='green', label='target')
     axs[0].set_xlabel('steps')
     axs[0].set_ylabel('rad/s')
-    axs[0].set_title('sim/real_body_rate_x')
+    axs[0].set_title('sim/target_body_rate_x')
     axs[0].legend()
     
     axs[1].scatter(steps, sim_body_rate_list[:, 0, 1], s=5, c='red', label='sim')
-    axs[1].scatter(steps, real_body_rate_list[:, 0, 1], s=5, c='green', label='real')
+    axs[1].scatter(steps, target_body_rate_list[:, 0, 1], s=5, c='green', label='target')
     axs[1].set_xlabel('steps')
     axs[1].set_ylabel('rad/s')
-    axs[1].set_title('sim/real_body_rate_y')
+    axs[1].set_title('sim/target_body_rate_y')
     axs[1].legend()
     
     axs[2].scatter(steps, sim_body_rate_list[:, 0, 2], s=5, c='red', label='sim')
-    axs[2].scatter(steps, real_body_rate_list[:, 0, 2], s=5, c='green', label='real')
+    axs[2].scatter(steps, target_body_rate_list[:, 0, 2], s=5, c='green', label='target')
     axs[2].set_xlabel('steps')
     axs[2].set_ylabel('rad/s')
-    axs[2].set_title('sim/real_body_rate_z')
+    axs[2].set_title('sim/target_body_rate_z')
     axs[2].legend()
     
-    error = np.square(sim_body_rate_list - real_body_rate_list)
-    print('sim_real/body_rateX_error', np.mean(error, axis=0)[0,0])
-    print('sim_real/body_rateY_error', np.mean(error, axis=0)[0,1])
-    print('sim_real/body_rateZ_error', np.mean(error, axis=0)[0,2])
-    print('sim_real/body_rate_error', np.mean(error))
+    error = np.square(sim_body_rate_list - target_body_rate_list)
+    print('sim_target/body_rateX_error', np.mean(error, axis=0)[0,0])
+    print('sim_target/body_rateY_error', np.mean(error, axis=0)[0,1])
+    print('sim_target/body_rateZ_error', np.mean(error, axis=0)[0,2])
+    print('sim_target/body_rate_error', np.mean(error))
+    
+    # # sim track real
+    # fig, axs = plt.subplots(1, 3, figsize=(10, 6))  # 1 * 3    
+    # axs[0].scatter(steps, sim_body_rate_list[:, 0, 0], s=5, c='red', label='sim')
+    # axs[0].scatter(steps, real_body_rate_list[:, 0, 0], s=5, c='green', label='real')
+    # axs[0].set_xlabel('steps')
+    # axs[0].set_ylabel('rad/s')
+    # axs[0].set_title('sim/real_body_rate_x')
+    # axs[0].legend()
+    
+    # axs[1].scatter(steps, sim_body_rate_list[:, 0, 1], s=5, c='red', label='sim')
+    # axs[1].scatter(steps, real_body_rate_list[:, 0, 1], s=5, c='green', label='real')
+    # axs[1].set_xlabel('steps')
+    # axs[1].set_ylabel('rad/s')
+    # axs[1].set_title('sim/real_body_rate_y')
+    # axs[1].legend()
+    
+    # axs[2].scatter(steps, sim_body_rate_list[:, 0, 2], s=5, c='red', label='sim')
+    # axs[2].scatter(steps, real_body_rate_list[:, 0, 2], s=5, c='green', label='real')
+    # axs[2].set_xlabel('steps')
+    # axs[2].set_ylabel('rad/s')
+    # axs[2].set_title('sim/real_body_rate_z')
+    # axs[2].legend()
+    
+    # error = np.square(sim_body_rate_list - real_body_rate_list)
+    # print('sim_real/body_rateX_error', np.mean(error, axis=0)[0,0])
+    # print('sim_real/body_rateY_error', np.mean(error, axis=0)[0,1])
+    # print('sim_real/body_rateZ_error', np.mean(error, axis=0)[0,2])
+    # print('sim_real/body_rate_error', np.mean(error))
     
     # # real
     # axs[1,0].scatter(steps, real_body_rate_list[:, 0, 0], s=5, c='red', label='real')
@@ -370,7 +355,8 @@ def main(cfg):
     # axs[1,2].set_title('real/target_body_rate_z')
     # axs[1,2].legend()
     
-    plt.savefig('simopt_tracking_trackreal')
+    # plt.savefig('RateController_trackTarget')
+    plt.savefig('PIDController_trackTarget')
     
     simulation_app.close()
 
