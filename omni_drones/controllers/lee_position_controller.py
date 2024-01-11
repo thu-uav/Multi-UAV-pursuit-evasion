@@ -483,7 +483,7 @@ class PIDRateController(nn.Module):
         pos, rot, linvel, angvel = root_state.split([3, 4, 3, 3], dim=1)
         body_rate = quat_rotate_inverse(rot, angvel)
 
-        rate_error = body_rate - target_rate
+        rate_error = target_rate - body_rate
         
         # P
         outputP = rate_error * self.kp.view(1, -1)
