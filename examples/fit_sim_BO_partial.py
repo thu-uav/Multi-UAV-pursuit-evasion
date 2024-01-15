@@ -16,12 +16,10 @@ import pdb
 import numpy as np
 import yaml
 from skopt import Optimizer
+from omni_drones.utils.torch import quat_rotate, quat_rotate_inverse
 
 rosbags = [
-    '/home/jiayu/OmniDrones/realdata/crazyflie/takeoff.csv',
-    # '/home/cf/ros2_ws/rosbags/takeoff.csv',
-    # '/home/cf/ros2_ws/rosbags/square.csv',
-    # '/home/cf/ros2_ws/rosbags/rl.csv',
+    '/home/jiayu/OmniDrones/realdata/crazyflie/8_100hz_light.csv'
 ]
 
 def loss_function(obs_sim, obs_real) -> float:
@@ -55,12 +53,12 @@ CRAZYFLIE_PARAMS = [
     'inertia_yy',
     'inertia_zz',
     'arm_lengths',
-    'force_constants',
-    'max_rotation_velocities',
-    'moment_constants',
+    'force_constants', # kf
+    'max_rotation_velocities', # kf and km
+    'moment_constants', # km
     # 'rotor_angles',
     'drag_coef',
-    'time_constant',
+    'time_constant', # tau
     'gain',
 ]
 
@@ -72,7 +70,7 @@ def init_sim(cfg, n_envs):
 
     import omni_drones.utils.scene as scene_utils
     from omni.isaac.core.simulation_context import SimulationContext
-    from omni_drones.controllers import RateController
+    from omni_drones.controllers import RateController, PIDRateController
     from omni_drones.robots.drone import MultirotorBase
     from omni_drones.utils.torch import euler_to_quaternion, quaternion_to_euler
     from omni_drones.sensors.camera import Camera, PinholeCameraCfg
@@ -107,7 +105,8 @@ def init_sim(cfg, n_envs):
     drone.initialize()
     drone.base_link.set_masses(torch.tensor([0.03785]).to(sim.device))
 
-    controller = RateController(9.81, drone.params).to(sim.device)
+    # controller = RateController(9.81, drone.params).to(sim.device)
+    controller = PIDRateController(9.81, drone.params).to(sim.device)
     return sim, drone, controller, simulation_app
 
 def evaluate(params, real_data, sim, drone, controller):
@@ -137,13 +136,17 @@ def evaluate(params, real_data, sim, drone, controller):
     controller.to(sim.device)
     mse = torch.nn.functional.mse_loss
     '''
-        df:
-        Index(['pos.time', 'pos.x', 'pos.y', 'pos.z', 
-                'quat.time', 'quat.w', 'quat.x', 'quat.y', 'quat.z',
-                'vel.time', 'vel.x', 'vel.y', 'vel.z', 
-                'omega.time','omega.r', 'omega.p', 'omega.y', 
-                'cmd.time', 'cmd.thrust', 'cmd.r_rate',
-                'cmd.p_rate', 'cmd.y_rate'],
+    df:
+    Index(['pos.time', 'pos.x', 'pos.y', 'pos.z', (1:4)
+        'quat.time', 'quat.w', 'quat.x','quat.y', 'quat.z', (5:9)
+        'vel.time', 'vel.x', 'vel.y', 'vel.z', (10:13)
+        'omega.time','omega.r', 'omega.p', 'omega.y', (14:17)
+        'real_rate.time', 'real_rate.r', 'real_rate.p', 'real_rate.y', 
+        'real_rate.thrust', (18:22)
+        'target_rate.time','target_rate.r', 'target_rate.p', 'target_rate.y', 
+        'target_rate.thrust',(23:27)
+        'motor.time', 'motor.m1', 'motor.m2', 'motor.m3', 'motor.m4'],(28:32)
+        dtype='object')
     '''
     # shuffle index and split into batches
     shuffled_idx = torch.randperm(real_data.shape[0])
@@ -176,22 +179,35 @@ def evaluate(params, real_data, sim, drone, controller):
         # returns up-to-date values
         sim._physics_sim_view.flush() 
     
-    for i in range(real_data.shape[1]-1):
+    # for i in range(real_data.shape[1]-1):
+    for i in range(real_data.shape[1] - 1):
         pos = torch.tensor(shuffled_real_data[:, i, 1:4])
         quat = torch.tensor(shuffled_real_data[:, i, 5:9])
         vel = torch.tensor(shuffled_real_data[:, i, 10:13])
-        ang_vel = torch.tensor(shuffled_real_data[:, i, 14:17])
+        body_rate = torch.tensor(shuffled_real_data[:, i, 18:21])
+        body_rate[:, 1] = -body_rate[:, 1]
+        # TODO: maybe use deried motor thrust
+        # TODO: maybe real_motor_thrust[:, i + 1, 28:32] ?
+        real_motor_thrust = torch.tensor(shuffled_real_data[:, i + 1, 28:32])
+        # get angvel
+        ang_vel = quat_rotate(quat, body_rate)
         if i == 0 :
             set_drone_state(pos, quat, vel, ang_vel)
 
-        drone_state = drone.get_state()[..., :13]
-        cmd_thrust = torch.tensor(shuffled_real_data[:, i, 18]).to(device=sim.device).float()
-        cmd_rate = torch.tensor(shuffled_real_data[:, i, 19:]).to(device=sim.device).float()
-        action = controller(
-            drone_state.squeeze(0), 
-            target_rate=cmd_rate / 180 * torch.pi,
-            target_thrust=cmd_thrust.unsqueeze(1) / (2**16) * max_thrust
+        drone_state = drone.get_state()[..., :13].reshape(-1, 13)
+        # get current_rate
+        pos, rot, linvel, angvel = drone_state.split([3, 4, 3, 3], dim=1)
+        current_rate = quat_rotate_inverse(rot, angvel)
+        target_thrust = torch.tensor(shuffled_real_data[:, i, 26]).to(device=sim.device).float()
+        target_rate = torch.tensor(shuffled_real_data[:, i, 23:26]).to(device=sim.device).float()
+        action = controller.sim_step(
+            current_rate=current_rate,
+            target_rate=target_rate / 180 * torch.pi,
+            # target_rate=real_next_rate,
+            target_thrust=target_thrust.unsqueeze(1) / (2**16) * max_thrust
         )
+        
+        real_action = real_motor_thrust.to(sim.device) / (2**16) * max_thrust * 2 - 1
         
         drone.apply_action(action)
         sim.step(render=True)
@@ -202,37 +218,30 @@ def evaluate(params, real_data, sim, drone, controller):
             sim.render()
             continue
 
-        # get simulated drone state
-        sim_state = drone.get_state().squeeze().cpu()
-        sim_pos = sim_state[..., :3]
-        sim_quat = sim_state[..., 3:7]
-        sim_vel = sim_state[..., 7:10]
-        sim_omega = sim_state[..., 10:13]
+        # # get simulated drone state
+        # sim_state = drone.get_state().squeeze().cpu()
+        # sim_pos = sim_state[..., :3]
+        # sim_quat = sim_state[..., 3:7]
+        # sim_vel = sim_state[..., 7:10]
+        # sim_omega = sim_state[..., 10:13]
 
-        # get real state & compare
-        real_pos = torch.tensor(shuffled_real_data[:, i+1, 1:4])
-        real_quat = torch.tensor(shuffled_real_data[:, i+1, 5:9])
-        real_vel = torch.tensor(shuffled_real_data[:, i+1, 10:13])
-        real_omega = torch.tensor(shuffled_real_data[:, i+1, 14:17])
+        # # get real state & compare
+        # real_pos = torch.tensor(shuffled_real_data[:, i+1, 1:4])
+        # real_quat = torch.tensor(shuffled_real_data[:, i+1, 5:9])
+        # real_vel = torch.tensor(shuffled_real_data[:, i+1, 10:13])
+        # real_omega = torch.tensor(shuffled_real_data[:, i+1, 14:17])
         
-        obs_sim = {
-            'pos': sim_pos, 'quat': sim_quat,
-            'vel': sim_vel, 'omega': sim_omega,
-        }
-        obs_real = {
-            'pos': real_pos, 'quat': real_quat,
-            'vel': real_vel, 'omega': real_omega,
-        }
+        # obs_sim = {
+        #     'pos': sim_pos, 'quat': sim_quat,
+        #     'vel': sim_vel, 'omega': sim_omega,
+        # }
+        # obs_real = {
+        #     'pos': real_pos, 'quat': real_quat,
+        #     'vel': real_vel, 'omega': real_omega,
+        # }
         
-        # pos_error += torch.sqrt(mse(sim_pos, real_pos))
-        # quat_error += torch.sqrt(mse(sim_quat, real_quat))
-        # vel_error += torch.sqrt(mse(sim_vel, real_vel))
-        # omega_error += torch.sqrt(mse(sim_omega, real_omega))
-        loss += (gamma **i) * loss_function(obs_sim, obs_real)
-
-    # TODO: update loss
-    # loss = pos_error + quat_error + vel_error + omega_error
-    # loss = pos_error + quat_error
+        # loss += (gamma **i) * loss_function(obs_sim, obs_real)
+        loss += np.mean(np.square(action.detach().to('cpu').numpy() - real_action.detach().to('cpu').numpy()))
 
     return loss, pos_error, quat_error, vel_error, omega_error
 
@@ -243,14 +252,25 @@ def main(cfg):
         real_data: [batch_size, T, dimension]
     """
     df = pd.read_csv(rosbags[0])
-    episode_length = df.index.stop
     df = np.array(df)
+    use_preprocess = True
+    if use_preprocess:
+        preprocess_df = []
+        for df_one in df:
+            if df_one[-1] > 0:
+                preprocess_df.append(df_one)
+        preprocess_df = np.array(preprocess_df)
+    else:
+        preprocess_df = df
+    episode_length = preprocess_df.shape[0]
     real_data = []
-    T = 20
-    skip = 5
+    # T = 20
+    # skip = 5
+    T = 2
+    skip = 1
     for i in range(0, episode_length-T, skip):
         _slice = slice(i, i+T)
-        real_data.append(df[_slice])
+        real_data.append(preprocess_df[_slice])
     real_data = np.array(real_data)
 
     r"""Apply Adams' Stochastic Gradient Descend based on finite-differences."""
@@ -265,21 +285,23 @@ def main(cfg):
         'inertia_yy': params[2],
         'inertia_zz': params[3],
         'arm_lengths': params[4],
-        'force_constants': params[5],
-        'max_rotation_velocities': params[6],
-        'moment_constants': params[7],
+        'force_constants': params[5], # kf
+        'max_rotation_velocities': params[6], # kf and km
+        'moment_constants': params[7], # km
         'drag_coef': params[8],
-        'time_constant': params[9],
+        'time_constant': params[9], # tau
         'gain': params[10:]
     """
     params_mask = np.array([0] * 13)
+    params_mask[5] = 1
+    params_mask[6] = 1
+    params_mask[7] = 1
     params_mask[9] = 1
-    params_mask[10:] = 1
 
     # TODO : update the range
     params_range = []
-    lower = 0.1
-    upper = 100.0
+    lower = 0.9
+    upper = 1.1
     for param, mask in zip(params, params_mask):
         if mask == 1:
             params_range.append((lower * param, upper * param))
