@@ -115,7 +115,7 @@ class MultirotorBase(RobotBase):
             # self.rotor_angles = torch.tensor(self.params['rotor_configuration']['rotor_angles']).float()
             self.drag_coef_para = torch.tensor([self.params['drag_coef']]).float().to(self.device)
             self.time_constant = torch.tensor([self.params['rotor_configuration']['time_constant']]).float().to(self.device)
-            self.gain = torch.tensor(self.params['controller_configuration']['gain']).float().to(self.device)
+            # self.gain = torch.tensor(self.params['controller_configuration']['gain']).float().to(self.device)
 
     def tunable_parameters(self):
         """
@@ -133,7 +133,7 @@ class MultirotorBase(RobotBase):
         # para_list.append(self.rotor_angles)
         para_list.append(self.drag_coef_para)
         para_list.append(self.time_constant)
-        para_list.append(self.gain)
+        # para_list.append(self.gain)
         # import pdb; pdb.set_trace()
 
         return torch.concat(para_list)
@@ -154,7 +154,7 @@ class MultirotorBase(RobotBase):
         # self.rotor_angles = params['rotor_angles']
         self.drag_coef_para = params['drag_coef']
         self.time_constant = params['time_constant']
-        self.gain = params['gain']
+        # self.gain = params['gain']
 
     def initialize(
         self, 

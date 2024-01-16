@@ -420,15 +420,15 @@ class PIDRateController(nn.Module):
         )
 
         self.mixer = nn.Parameter(compute_parameters(rotor_config, I))
-        self.gain_angular_rate = nn.Parameter(
-            torch.tensor(gain) @ I[:3, :3].inverse()
-        )
+        # self.gain_angular_rate = nn.Parameter(
+        #     torch.tensor(gain) @ I[:3, :3].inverse()
+        # )
         
         # PID param
-        self.dt = nn.Parameter(torch.tensor(0.02))
-        self.kp = nn.Parameter(torch.tensor([250.0, 250.0, 120.0]))
-        self.kd = nn.Parameter(torch.tensor([2.5, 2.5, 0.0]))
-        self.ki = nn.Parameter(torch.tensor([500.0, 500.0, 16.7]))
+        self.dt = nn.Parameter(torch.tensor(0.01))
+        self.pid_kp = nn.Parameter(torch.tensor([250.0, 250.0, 120.0]))
+        self.pid_kd = nn.Parameter(torch.tensor([2.5, 2.5, 0.0]))
+        self.pid_ki = nn.Parameter(torch.tensor([500.0, 500.0, 16.7]))
         self.kff = nn.Parameter(torch.tensor([0.0, 0.0, 0.0]))
         self.count = 0 # if = 0, integ, last_rate_error = 0.0
         self.iLimit = nn.Parameter(torch.tensor([33.3, 33.3, 166.7]))
@@ -444,7 +444,7 @@ class PIDRateController(nn.Module):
         inertia_xx = tunable_parameters['inertia_xx']
         inertia_yy = tunable_parameters['inertia_yy']
         inertia_zz = tunable_parameters['inertia_zz']
-        gain = tunable_parameters['gain']
+        # gain = tunable_parameters['gain']
         I = torch.diag_embed(
             torch.tensor([inertia_xx, inertia_yy, inertia_zz, 1])
         )
@@ -457,10 +457,19 @@ class PIDRateController(nn.Module):
         self.rotor_config['time_constant'] = tunable_parameters['time_constant']
 
         self.mixer = nn.Parameter(compute_parameters(self.rotor_config, I))
-        # TODO: jiayu, only crazyflie
-        self.gain_angular_rate = nn.Parameter(
-            torch.tensor(gain).float() @ I[:3, :3].inverse()
-        )
+        # self.gain_angular_rate = nn.Parameter(
+        #     torch.tensor(gain).float() @ I[:3, :3].inverse()
+        # )
+        
+        # PID param
+        self.dt = nn.Parameter(torch.tensor(0.01))
+        self.pid_kp = nn.Parameter(torch.tensor(tunable_parameters['pid_kp']))
+        self.pid_kd = nn.Parameter(torch.tensor(tunable_parameters['pid_kd'] + [0.0])) # set coeff_yaw = 0.0
+        self.pid_ki = nn.Parameter(torch.tensor(tunable_parameters['pid_ki']))
+        self.kff = nn.Parameter(torch.tensor([0.0, 0.0, 0.0]))
+        self.count = 0 # if = 0, integ, last_rate_error = 0.0
+        self.iLimit = nn.Parameter(torch.tensor(tunable_parameters['iLimit']))
+        self.outputLimit = 0.0
     
     def forward(
         self, 
@@ -486,16 +495,16 @@ class PIDRateController(nn.Module):
         rate_error = target_rate - body_rate
         
         # P
-        outputP = rate_error * self.kp.view(1, -1)
+        outputP = rate_error * self.pid_kp.view(1, -1)
         # D
         deriv = (rate_error - self.last_rate_error) / self.dt
         # TODO, w.o.lpf2pApply filter to deriv
         deriv[torch.isnan(deriv)] = 0.0
-        outputD = deriv * self.kd.view(1, -1)
+        outputD = deriv * self.pid_kd.view(1, -1)
         # I
         self.integ += rate_error * self.dt
         self.integ = torch.clip(self.integ, -self.iLimit, self.iLimit)
-        outputI = self.integ * self.ki.view(1, -1)
+        outputI = self.integ * self.pid_ki.view(1, -1)
         # kff
         outputFF = body_rate * self.kff.view(1, -1)
         
@@ -537,20 +546,20 @@ class PIDRateController(nn.Module):
         rate_error = target_rate - current_rate
         
         # P
-        outputP = rate_error * self.kp.view(1, -1)
+        outputP = rate_error * self.pid_kp.view(1, -1)
         # D
         deriv = (rate_error - self.last_rate_error) / self.dt
         # TODO, w.o.lpf2pApply filter to deriv
         deriv[torch.isnan(deriv)] = 0.0
-        outputD = deriv * self.kd.view(1, -1)
+        outputD = deriv * self.pid_kd.view(1, -1)
         # I
         self.integ += rate_error * self.dt
         self.integ = torch.clip(self.integ, -self.iLimit, self.iLimit)
-        outputI = self.integ * self.ki.view(1, -1)
+        outputI = self.integ * self.pid_ki.view(1, -1)
         # kff
         outputFF = current_rate * self.kff.view(1, -1)
         
-        output = outputP + outputD + outputI + outputFF
+        output = (outputP + outputD + outputI + outputFF).float()
         # TODO, w.o.lpf2pApply filter to output
         output[torch.isnan(output)] = 0.0
         

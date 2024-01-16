@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 rosbags = [
-    '/home/chenjiayu/OmniDrones/realdata/crazyflie/8_100hz_light.csv',
+    '/home/jiayu/OmniDrones/realdata/crazyflie/8_100hz_light.csv',
     # '/home/cf/ros2_ws/rosbags/takeoff.csv',
     # '/home/cf/ros2_ws/rosbags/square.csv',
     # '/home/cf/ros2_ws/rosbags/rl.csv',
@@ -52,21 +52,6 @@ def loss_function(obs_sim, obs_real) -> float:
     L = L1 + L2
     return L
 
-CRAZYFLIE_PARAMS = [
-    'mass',
-    'inertia_xx',
-    'inertia_yy',
-    'inertia_zz',
-    'arm_lengths',
-    'force_constants',
-    'max_rotation_velocities',
-    'moment_constants',
-    # 'rotor_angles',
-    'drag_coef',
-    'time_constant',
-    'gain',
-]
-
 @hydra.main(version_base=None, config_path=".", config_name="real2sim")
 def main(cfg):
     """
@@ -87,7 +72,8 @@ def main(cfg):
         preprocess_df = np.array(preprocess_df)
     else:
         preprocess_df = df
-    episode_length = preprocess_df.shape[0]
+    # episode_length = preprocess_df.shape[0]
+    episode_length = 1400
     real_data = []
     # T = 20
     # skip = 5
@@ -100,14 +86,17 @@ def main(cfg):
     
     # add real next_state
     next_body_rate = real_data[1:,:,18:21]
+    # add real next motor_thrust
+    next_motor_thrust = real_data[1:,:,28:32]
     real_data = np.concatenate([real_data[:-1],next_body_rate], axis=-1)
+    real_data = np.concatenate([real_data, next_motor_thrust], axis=-1)
 
     # start sim
     OmegaConf.resolve(cfg)
     simulation_app = init_simulation_app(cfg)
     import omni_drones.utils.scene as scene_utils
     from omni.isaac.core.simulation_context import SimulationContext
-    from omni_drones.controllers import RateController
+    from omni_drones.controllers import RateController, PIDRateController
     from omni_drones.robots.drone import MultirotorBase
     from omni_drones.utils.torch import euler_to_quaternion, quaternion_to_euler
     from omni_drones.sensors.camera import Camera, PinholeCameraCfg
@@ -149,13 +138,18 @@ def main(cfg):
             'moment_constants': params[7],
             'drag_coef': params[8],
             'time_constant': params[9],
-            'gain': params[10:]
+            # 'gain': params[10:]
+            'pid_kp': params[10:13],
+            'pid_kd': params[13:15],
+            'pid_ki': params[15:18],
+            'iLimit': params[18:21],
         }
         
         # reset sim
         sim.reset()
         drone.initialize_byTunablePara(tunable_parameters=tunable_parameters)
-        controller = RateController(9.81, drone.params).to(sim.device)
+        # controller = RateController(9.81, drone.params).to(sim.device)
+        controller = PIDRateController(9.81, drone.params).to(sim.device)
         controller.set_byTunablePara(tunable_parameters=tunable_parameters)
         controller = controller.to(sim.device)
         
@@ -203,21 +197,21 @@ def main(cfg):
             'real_rate.thrust', (18:22)
             'target_rate.time','target_rate.r', 'target_rate.p', 'target_rate.y', 
             'target_rate.thrust',(23:27)
-            'motor.time', 'motor.m1', 'motor.m2', 'motor.m3', 'motor.m4',(28:32),
-            'next_real_rate.r', 'next_real_rate.p', 'next_real_rate.y']
+            'motor.time', 'motor.m1', 'motor.m2', 'motor.m3', 'motor.m4',(28:32)
+            'next_real_rate.r', 'next_real_rate.p', 'next_real_rate.y', (33:35)
+            'next_motor1', 'next_motor2', 'next_motor3', 'next_motor4', (35:)]
             dtype='object')
         '''
         for i in range(max(1, real_data.shape[1]-1)):
             pos = torch.tensor(shuffled_real_data[:, i, 1:4])
             quat = torch.tensor(shuffled_real_data[:, i, 5:9])
             vel = torch.tensor(shuffled_real_data[:, i, 10:13])
-            # body_rate = torch.tensor(shuffled_real_data[:, i, 14:17]) / 180 * torch.pi
             real_rate = torch.tensor(shuffled_real_data[:, i, 18:21])
-            next_real_rate = torch.tensor(shuffled_real_data[:, i, 32:])
+            next_real_rate = torch.tensor(shuffled_real_data[:, i, 32:35])
+            next_real_motor_thrust = torch.tensor(shuffled_real_data[:, i, 35:])
             real_rate[:, 1] = -real_rate[:, 1]
             next_real_rate[:, 1] = -next_real_rate[:, 1]
             # get angvel
-            # ang_vel = quat_rotate(quat, body_rate)
             ang_vel = quat_rotate(quat, real_rate)
             if i == 0 :
                 set_drone_state(pos, quat, vel, ang_vel)
@@ -225,26 +219,25 @@ def main(cfg):
             drone_state = drone.get_state()[..., :13].reshape(-1, 13)
             # get current_rate
             pos, rot, linvel, angvel = drone_state.split([3, 4, 3, 3], dim=1)
-            # current_rate = quat_rotate_inverse(rot, angvel)
+            current_rate = quat_rotate_inverse(rot, angvel)
             target_thrust = torch.tensor(shuffled_real_data[:, i, 26]).to(device=sim.device).float()
             target_rate = torch.tensor(shuffled_real_data[:, i, 23:26]).to(device=sim.device).float()
             # TODO: check error of current_rate and real_rate, why are they diff ?
-            # real_rate = torch.tensor(shuffled_real_data[:, i, 18:21]).to(device=sim.device).float()
-            # real_rate[:, 1] = -real_rate[:, 1]
             real_rate = real_rate.to(device=sim.device).float()
             next_real_rate = next_real_rate.to(device=sim.device).float()
             target_rate[:, 1] = -target_rate[:, 1]
-            # pdb.set_trace()
             action = controller.sim_step(
-                current_rate=real_rate,
-                # target_rate=target_rate / 180 * torch.pi,
-                target_rate=next_real_rate,
+                current_rate=current_rate,
+                target_rate=target_rate / 180 * torch.pi,
                 target_thrust=target_thrust.unsqueeze(1) / (2**16) * max_thrust
             )
             
             drone.apply_action(action)
             # _, thrust, torques = drone.apply_action_foropt(action)
             sim.step(render=True)
+            
+            real_action = next_real_motor_thrust.to(sim.device) / (2**16) * max_thrust * 2 - 1
+            loss = np.mean(np.square(action.detach().to('cpu').numpy() - real_action.detach().to('cpu').numpy()))
 
             if sim.is_stopped():
                 break
@@ -252,42 +245,42 @@ def main(cfg):
                 sim.render()
                 continue
 
-            # get simulated drone state
-            sim_state = drone.get_state().squeeze().cpu()
-            sim_pos = sim_state[..., :3]
-            sim_quat = sim_state[..., 3:7]
-            sim_vel = sim_state[..., 7:10]
-            sim_omega = sim_state[..., 10:13]
-            next_body_rate = quat_rotate_inverse(sim_quat, sim_omega)
+            # # get simulated drone state
+            # sim_state = drone.get_state().squeeze().cpu()
+            # sim_pos = sim_state[..., :3]
+            # sim_quat = sim_state[..., 3:7]
+            # sim_vel = sim_state[..., 7:10]
+            # sim_omega = sim_state[..., 10:13]
+            # next_body_rate = quat_rotate_inverse(sim_quat, sim_omega)
 
-            # get body_rate and thrust & compare
-            target_body_rate = (target_rate / 180 * torch.pi).cpu()
-            target_thrust = target_thrust.unsqueeze(1) / (2**16) * max_thrust
+            # # get body_rate and thrust & compare
+            # target_body_rate = (target_rate / 180 * torch.pi).cpu()
+            # target_thrust = target_thrust.unsqueeze(1) / (2**16) * max_thrust
             
-            # loss: thrust error
-            # real_motor_thrust = torch.tensor(shuffled_real_data[:, i, 28:32]).to(device=sim.device).float() / (2**16) * max_thrust
-            # mask = ~torch.isnan(thrust.squeeze(0))
-            # thrust_no_nan = thrust.squeeze(0)[mask]
-            # real_motor_thrust_no_nan = real_motor_thrust[mask]
-            # loss += mse(thrust_no_nan.to('cpu'), real_motor_thrust_no_nan.to('cpu'))
+            # # loss: thrust error
+            # # real_motor_thrust = torch.tensor(shuffled_real_data[:, i, 28:32]).to(device=sim.device).float() / (2**16) * max_thrust
+            # # mask = ~torch.isnan(thrust.squeeze(0))
+            # # thrust_no_nan = thrust.squeeze(0)[mask]
+            # # real_motor_thrust_no_nan = real_motor_thrust[mask]
+            # # loss += mse(thrust_no_nan.to('cpu'), real_motor_thrust_no_nan.to('cpu'))
             
-            # # TODO: mask NaN, why?
-            # # track target body rate
+            # # # TODO: mask NaN, why?
+            # # # track target body rate
+            # # mask = ~torch.isnan(next_body_rate)
+            # # next_body_rate_no_nan = next_body_rate[mask]
+            # # target_body_rate_no_nan = target_body_rate[mask]
+            # # loss += mse(next_body_rate_no_nan.to('cpu'), target_body_rate_no_nan.to('cpu'))
+            
+            # # track real body rate
             # mask = ~torch.isnan(next_body_rate)
             # next_body_rate_no_nan = next_body_rate[mask]
+            # real_body_rate_no_nan = real_rate[mask]
+            # loss += mse(next_body_rate_no_nan.to('cpu'), real_body_rate_no_nan.to('cpu'))
+            
+            # # report
             # target_body_rate_no_nan = target_body_rate[mask]
-            # loss += mse(next_body_rate_no_nan.to('cpu'), target_body_rate_no_nan.to('cpu'))
-            
-            # track real body rate
-            mask = ~torch.isnan(next_body_rate)
-            next_body_rate_no_nan = next_body_rate[mask]
-            real_body_rate_no_nan = real_rate[mask]
-            loss += mse(next_body_rate_no_nan.to('cpu'), real_body_rate_no_nan.to('cpu'))
-            
-            # report
-            target_body_rate_no_nan = target_body_rate[mask]
-            target_sim_rate_error += mse(next_body_rate_no_nan, target_body_rate_no_nan)
-            # target_gt_thrust_error += mse(gt_thrust, target_thrust)
+            # target_sim_rate_error += mse(next_body_rate_no_nan, target_body_rate_no_nan)
+            # # target_gt_thrust_error += mse(gt_thrust, target_thrust)
 
         return loss, target_sim_rate_error
 
@@ -306,9 +299,30 @@ def main(cfg):
         7.24e-10,
         0.2,
         0.43,
-        5.2e-07,
-        3.147753261141643e-05,
-        1.1214032970321934e-05
+        # origin
+        # 250.0, # kp
+        # 250.0, 
+        # 120.0,
+        # 2.5, # kd 
+        # 2.5, 
+        # 500.0, # ki
+        # 500.0, 
+        # 16.7,
+        # 33.3, # ilimit
+        # 33.3, 
+        # 166.7
+        # opt
+        25.0, # kp
+        25.0, 
+        12.0,
+        0.25, # kd 
+        0.25, 
+        50.0, # ki
+        50.0, 
+        1.67,
+        333.0, # ilimit
+        333.0, 
+        16.7
     ]
 
     """
@@ -322,9 +336,13 @@ def main(cfg):
         'moment_constants': params[7],
         'drag_coef': params[8],
         'time_constant': params[9],
-        'gain': params[10:]
+        # 'gain': params[10:]
+        'pid_kp': params[10:13],
+        'pid_kd': params[13:15],
+        'pid_ki': params[15:18],
+        'iLimit': params[18:21],
     """
-    params_mask = np.array([0] * 13)
+    params_mask = np.array([0] * 21)
     # params_mask[0] = 1
     # params_mask[5] = 1
     # params_mask[6] = 1
@@ -332,17 +350,12 @@ def main(cfg):
     params_mask[10:] = 1
 
     params_range = []
-    lower_gain = 0.01
-    upper_gain = 100.0
-    lower = 0.9
-    upper = 1.1
+    lower = 0.1
+    upper = 10.0
     count = 0
     for param, mask in zip(params, params_mask):
         if mask == 1:
-            if count >= 10:
-                params_range.append((lower_gain * param, upper_gain * param))
-            else:
-                params_range.append((lower * param, upper * param))
+            params_range.append((lower * param, upper * param))
         count += 1
     opt = Optimizer(
         dimensions=params_range,
@@ -366,7 +379,6 @@ def main(cfg):
         print(f'Start with epoch: {epoch}')
         
         x = np.array(opt.ask(), dtype=float)
-        # x = np.array([0.0052, 0.0052, 0.00025])
         # set real params
         set_idx = 0
         for idx, mask in enumerate(params_mask):

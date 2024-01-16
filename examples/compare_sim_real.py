@@ -27,21 +27,6 @@ rosbags = [
     # '/home/cf/ros2_ws/rosbags/rl.csv',
 ]
 
-CRAZYFLIE_PARAMS = [
-    'mass',
-    'inertia_xx',
-    'inertia_yy',
-    'inertia_zz',
-    'arm_lengths',
-    'force_constants',
-    'max_rotation_velocities',
-    'moment_constants',
-    # 'rotor_angles',
-    'drag_coef',
-    'time_constant',
-    'gain',
-]
-
 @hydra.main(version_base=None, config_path=".", config_name="real2sim")
 def main(cfg):
     """
@@ -60,13 +45,14 @@ def main(cfg):
         preprocess_df = np.array(preprocess_df)
     else:
         preprocess_df = df
-    episode_length = preprocess_df.shape[0]
+    # episode_len = preprocess_df.shape[0] # contains land
+    episode_len = 1400 # TODO, apply to all trajectories
     real_data = []
     # T = 20
     # skip = 5
     T = 1
     skip = 1
-    for i in range(0, episode_length-T, skip):
+    for i in range(0, episode_len-T, skip):
         _slice = slice(i, i+T)
         real_data.append(preprocess_df[_slice])
     real_data = np.array(real_data)
@@ -118,9 +104,30 @@ def main(cfg):
         7.24e-10,
         0.2,
         0.43,
-        0.0052,
-        0.0052,
-        0.00025
+        # origin
+        # 250.0, # kp
+        # 250.0, 
+        # 120.0,
+        # 2.5, # kd 
+        # 2.5, 
+        # 500.0, # ki
+        # 500.0, 
+        # 16.7,
+        # 33.3, # ilimit
+        # 33.3, 
+        # 166.7
+        # simopt
+        25.0, # kp
+        25.0, 
+        12.0,
+        0.25, # kd 
+        0.25, 
+        50.0, # ki
+        50.0, 
+        1.67,
+        333.0, # ilimit
+        333.0, 
+        16.7
     ]
     
     tunable_parameters = {
@@ -134,7 +141,11 @@ def main(cfg):
         'moment_constants': params[7],
         'drag_coef': params[8],
         'time_constant': params[9],
-        'gain': params[10:]
+        # 'gain': params[10:]
+        'pid_kp': params[10:13],
+        'pid_kd': params[13:15],
+        'pid_ki': params[15:18],
+        'iLimit': params[18:21],
     }
     
     # reset sim
@@ -190,9 +201,8 @@ def main(cfg):
     sim_motor = []
     real_motor = []
 
-    trajectory_len = 1500
     use_real_action = False
-    # trajectory_len = real_data.shape[0] - 1
+    trajectory_len = real_data.shape[0] - 1
     
     for i in range(trajectory_len):
         real_pos = torch.tensor(real_data[i, :, 1:4])
@@ -273,7 +283,6 @@ def main(cfg):
     # now run optimization
     print('*'*55)
     
-    steps = np.arange(0, real_data.shape[0]-1)
     real_body_rate_list = np.array(real_body_rate_list)
     target_body_rate_list = np.array(target_body_rate_list)
     sim_body_rate_list = np.array(sim_body_rate_list)
@@ -292,6 +301,8 @@ def main(cfg):
     real_body_rate_list = np.array(real_body_rate_list)
     real_angvel_list = np.array(real_angvel_list)
     
+    steps = np.arange(0, sim_pos_list.shape[0])
+    
     # error
     if use_real_action:
         fig, axs = plt.subplots(5, 4, figsize=(20, 12))  # 5 * 4 
@@ -299,22 +310,22 @@ def main(cfg):
         fig, axs = plt.subplots(6, 4, figsize=(20, 12))  # 6 * 4 
     fig.subplots_adjust()
     # x error
-    axs[0, 0].scatter(steps[:trajectory_len], sim_pos_list[:trajectory_len, 0, 0], s=5, c='red', label='sim')
-    axs[0, 0].scatter(steps[:trajectory_len], real_pos_list[:trajectory_len, 0, 0], s=5, c='green', label='real')
+    axs[0, 0].scatter(steps, sim_pos_list[:, 0, 0], s=5, c='red', label='sim')
+    axs[0, 0].scatter(steps, real_pos_list[:, 0, 0], s=5, c='green', label='real')
     axs[0, 0].set_xlabel('steps')
     axs[0, 0].set_ylabel('m')
     axs[0, 0].set_title('sim/real_X')
     axs[0, 0].legend()
     # y error
-    axs[0, 1].scatter(steps[:trajectory_len], sim_pos_list[:trajectory_len, 0, 1], s=5, c='red', label='sim')
-    axs[0, 1].scatter(steps[:trajectory_len], real_pos_list[:trajectory_len, 0, 1], s=5, c='green', label='real')
+    axs[0, 1].scatter(steps, sim_pos_list[:, 0, 1], s=5, c='red', label='sim')
+    axs[0, 1].scatter(steps, real_pos_list[:, 0, 1], s=5, c='green', label='real')
     axs[0, 1].set_xlabel('steps')
     axs[0, 1].set_ylabel('m')
     axs[0, 1].set_title('sim/real_Y')
     axs[0, 1].legend()
     # z error
-    axs[0, 2].scatter(steps[:trajectory_len], sim_pos_list[:trajectory_len, 0, 2], s=5, c='red', label='sim')
-    axs[0, 2].scatter(steps[:trajectory_len], real_pos_list[:trajectory_len, 0, 2], s=5, c='green', label='real')
+    axs[0, 2].scatter(steps[:], sim_pos_list[:, 0, 2], s=5, c='red', label='sim')
+    axs[0, 2].scatter(steps[:], real_pos_list[:, 0, 2], s=5, c='green', label='real')
     axs[0, 2].set_xlabel('steps')
     axs[0, 2].set_ylabel('m')
     axs[0, 2].set_title('sim/real_Z')
@@ -327,29 +338,29 @@ def main(cfg):
     print('#'*55)
     
     # quat1 error
-    axs[1, 0].scatter(steps[:trajectory_len], sim_quat_list[:trajectory_len, 0, 0], s=5, c='red', label='sim')
-    axs[1, 0].scatter(steps[:trajectory_len], real_quat_list[:trajectory_len, 0, 0], s=5, c='green', label='real')
+    axs[1, 0].scatter(steps[:], sim_quat_list[:, 0, 0], s=5, c='red', label='sim')
+    axs[1, 0].scatter(steps[:], real_quat_list[:, 0, 0], s=5, c='green', label='real')
     axs[1, 0].set_xlabel('steps')
     axs[1, 0].set_ylabel('rad')
     axs[1, 0].set_title('sim/real_quat1')
     axs[1, 0].legend()
     # quat2 error
-    axs[1, 1].scatter(steps[:trajectory_len], sim_quat_list[:trajectory_len, 0, 1], s=5, c='red', label='sim')
-    axs[1, 1].scatter(steps[:trajectory_len], real_quat_list[:trajectory_len, 0, 1], s=5, c='green', label='real')
+    axs[1, 1].scatter(steps[:], sim_quat_list[:, 0, 1], s=5, c='red', label='sim')
+    axs[1, 1].scatter(steps[:], real_quat_list[:, 0, 1], s=5, c='green', label='real')
     axs[1, 1].set_xlabel('steps')
     axs[1, 1].set_ylabel('rad')
     axs[1, 1].set_title('sim/real_quat2')
     axs[1, 1].legend()
     # quat3 error
-    axs[1, 2].scatter(steps[:trajectory_len], sim_quat_list[:trajectory_len, 0, 2], s=5, c='red', label='sim')
-    axs[1, 2].scatter(steps[:trajectory_len], real_quat_list[:trajectory_len, 0, 2], s=5, c='green', label='real')
+    axs[1, 2].scatter(steps[:], sim_quat_list[:, 0, 2], s=5, c='red', label='sim')
+    axs[1, 2].scatter(steps[:], real_quat_list[:, 0, 2], s=5, c='green', label='real')
     axs[1, 2].set_xlabel('steps')
     axs[1, 2].set_ylabel('rad')
     axs[1, 2].set_title('sim/real_quat3')
     axs[1, 2].legend()
     # quat4 error
-    axs[1, 3].scatter(steps[:trajectory_len], sim_quat_list[:trajectory_len, 0, 3], s=5, c='red', label='sim')
-    axs[1, 3].scatter(steps[:trajectory_len], real_quat_list[:trajectory_len, 0, 3], s=5, c='green', label='real')
+    axs[1, 3].scatter(steps[:], sim_quat_list[:, 0, 3], s=5, c='red', label='sim')
+    axs[1, 3].scatter(steps[:], real_quat_list[:, 0, 3], s=5, c='green', label='real')
     axs[1, 3].set_xlabel('steps')
     axs[1, 3].set_ylabel('rad')
     axs[1, 3].set_title('sim/real_quat4')
@@ -363,22 +374,22 @@ def main(cfg):
     print('#'*55)
 
     # vel x error
-    axs[2, 0].scatter(steps[:trajectory_len], sim_vel_list[:trajectory_len, 0, 0], s=5, c='red', label='sim')
-    axs[2, 0].scatter(steps[:trajectory_len], real_vel_list[:trajectory_len, 0, 0], s=5, c='green', label='real')
+    axs[2, 0].scatter(steps[:], sim_vel_list[:, 0, 0], s=5, c='red', label='sim')
+    axs[2, 0].scatter(steps[:], real_vel_list[:, 0, 0], s=5, c='green', label='real')
     axs[2, 0].set_xlabel('steps')
     axs[2, 0].set_ylabel('m/s')
     axs[2, 0].set_title('sim/real_velx')
     axs[2, 0].legend()
     # vel y error
-    axs[2, 1].scatter(steps[:trajectory_len], sim_vel_list[:trajectory_len, 0, 1], s=5, c='red', label='sim')
-    axs[2, 1].scatter(steps[:trajectory_len], real_vel_list[:trajectory_len, 0, 1], s=5, c='green', label='real')
+    axs[2, 1].scatter(steps[:], sim_vel_list[:, 0, 1], s=5, c='red', label='sim')
+    axs[2, 1].scatter(steps[:], real_vel_list[:, 0, 1], s=5, c='green', label='real')
     axs[2, 1].set_xlabel('steps')
     axs[2, 1].set_ylabel('m/s')
     axs[2, 1].set_title('sim/real_vely')
     axs[2, 1].legend()
     # vel z error
-    axs[2, 2].scatter(steps[:trajectory_len], sim_vel_list[:trajectory_len, 0, 2], s=5, c='red', label='sim')
-    axs[2, 2].scatter(steps[:trajectory_len], real_vel_list[:trajectory_len, 0, 2], s=5, c='green', label='real')
+    axs[2, 2].scatter(steps[:], sim_vel_list[:, 0, 2], s=5, c='red', label='sim')
+    axs[2, 2].scatter(steps[:], real_vel_list[:, 0, 2], s=5, c='green', label='real')
     axs[2, 2].set_xlabel('steps')
     axs[2, 2].set_ylabel('m/s')
     axs[2, 2].set_title('sim/real_velz')
@@ -391,22 +402,22 @@ def main(cfg):
     print('#'*55)
 
     # angvel x error
-    axs[3, 0].scatter(steps[:trajectory_len], sim_angvel_list[:trajectory_len, 0, 0], s=5, c='red', label='sim')
-    axs[3, 0].scatter(steps[:trajectory_len], real_angvel_list[:trajectory_len, 0, 0], s=5, c='green', label='real')
+    axs[3, 0].scatter(steps[:], sim_angvel_list[:, 0, 0], s=5, c='red', label='sim')
+    axs[3, 0].scatter(steps[:], real_angvel_list[:, 0, 0], s=5, c='green', label='real')
     axs[3, 0].set_xlabel('steps')
     axs[3, 0].set_ylabel('rad/s')
     axs[3, 0].set_title('sim/real_angvelx')
     axs[3, 0].legend()
     # angvel y error
-    axs[3, 1].scatter(steps[:trajectory_len], sim_angvel_list[:trajectory_len, 0, 1], s=5, c='red', label='sim')
-    axs[3, 1].scatter(steps[:trajectory_len], real_angvel_list[:trajectory_len, 0, 1], s=5, c='green', label='real')
+    axs[3, 1].scatter(steps[:], sim_angvel_list[:, 0, 1], s=5, c='red', label='sim')
+    axs[3, 1].scatter(steps[:], real_angvel_list[:, 0, 1], s=5, c='green', label='real')
     axs[3, 1].set_xlabel('steps')
     axs[3, 1].set_ylabel('rad/s')
     axs[3, 1].set_title('sim/real_angvely')
     axs[3, 1].legend()
     # angvel z error
-    axs[3, 2].scatter(steps[:trajectory_len], sim_angvel_list[:trajectory_len, 0, 2], s=5, c='red', label='sim')
-    axs[3, 2].scatter(steps[:trajectory_len], real_angvel_list[:trajectory_len, 0, 2], s=5, c='green', label='real')
+    axs[3, 2].scatter(steps[:], sim_angvel_list[:, 0, 2], s=5, c='red', label='sim')
+    axs[3, 2].scatter(steps[:], real_angvel_list[:, 0, 2], s=5, c='green', label='real')
     axs[3, 2].set_xlabel('steps')
     axs[3, 2].set_ylabel('rad/s')
     axs[3, 2].set_title('sim/real_angvelz')
@@ -419,20 +430,20 @@ def main(cfg):
     print('#'*55)
     
     # body rate x error
-    axs[4, 0].scatter(steps[:trajectory_len], sim_body_rate_list[:trajectory_len, 0, 0], s=5, c='red', label='sim')
-    axs[4, 0].scatter(steps[:trajectory_len], real_body_rate_list[:trajectory_len, 0, 0], s=5, c='green', label='real')
+    axs[4, 0].scatter(steps[:], sim_body_rate_list[:, 0, 0], s=5, c='red', label='sim')
+    axs[4, 0].scatter(steps[:], real_body_rate_list[:, 0, 0], s=5, c='green', label='real')
     axs[4, 0].set_xlabel('steps')
     axs[4, 0].set_ylabel('rad/s')
     axs[4, 0].set_title('sim/real_bodyratex')
     # body rate y error
-    axs[4, 1].scatter(steps[:trajectory_len], sim_body_rate_list[:trajectory_len, 0, 1], s=5, c='red', label='sim')
-    axs[4, 1].scatter(steps[:trajectory_len], real_body_rate_list[:trajectory_len, 0, 1], s=5, c='green', label='real')
+    axs[4, 1].scatter(steps[:], sim_body_rate_list[:, 0, 1], s=5, c='red', label='sim')
+    axs[4, 1].scatter(steps[:], real_body_rate_list[:, 0, 1], s=5, c='green', label='real')
     axs[4, 1].set_xlabel('steps')
     axs[4, 1].set_ylabel('rad/s')
     axs[4, 1].set_title('sim/real_bodyratey')
     # body rate z error
-    axs[4, 2].scatter(steps[:trajectory_len], sim_body_rate_list[:trajectory_len, 0, 2], s=5, c='red', label='sim')
-    axs[4, 2].scatter(steps[:trajectory_len], real_body_rate_list[:trajectory_len, 0, 2], s=5, c='green', label='real')
+    axs[4, 2].scatter(steps[:], sim_body_rate_list[:, 0, 2], s=5, c='red', label='sim')
+    axs[4, 2].scatter(steps[:], real_body_rate_list[:, 0, 2], s=5, c='green', label='real')
     axs[4, 2].set_xlabel('steps')
     axs[4, 2].set_ylabel('rad/s')
     axs[4, 2].set_title('sim/real_bodyratez')
@@ -445,36 +456,35 @@ def main(cfg):
     
     # motor thrust error
     if not use_real_action:
-        axs[5, 0].scatter(steps[:trajectory_len], sim_motor[:trajectory_len, 0, 0], s=5, c='red', label='controller')
-        axs[5, 0].scatter(steps[:trajectory_len], real_motor[:trajectory_len, 0, 0], s=5, c='green', label='real')
+        axs[5, 0].scatter(steps[:], sim_motor[:, 0, 0], s=5, c='red', label='controller')
+        axs[5, 0].scatter(steps[:], real_motor[:, 0, 0], s=5, c='green', label='real')
         axs[5, 0].set_xlabel('steps')
         axs[5, 0].set_ylabel('ratio')
         axs[5, 0].set_title('sim/real_motor_1')
         axs[5, 0].legend()
         
-        axs[5, 1].scatter(steps[:trajectory_len], sim_motor[:trajectory_len, 0, 1], s=5, c='red', label='controller')
-        axs[5, 1].scatter(steps[:trajectory_len], real_motor[:trajectory_len, 0, 1], s=5, c='green', label='real')
+        axs[5, 1].scatter(steps[:], sim_motor[:, 0, 1], s=5, c='red', label='controller')
+        axs[5, 1].scatter(steps[:], real_motor[:, 0, 1], s=5, c='green', label='real')
         axs[5, 1].set_xlabel('steps')
         axs[5, 1].set_ylabel('ratio')
         axs[5, 1].set_title('sim/real_motor_2')
         axs[5, 1].legend()
         
-        axs[5, 2].scatter(steps[:trajectory_len], sim_motor[:trajectory_len, 0, 2], s=5, c='red', label='controller')
-        axs[5, 2].scatter(steps[:trajectory_len], real_motor[:trajectory_len, 0, 2], s=5, c='green', label='real')
+        axs[5, 2].scatter(steps[:], sim_motor[:, 0, 2], s=5, c='red', label='controller')
+        axs[5, 2].scatter(steps[:], real_motor[:, 0, 2], s=5, c='green', label='real')
         axs[5, 2].set_xlabel('steps')
         axs[5, 2].set_ylabel('ratio')
         axs[5, 2].set_title('sim/real_motor_3')
         axs[5, 2].legend()
 
-        axs[5, 3].scatter(steps[:trajectory_len], sim_motor[:trajectory_len, 0, 3], s=5, c='red', label='controller')
-        axs[5, 3].scatter(steps[:trajectory_len], real_motor[:trajectory_len, 0, 3], s=5, c='green', label='real')
+        axs[5, 3].scatter(steps[:], sim_motor[:, 0, 3], s=5, c='red', label='controller')
+        axs[5, 3].scatter(steps[:], real_motor[:, 0, 3], s=5, c='green', label='real')
         axs[5, 3].set_xlabel('steps')
         axs[5, 3].set_ylabel('ratio')
         axs[5, 3].set_title('sim/real_motor_4')
         axs[5, 3].legend()
         
         motor_thrust_error = np.square(sim_motor - real_motor)
-        pdb.set_trace()
         print('sim_real/motor1_error', np.mean(motor_thrust_error, axis=0)[0,0])
         print('sim_real/motor2_error', np.mean(motor_thrust_error, axis=0)[0,1])
         print('sim_real/motor3_error', np.mean(motor_thrust_error, axis=0)[0,2])
@@ -484,15 +494,16 @@ def main(cfg):
     plt.tight_layout()
     plt.savefig('comparison_sim_real')
 
-    # # plot trajectory
-    # fig_3d = plt.figure()
-    # ax_3d = fig_3d.add_subplot(projection='3d')
-    # ax_3d.scatter(sim_pos_list[:trajectory_len, 0, 0], sim_pos_list[:trajectory_len, 0, 1], sim_pos_list[:trajectory_len, 0, 2], s=5, label='sim')
-    # ax_3d.scatter(real_pos_list[:trajectory_len, 0, 0], real_pos_list[:trajectory_len, 0, 1], real_pos_list[:trajectory_len, 0, 2], s=5, label='real')
-    # ax_3d.set_xlabel('X')
-    # ax_3d.set_ylabel('Y')
-    # ax_3d.set_zlabel('Z')
-    # ax_3d.legend()
+    # plot trajectory
+    fig_3d = plt.figure()
+    ax_3d = fig_3d.add_subplot(projection='3d')
+    ax_3d.scatter(sim_pos_list[:, 0, 0], sim_pos_list[:, 0, 1], sim_pos_list[:, 0, 2], s=5, label='sim')
+    ax_3d.scatter(real_pos_list[:, 0, 0], real_pos_list[:, 0, 1], real_pos_list[:, 0, 2], s=5, label='real')
+    ax_3d.set_xlabel('X')
+    ax_3d.set_ylabel('Y')
+    ax_3d.set_zlabel('Z')
+    ax_3d.legend()
+    plt.savefig('simopt')
     
     # pos_error = np.square(sim_pos_list - real_pos_list)
     # print('sim_real/X_error', np.mean(pos_error, axis=0)[0,0])

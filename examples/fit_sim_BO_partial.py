@@ -107,6 +107,7 @@ def init_sim(cfg, n_envs):
 
     # controller = RateController(9.81, drone.params).to(sim.device)
     controller = PIDRateController(9.81, drone.params).to(sim.device)
+    
     return sim, drone, controller, simulation_app
 
 def evaluate(params, real_data, sim, drone, controller):
@@ -186,6 +187,7 @@ def evaluate(params, real_data, sim, drone, controller):
         vel = torch.tensor(shuffled_real_data[:, i, 10:13])
         body_rate = torch.tensor(shuffled_real_data[:, i, 18:21])
         body_rate[:, 1] = -body_rate[:, 1]
+        pdb.set_trace()
         # TODO: maybe use deried motor thrust
         # TODO: maybe real_motor_thrust[:, i + 1, 28:32] ?
         real_motor_thrust = torch.tensor(shuffled_real_data[:, i + 1, 28:32])
@@ -294,7 +296,6 @@ def main(cfg):
     """
     params_mask = np.array([0] * 13)
     params_mask[5] = 1
-    params_mask[6] = 1
     params_mask[7] = 1
     params_mask[9] = 1
 
