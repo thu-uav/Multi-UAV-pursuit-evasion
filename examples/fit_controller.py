@@ -88,6 +88,10 @@ def main(cfg):
     translations[:, 2] = 0.5
     drone.spawn(translations=translations)
     scene_utils.design_scene()
+    
+    # apply_action, if True, opt for rotor
+    # if False, opt for controller
+    use_real_action = True
 
     def evaluate(params, real_data):
         """
@@ -169,6 +173,9 @@ def main(cfg):
         sim_action_list = []
         real_action_list = []
         
+        sim_body_rate_list = []
+        real_body_rate_list = []
+        
         for i in range(real_data.shape[0]):
             pos = torch.tensor(real_data[i, :, 1:4])
             quat = torch.tensor(real_data[i, :, 5:9])
@@ -200,25 +207,46 @@ def main(cfg):
             
             sim_action_list.append(action.detach().to('cpu').numpy())
             
-            drone.apply_action(action)
-            sim.step(render=True)
-            
             real_action = next_real_motor_thrust.to(sim.device) / (2**16) * max_thrust * 2 - 1
-            
             real_action_list.append(real_action.detach().to('cpu').numpy())
+            
+            if use_real_action:
+                drone.apply_action(real_action)
+            else:
+                drone.apply_action(action)
+            sim.step(render=True)
             
             if sim.is_stopped():
                 break
             if not sim.is_playing():
                 sim.render()
                 continue
+            
+            # get simulated drone state
+            sim_state = drone.get_state().squeeze(0).cpu()
+            sim_pos = sim_state[..., :3]
+            sim_quat = sim_state[..., 3:7]
+            sim_vel = sim_state[..., 7:10]
+            sim_omega = sim_state[..., 10:13]
+            next_body_rate = quat_rotate_inverse(sim_quat, sim_omega)
+
+            sim_body_rate_list.append(next_body_rate.cpu().detach().numpy())
+            real_body_rate_list.append(next_real_rate.cpu().detach().numpy())
         
         sim_action_list = np.array(sim_action_list).reshape(-1, 4)
         real_action_list = np.array(real_action_list).reshape(-1, 4)
         
-        # opt for controller
-        loss = np.mean(np.sum(np.square(sim_action_list - real_action_list), axis=1))
+        sim_body_rate_list = np.array(sim_body_rate_list).reshape(-1, 3)
+        real_body_rate_list = np.array(real_body_rate_list).reshape(-1, 3)
+        
+        if use_real_action:
+            # opt for rotor
+            loss = np.mean(np.square(sim_body_rate_list - real_body_rate_list))
+        else:
+            # opt for controller
+            loss = np.mean(np.square(sim_action_list - real_action_list))
 
+        pdb.set_trace()
         return loss
 
     # start from the yaml
@@ -245,18 +273,6 @@ def main(cfg):
         33.3, # ilimit
         33.3, 
         166.7
-        # # opt, good param
-        # 25.0, # kp
-        # 25.0, 
-        # 12.0,
-        # 0.25, # kd 
-        # 0.25, 
-        # 50.0, # ki
-        # 50.0, 
-        # 1.67,
-        # 333.0, # ilimit
-        # 333.0, 
-        # 16.7
     ]
 
     """
@@ -277,8 +293,14 @@ def main(cfg):
         'iLimit': params[18:21],
     """
     params_mask = np.array([0] * 21)
-    # TODO: only update controller params
-    params_mask[10:] = 1
+    if use_real_action:
+        # update rotor params
+        params_mask[5] = 1
+        params_mask[7] = 1
+        params_mask[9] = 1
+    else:
+        # update controller params
+        params_mask[10:] = 1
 
     params_range = []
     lower = 0.1
@@ -309,19 +331,8 @@ def main(cfg):
     for epoch in range(100):
         print(f'Start with epoch: {epoch}')
         
-        # x = np.array(opt.ask(), dtype=float)
-        x = np.array(
-                    [250.0, # kp
-                    250.0, 
-                    120.0,
-                    2.5, # kd 
-                    2.5, 
-                    500.0, # ki
-                    500.0, 
-                    16.7,
-                    33.3, # ilimit
-                    33.3, 
-                    166.7])
+        x = np.array(opt.ask(), dtype=float)
+        x = np.array([2.88e-8, 7.24e-10, 0.43])
         # set real params
         set_idx = 0
         for idx, mask in enumerate(params_mask):
@@ -338,7 +349,6 @@ def main(cfg):
         print(f'CurrentParam/{x.tolist()}')
         print(f'Best/{res.x}')
         print('Best/Loss', res.fun)
-        pdb.set_trace()
         losses.append(grad)
         epochs.append(epoch)
     

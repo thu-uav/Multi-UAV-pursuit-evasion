@@ -223,7 +223,7 @@ def main(cfg):
         real_pos_list.append(real_pos.numpy())
         real_quat_list.append(real_quat.numpy())
         real_vel_list.append(real_vel.numpy())
-        real_body_rate_list.append(real_rate.numpy())
+        real_body_rate_list.append(real_next_rate.numpy())
         real_angvel_list.append(real_ang_vel.numpy())
 
         drone_state = drone.get_state()[..., :13].reshape(-1, 13)
