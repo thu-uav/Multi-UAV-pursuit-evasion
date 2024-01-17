@@ -105,29 +105,29 @@ def main(cfg):
         0.2,
         0.43,
         # origin
-        # 250.0, # kp
-        # 250.0, 
-        # 120.0,
-        # 2.5, # kd 
-        # 2.5, 
-        # 500.0, # ki
-        # 500.0, 
-        # 16.7,
-        # 33.3, # ilimit
-        # 33.3, 
-        # 166.7
+        250.0, # kp
+        250.0, 
+        120.0,
+        2.5, # kd 
+        2.5, 
+        500.0, # ki
+        500.0, 
+        16.7,
+        33.3, # ilimit
+        33.3, 
+        166.7
         # simopt
-        25.0, # kp
-        25.0, 
-        12.0,
-        0.25, # kd 
-        0.25, 
-        50.0, # ki
-        50.0, 
-        1.67,
-        333.0, # ilimit
-        333.0, 
-        16.7
+        # 25.0, # kp
+        # 25.0, 
+        # 12.0,
+        # 0.25, # kd 
+        # 0.25, 
+        # 50.0, # ki
+        # 50.0, 
+        # 1.67,
+        # 333.0, # ilimit
+        # 333.0, 
+        # 16.7
     ]
     
     tunable_parameters = {
@@ -504,138 +504,6 @@ def main(cfg):
     ax_3d.set_zlabel('Z')
     ax_3d.legend()
     plt.savefig('simopt')
-    
-    # pos_error = np.square(sim_pos_list - real_pos_list)
-    # print('sim_real/X_error', np.mean(pos_error, axis=0)[0,0])
-    # print('sim_real/Y_error', np.mean(pos_error, axis=0)[0,1])
-    # print('sim_real/Z_error', np.mean(pos_error, axis=0)[0,2])
-    # print('sim_real/Pos_error', np.mean(pos_error))
-    # ab_study = 'real_state_setperiod10_sim_action_transition'
-    # plt.savefig(ab_study)
-    # pdb.set_trace()
-
-    # # sim track target
-    # fig, axs = plt.subplots(1, 3, figsize=(10, 6))  # 1 * 3    
-    # # sim
-    # axs[0].scatter(steps, sim_body_rate_list[:, 0, 0], s=5, c='red', label='sim')
-    # axs[0].scatter(steps, target_body_rate_list[:, 0, 0], s=5, c='green', label='target')
-    # axs[0].set_xlabel('steps')
-    # axs[0].set_ylabel('rad/s')
-    # axs[0].set_title('sim/target_body_rate_x')
-    # axs[0].legend()
-    
-    # axs[1].scatter(steps, sim_body_rate_list[:, 0, 1], s=5, c='red', label='sim')
-    # axs[1].scatter(steps, target_body_rate_list[:, 0, 1], s=5, c='green', label='target')
-    # axs[1].set_xlabel('steps')
-    # axs[1].set_ylabel('rad/s')
-    # axs[1].set_title('sim/target_body_rate_y')
-    # axs[1].legend()
-    
-    # axs[2].scatter(steps, sim_body_rate_list[:, 0, 2], s=5, c='red', label='sim')
-    # axs[2].scatter(steps, target_body_rate_list[:, 0, 2], s=5, c='green', label='target')
-    # axs[2].set_xlabel('steps')
-    # axs[2].set_ylabel('rad/s')
-    # axs[2].set_title('sim/target_body_rate_z')
-    # axs[2].legend()
-    
-    # error = np.square(sim_body_rate_list - target_body_rate_list)
-    # print('sim_target/body_rateX_error', np.mean(error, axis=0)[0,0])
-    # print('sim_target/body_rateY_error', np.mean(error, axis=0)[0,1])
-    # print('sim_target/body_rateZ_error', np.mean(error, axis=0)[0,2])
-    # print('sim_target/body_rate_error', np.mean(error))
-
-    # # motor thrust comparison
-    # fig, axs = plt.subplots(1, 4, figsize=(10, 6))  # 1 * 4  
-    # axs[0].scatter(steps[:trajectory_len], sim_motor[:trajectory_len, 0, 0], s=5, c='red', label='controller')
-    # axs[0].scatter(steps[:trajectory_len], real_motor[:trajectory_len, 0, 0], s=5, c='green', label='real')
-    # axs[0].set_xlabel('steps')
-    # axs[0].set_ylabel('ratio')
-    # axs[0].set_title('controller/real_motor_1')
-    # axs[0].legend()
-    
-    # axs[1].scatter(steps[:trajectory_len], sim_motor[:trajectory_len, 0, 1], s=5, c='red', label='controller')
-    # axs[1].scatter(steps[:trajectory_len], real_motor[:trajectory_len, 0, 1], s=5, c='green', label='real')
-    # axs[1].set_xlabel('steps')
-    # axs[1].set_ylabel('ratio')
-    # axs[1].set_title('controller/real_motor_2')
-    # axs[1].legend()
-    
-    # axs[2].scatter(steps[:trajectory_len], sim_motor[:trajectory_len, 0, 2], s=5, c='red', label='controller')
-    # axs[2].scatter(steps[:trajectory_len], real_motor[:trajectory_len, 0, 2], s=5, c='green', label='real')
-    # axs[2].set_xlabel('steps')
-    # axs[2].set_ylabel('ratio')
-    # axs[2].set_title('controller/real_motor_3')
-    # axs[2].legend()
-
-    # axs[3].scatter(steps[:trajectory_len], sim_motor[:trajectory_len, 0, 3], s=5, c='red', label='controller')
-    # axs[3].scatter(steps[:trajectory_len], real_motor[:trajectory_len, 0, 3], s=5, c='green', label='real')
-    # axs[3].set_xlabel('steps')
-    # axs[3].set_ylabel('ratio')
-    # axs[3].set_title('controller/real_motor_4')
-    # axs[3].legend()
-    # plt.savefig('PID_real_motor_thrust')
-    # # plt.savefig('real_motor_thrust')
-    
-    # error = np.square(sim_motor - real_motor)
-    # print('controller_real/motor1_error', np.mean(error, axis=0)[0,0])
-    # print('controller_real/motor2_error', np.mean(error, axis=0)[0,1])
-    # print('controller_real/motor3_error', np.mean(error, axis=0)[0,2])
-    # print('controller_real/motor4_error', np.mean(error, axis=0)[0,3])
-    # print('controller_real/motor_error', np.mean(error))
-    
-    # # sim track real
-    # fig, axs = plt.subplots(1, 3, figsize=(10, 6))  # 1 * 3    
-    # axs[0].scatter(steps[:trajectory_len], sim_body_rate_list[:trajectory_len, 0, 0], s=5, c='red', label='sim')
-    # axs[0].scatter(steps[:trajectory_len], real_body_rate_list[:trajectory_len, 0, 0], s=5, c='green', label='real')
-    # axs[0].set_xlabel('steps')
-    # axs[0].set_ylabel('rad/s')
-    # axs[0].set_title('sim/real_body_rate_x')
-    # axs[0].legend()
-    
-    # axs[1].scatter(steps[:trajectory_len], sim_body_rate_list[:trajectory_len, 0, 1], s=5, c='red', label='sim')
-    # axs[1].scatter(steps[:trajectory_len], real_body_rate_list[:trajectory_len, 0, 1], s=5, c='green', label='real')
-    # axs[1].set_xlabel('steps')
-    # axs[1].set_ylabel('rad/s')
-    # axs[1].set_title('sim/real_body_rate_y')
-    # axs[1].legend()
-    
-    # axs[2].scatter(steps[:trajectory_len], sim_body_rate_list[:trajectory_len, 0, 2], s=5, c='red', label='sim')
-    # axs[2].scatter(steps[:trajectory_len], real_body_rate_list[:trajectory_len, 0, 2], s=5, c='green', label='real')
-    # axs[2].set_xlabel('steps')
-    # axs[2].set_ylabel('rad/s')
-    # axs[2].set_title('sim/real_body_rate_z')
-    # axs[2].legend()
-    
-    # error = np.square(sim_body_rate_list - real_body_rate_list)
-    # print('sim_real/body_rateX_error', np.mean(error, axis=0)[0,0])
-    # print('sim_real/body_rateY_error', np.mean(error, axis=0)[0,1])
-    # print('sim_real/body_rateZ_error', np.mean(error, axis=0)[0,2])
-    # print('sim_real/body_rate_error', np.mean(error))
-    
-    # # real
-    # axs[1,0].scatter(steps, real_body_rate_list[:, 0, 0], s=5, c='red', label='real')
-    # axs[1,0].scatter(steps, target_body_rate_list[:, 0, 0], s=5, c='green', label='target')
-    # axs[1,0].set_xlabel('steps')
-    # axs[1,0].set_ylabel('rad/s')
-    # axs[1,0].set_title('real/target_body_rate_x')
-    # axs[1,0].legend()
-    
-    # axs[1,1].scatter(steps, real_body_rate_list[:, 0, 1], s=5, c='red', label='real')
-    # axs[1,1].scatter(steps, target_body_rate_list[:, 0, 1], s=5, c='green', label='target')
-    # axs[1,1].set_xlabel('steps')
-    # axs[1,1].set_ylabel('rad/s')
-    # axs[1,1].set_title('real/target_body_rate_y')
-    # axs[1,1].legend()
-    
-    # axs[1,2].scatter(steps, real_body_rate_list[:, 0, 2], s=5, c='red', label='real')
-    # axs[1,2].scatter(steps, target_body_rate_list[:, 0, 2], s=5, c='green', label='target')
-    # axs[1,2].set_xlabel('steps')
-    # axs[1,2].set_ylabel('rad/s')
-    # axs[1,2].set_title('real/target_body_rate_z')
-    # axs[1,2].legend()
-    
-    # plt.savefig('RateController_trackTarget')
-    # plt.savefig('PIDController_trackreal')
     
     simulation_app.close()
 

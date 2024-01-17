@@ -33,6 +33,8 @@ def main(cfg):
         preprocess real data
         real_data: [batch_size, T, dimension]
     """
+    exp_name = 'lossBodyrate_tuneGain_trackreal'
+    # exp_name = 'lossBodyrate_tuneGain_kf'
     df = pd.read_csv(rosbags[0], skip_blank_lines=True)
     df = np.array(df)
     # preprocess, motor > 0
@@ -48,9 +50,11 @@ def main(cfg):
     # episode_length = preprocess_df.shape[0]
     episode_length = 1400
     real_data = []
-    # real_date: [episode_length, num_trajectory, dim]
+    # T = 20
+    # skip = 5
     T = 1
-    for i in range(0, episode_length-T):
+    skip = 1
+    for i in range(0, episode_length-T, skip):
         _slice = slice(i, i+T)
         real_data.append(preprocess_df[_slice])
     real_data = np.array(real_data)
@@ -82,7 +86,7 @@ def main(cfg):
         device=cfg.sim.device,
     )
     drone: MultirotorBase = MultirotorBase.REGISTRY[cfg.drone_model]()
-    n = real_data.shape[1] # parrallel envs, num_trajetories
+    n = 1 # serial envs
     translations = torch.zeros(n, 3)
     translations[:, 1] = torch.arange(n)
     translations[:, 2] = 0.5
@@ -123,14 +127,12 @@ def main(cfg):
         controller = PIDRateController(9.81, drone.params).to(sim.device)
         controller.set_byTunablePara(tunable_parameters=tunable_parameters)
         controller = controller.to(sim.device)
-        max_thrust = controller.max_thrusts.sum(-1)
-        
-        # # shuffle index and split into batches
-        # shuffled_idx = torch.randperm(real_data.shape[0])
-        # # shuffled_idx = np.arange(0,real_data.shape[0])
-        # shuffled_real_data = real_data[shuffled_idx]
         
         loss = torch.tensor(0.0, dtype=torch.float)
+        
+        # tunable_parameters = drone.tunable_parameters()
+        max_thrust = controller.max_thrusts.sum(-1)
+
         # update simulation parameters
         """
             1. set parameters into sim
@@ -164,31 +166,27 @@ def main(cfg):
             'next_motor1', 'next_motor2', 'next_motor3', 'next_motor4', (35:)]
             dtype='object')
         '''
-        # for i in range(max(1, real_data.shape[1]-1)):
         
-        sim_action_list = []
-        real_action_list = []
-        
-        for i in range(real_data.shape[0]):
-            pos = torch.tensor(real_data[i, :, 1:4])
-            quat = torch.tensor(real_data[i, :, 5:9])
-            vel = torch.tensor(real_data[i, :, 10:13])
-            real_rate = torch.tensor(real_data[i, :, 18:21])
-            next_real_rate = torch.tensor(real_data[i, :, 32:35])
-            next_real_motor_thrust = torch.tensor(real_data[i, :, 35:])
+        # TODO: serial data collection
+        for i in range(max(1, real_data.shape[1]-1)):
+            pos = torch.tensor(real_data[:, i, 1:4])
+            quat = torch.tensor(real_data[:, i, 5:9])
+            vel = torch.tensor(real_data[:, i, 10:13])
+            real_rate = torch.tensor(real_data[:, i, 18:21])
+            next_real_rate = torch.tensor(real_data[:, i, 32:35])
+            next_real_motor_thrust = torch.tensor(real_data[:, i, 35:])
             real_rate[:, 1] = -real_rate[:, 1]
             next_real_rate[:, 1] = -next_real_rate[:, 1]
             # get angvel
             ang_vel = quat_rotate(quat, real_rate)
-            # if i == 0 :
             set_drone_state(pos, quat, vel, ang_vel)
 
             drone_state = drone.get_state()[..., :13].reshape(-1, 13)
             # get current_rate
             pos, rot, linvel, angvel = drone_state.split([3, 4, 3, 3], dim=1)
             current_rate = quat_rotate_inverse(rot, angvel)
-            target_thrust = torch.tensor(real_data[i, :, 26]).to(device=sim.device).float()
-            target_rate = torch.tensor(real_data[i, :, 23:26]).to(device=sim.device).float()
+            target_thrust = torch.tensor(real_data[:, i, 26]).to(device=sim.device).float()
+            target_rate = torch.tensor(real_data[:, i, 23:26]).to(device=sim.device).float()
             real_rate = real_rate.to(device=sim.device).float()
             next_real_rate = next_real_rate.to(device=sim.device).float()
             target_rate[:, 1] = -target_rate[:, 1]
@@ -198,30 +196,35 @@ def main(cfg):
                 target_thrust=target_thrust.unsqueeze(1) / (2**16) * max_thrust
             )
             
-            sim_action_list.append(action.detach().to('cpu').numpy())
-            
             drone.apply_action(action)
+            # _, thrust, torques = drone.apply_action_foropt(action)
             sim.step(render=True)
             
             real_action = next_real_motor_thrust.to(sim.device) / (2**16) * max_thrust * 2 - 1
             
-            real_action_list.append(real_action.detach().to('cpu').numpy())
+            # opt for controller
+            loss = np.mean(np.square(action.detach().to('cpu').numpy() - real_action.detach().to('cpu').numpy()))
             
+            # opt for motor dynamics, loss = body rate error
+            # get simulated drone state
+            # sim_state = drone.get_state().squeeze().cpu()
+            # sim_pos = sim_state[..., :3]
+            # sim_quat = sim_state[..., 3:7]
+            # sim_vel = sim_state[..., 7:10]
+            # sim_omega = sim_state[..., 10:13]
+            # next_body_rate = quat_rotate_inverse(sim_quat, sim_omega)
+            # loss = np.mean(np.square(next_body_rate.detach().to('cpu').numpy() - next_real_rate.detach().to('cpu').numpy()))
+
             if sim.is_stopped():
                 break
             if not sim.is_playing():
                 sim.render()
                 continue
-        
-        sim_action_list = np.array(sim_action_list).reshape(-1, 4)
-        real_action_list = np.array(real_action_list).reshape(-1, 4)
-        
-        # opt for controller
-        loss = np.mean(np.sum(np.square(sim_action_list - real_action_list), axis=1))
 
         return loss
 
     # start from the yaml
+    # params = drone.tunable_parameters().detach().tolist()
     params = [
         0.03,
         1.4e-5,
@@ -277,8 +280,10 @@ def main(cfg):
         'iLimit': params[18:21],
     """
     params_mask = np.array([0] * 21)
-    # TODO: only update controller params
-    params_mask[10:] = 1
+    # TODO: only update rotor params
+    params_mask[5] = 1
+    params_mask[7] = 1
+    params_mask[9] = 1
 
     params_range = []
     lower = 0.1
@@ -309,19 +314,7 @@ def main(cfg):
     for epoch in range(100):
         print(f'Start with epoch: {epoch}')
         
-        # x = np.array(opt.ask(), dtype=float)
-        x = np.array(
-                    [250.0, # kp
-                    250.0, 
-                    120.0,
-                    2.5, # kd 
-                    2.5, 
-                    500.0, # ki
-                    500.0, 
-                    16.7,
-                    33.3, # ilimit
-                    33.3, 
-                    166.7])
+        x = np.array(opt.ask(), dtype=float)
         # set real params
         set_idx = 0
         for idx, mask in enumerate(params_mask):
@@ -338,7 +331,6 @@ def main(cfg):
         print(f'CurrentParam/{x.tolist()}')
         print(f'Best/{res.x}')
         print('Best/Loss', res.fun)
-        pdb.set_trace()
         losses.append(grad)
         epochs.append(epoch)
     
