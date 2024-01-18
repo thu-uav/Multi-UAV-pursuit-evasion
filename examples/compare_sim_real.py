@@ -21,10 +21,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 rosbags = [
-    '/home/jiayu/OmniDrones/realdata/crazyflie/8_100hz_light.csv',
-    # '/home/cf/ros2_ws/rosbags/takeoff.csv',
-    # '/home/cf/ros2_ws/rosbags/square.csv',
-    # '/home/cf/ros2_ws/rosbags/rl.csv',
+    # '/home/jiayu/OmniDrones/realdata/crazyflie/train_figure8.csv',
+    # '/home/jiayu/OmniDrones/realdata/crazyflie/cf1_figure8.csv',
+    '/home/jiayu/OmniDrones/realdata/crazyflie/cf7_figure8.csv',
+    # '/home/jiayu/OmniDrones/realdata/crazyflie/cf9_figure8.csv',
 ]
 
 @hydra.main(version_base=None, config_path=".", config_name="real2sim")
@@ -135,15 +135,26 @@ def main(cfg):
     #     29.59774460620317, 36.63, 16.669999999999998 # ilimit
     # ]
     
-    # opt all, loss = body rate error
+    # # opt all, loss = body rate error
+    # params = [
+    #     0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
+    #     2.88e-9, 2315, 7.24e-11, 0.2, 0.43,
+    #     # controller
+    #     25.0, 25.0, 12.0, # kp
+    #     0.25, 0.25, # kd
+    #     50.0, 50.0, 1.67, # ki
+    #     3.33, 3.33, 1667.0 # ilimit
+    # ]
+    
+    # opt all, loss = sim action - real action
     params = [
         0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
-        2.88e-9, 2315, 7.24e-11, 0.2, 0.43,
+        3.168e-08, 2315, 7.964000000000001e-10, 0.2, 0.43,
         # controller
         25.0, 25.0, 12.0, # kp
         0.25, 0.25, # kd
         50.0, 50.0, 1.67, # ki
-        3.33, 3.33, 1667.0 # ilimit
+        3.33, 3.33, 183.37 # ilimit
     ]
     
     tunable_parameters = {

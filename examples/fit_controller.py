@@ -21,10 +21,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 rosbags = [
-    '/home/jiayu/OmniDrones/realdata/crazyflie/8_100hz_light.csv',
-    # '/home/cf/ros2_ws/rosbags/takeoff.csv',
-    # '/home/cf/ros2_ws/rosbags/square.csv',
-    # '/home/cf/ros2_ws/rosbags/rl.csv',
+    # '/home/jiayu/OmniDrones/realdata/crazyflie/train_figure8.csv',
+    # '/home/jiayu/OmniDrones/realdata/crazyflie/cf1_figure8.csv',
+    '/home/jiayu/OmniDrones/realdata/crazyflie/cf7_figure8.csv',
+    # '/home/jiayu/OmniDrones/realdata/crazyflie/cf9_figure8.csv',
 ]
 
 @hydra.main(version_base=None, config_path=".", config_name="real2sim")
@@ -259,8 +259,8 @@ def main(cfg):
             loss += 0.0 * np.mean(np.square(sim_vel_list - real_vel_list))
         else:
             # opt for controller
-            # loss = np.mean(np.square(sim_action_list - real_action_list))
-            loss = np.mean(np.square(sim_body_rate_list - real_body_rate_list))
+            loss = np.mean(np.square(sim_action_list - real_action_list))
+            # loss = np.mean(np.square(sim_body_rate_list - real_body_rate_list))
 
         return loss
 
