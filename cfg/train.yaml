@@ -21,7 +21,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: Track_star_origin_randommass_bodyrate_clip60_fixedz_PID
+  run_name: Track_star_origin_clip60
   # run_name: debug
   job_type: train
   entity: chenjy

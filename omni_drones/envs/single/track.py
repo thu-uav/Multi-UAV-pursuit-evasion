@@ -305,7 +305,8 @@ class Track(IsaacEnv):
         self.stats["tracking_error"].add_(-distance)
         self.stats["tracking_error_ema"].lerp_(distance, (1-self.alpha))
         
-        reward_pose = torch.exp(-self.reward_distance_scale * distance)
+        # reward_pose = torch.exp(-self.reward_distance_scale * distance)
+        reward_pose = - distance
         
         # uprightness
         tiltage = torch.abs(1 - self.drone.up[..., 2])
@@ -366,8 +367,8 @@ class Track(IsaacEnv):
 
 def pentagram(t, c):
     # TODO: use c
-    x = -1.5 * torch.sin(2 * t) - 0.5 * torch.sin(3 * t)
-    y = 1.5 * torch.cos(2 * t) - 0.5 * torch.cos(3 * t)
+    x = -1.1 * torch.sin(2 * t) - 0.5 * torch.sin(3 * t)
+    y = 1.1 * torch.cos(2 * t) - 0.5 * torch.cos(3 * t)
     z = torch.zeros_like(t)
 
     return torch.stack([x, y, z], dim=-1)
