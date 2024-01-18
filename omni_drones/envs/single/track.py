@@ -305,8 +305,8 @@ class Track(IsaacEnv):
         self.stats["tracking_error"].add_(-distance)
         self.stats["tracking_error_ema"].lerp_(distance, (1-self.alpha))
         
-        # reward_pose = torch.exp(-self.reward_distance_scale * distance)
-        reward_pose = - distance
+        reward_pose = torch.exp(-self.reward_distance_scale * distance)
+        # reward_pose = - distance
         
         # uprightness
         tiltage = torch.abs(1 - self.drone.up[..., 2])
