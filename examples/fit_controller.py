@@ -55,12 +55,15 @@ def main(cfg):
         real_data.append(preprocess_df[_slice])
     real_data = np.array(real_data)
     
-    # add real next_state
+    # add real next_body_rate
     next_body_rate = real_data[1:,:,18:21]
     # add real next motor_thrust
     next_motor_thrust = real_data[1:,:,28:32]
+    # add real next_vel
+    next_vel = real_data[1:,:,10:13]
     real_data = np.concatenate([real_data[:-1],next_body_rate], axis=-1)
     real_data = np.concatenate([real_data, next_motor_thrust], axis=-1)
+    real_data = np.concatenate([real_data, next_vel], axis=-1)
 
     # start sim
     OmegaConf.resolve(cfg)
@@ -91,7 +94,7 @@ def main(cfg):
     
     # apply_action, if True, opt for rotor
     # if False, opt for controller
-    use_real_action = True
+    use_real_action = False
 
     def evaluate(params, real_data):
         """
@@ -165,7 +168,8 @@ def main(cfg):
             'target_rate.thrust',(23:27)
             'motor.time', 'motor.m1', 'motor.m2', 'motor.m3', 'motor.m4',(28:32)
             'next_real_rate.r', 'next_real_rate.p', 'next_real_rate.y', (33:35)
-            'next_motor1', 'next_motor2', 'next_motor3', 'next_motor4', (35:)]
+            'next_motor1', 'next_motor2', 'next_motor3', 'next_motor4', (35:39)
+            'next_vel.x', 'next_vel.y', 'next_vel.z', (39:42)]
             dtype='object')
         '''
         # for i in range(max(1, real_data.shape[1]-1)):
@@ -175,6 +179,9 @@ def main(cfg):
         
         sim_body_rate_list = []
         real_body_rate_list = []
+
+        sim_vel_list = []
+        real_vel_list = []
         
         for i in range(real_data.shape[0]):
             pos = torch.tensor(real_data[i, :, 1:4])
@@ -182,7 +189,8 @@ def main(cfg):
             vel = torch.tensor(real_data[i, :, 10:13])
             real_rate = torch.tensor(real_data[i, :, 18:21])
             next_real_rate = torch.tensor(real_data[i, :, 32:35])
-            next_real_motor_thrust = torch.tensor(real_data[i, :, 35:])
+            next_real_motor_thrust = torch.tensor(real_data[i, :, 35:39])
+            next_vel = torch.tensor(real_data[i, :, 39:42])
             real_rate[:, 1] = -real_rate[:, 1]
             next_real_rate[:, 1] = -next_real_rate[:, 1]
             # get angvel
@@ -232,6 +240,9 @@ def main(cfg):
 
             sim_body_rate_list.append(next_body_rate.cpu().detach().numpy())
             real_body_rate_list.append(next_real_rate.cpu().detach().numpy())
+            
+            sim_vel_list.append(sim_vel.cpu().detach().numpy())
+            real_vel_list.append(next_vel.cpu().detach().numpy())
         
         sim_action_list = np.array(sim_action_list).reshape(-1, 4)
         real_action_list = np.array(real_action_list).reshape(-1, 4)
@@ -239,14 +250,17 @@ def main(cfg):
         sim_body_rate_list = np.array(sim_body_rate_list).reshape(-1, 3)
         real_body_rate_list = np.array(real_body_rate_list).reshape(-1, 3)
         
+        sim_vel_list = np.array(sim_vel_list).reshape(-1, 3)
+        real_vel_list = np.array(real_vel_list).reshape(-1, 3)
+        
         if use_real_action:
             # opt for rotor
             loss = np.mean(np.square(sim_body_rate_list - real_body_rate_list))
+            loss += 0.0 * np.mean(np.square(sim_vel_list - real_vel_list))
         else:
             # opt for controller
             loss = np.mean(np.square(sim_action_list - real_action_list))
 
-        pdb.set_trace()
         return loss
 
     # start from the yaml
@@ -256,9 +270,11 @@ def main(cfg):
         1.4e-5,
         2.17e-5,
         0.043,
-        2.88e-8, # kf
+        # 2.88e-8, # kf
+        2.88e-9, # opt
         2315,
-        7.24e-10, # km
+        # 7.24e-10, # km
+        7.24e-11, # opt
         0.2,
         0.43, # tau
         # origin
@@ -297,14 +313,14 @@ def main(cfg):
         # update rotor params
         params_mask[5] = 1
         params_mask[7] = 1
-        params_mask[9] = 1
+        # params_mask[9] = 1
     else:
         # update controller params
         params_mask[10:] = 1
 
     params_range = []
     lower = 0.1
-    upper = 10.0
+    upper = 1.1
     count = 0
     for param, mask in zip(params, params_mask):
         if mask == 1:
@@ -332,7 +348,6 @@ def main(cfg):
         print(f'Start with epoch: {epoch}')
         
         x = np.array(opt.ask(), dtype=float)
-        x = np.array([2.88e-8, 7.24e-10, 0.43])
         # set real params
         set_idx = 0
         for idx, mask in enumerate(params_mask):

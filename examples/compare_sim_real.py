@@ -100,8 +100,10 @@ def main(cfg):
         2.17e-5,
         0.043,
         2.88e-8,
+        # 2.88e-09, # opt
         2315,
         7.24e-10,
+        # 7.24e-11, # opt
         0.2,
         0.43,
         # origin
@@ -116,18 +118,6 @@ def main(cfg):
         33.3, # ilimit
         33.3, 
         166.7
-        # simopt
-        # 25.0, # kp
-        # 25.0, 
-        # 12.0,
-        # 0.25, # kd 
-        # 0.25, 
-        # 50.0, # ki
-        # 50.0, 
-        # 1.67,
-        # 333.0, # ilimit
-        # 333.0, 
-        # 16.7
     ]
     
     tunable_parameters = {
@@ -201,7 +191,7 @@ def main(cfg):
     sim_motor = []
     real_motor = []
 
-    use_real_action = False
+    use_real_action = True
     trajectory_len = real_data.shape[0] - 1
     
     for i in range(trajectory_len):
@@ -281,7 +271,7 @@ def main(cfg):
         target_body_rate_list.append(target_body_rate.detach().numpy())
 
     # now run optimization
-    print('*'*55)
+    # print('*'*55)
     
     real_body_rate_list = np.array(real_body_rate_list)
     target_body_rate_list = np.array(target_body_rate_list)
@@ -305,9 +295,9 @@ def main(cfg):
     
     # error
     if use_real_action:
-        fig, axs = plt.subplots(5, 4, figsize=(20, 12))  # 5 * 4 
-    else:
         fig, axs = plt.subplots(6, 4, figsize=(20, 12))  # 6 * 4 
+    else:
+        fig, axs = plt.subplots(7, 4, figsize=(20, 12))  # 7 * 4 
     fig.subplots_adjust()
     # x error
     axs[0, 0].scatter(steps, sim_pos_list[:, 0, 0], s=5, c='red', label='sim')
@@ -331,11 +321,11 @@ def main(cfg):
     axs[0, 2].set_title('sim/real_Z')
     axs[0, 2].legend()
     pos_error = np.square(sim_pos_list - real_pos_list)
-    print('sim_real/X_error', np.mean(pos_error, axis=0)[0,0])
-    print('sim_real/Y_error', np.mean(pos_error, axis=0)[0,1])
-    print('sim_real/Z_error', np.mean(pos_error, axis=0)[0,2])
+    # print('sim_real/X_error', np.mean(pos_error, axis=0)[0,0])
+    # print('sim_real/Y_error', np.mean(pos_error, axis=0)[0,1])
+    # print('sim_real/Z_error', np.mean(pos_error, axis=0)[0,2])
     print('sim_real/Pos_error', np.mean(pos_error))
-    print('#'*55)
+    # print('#'*55)
     
     # quat1 error
     axs[1, 0].scatter(steps[:], sim_quat_list[:, 0, 0], s=5, c='red', label='sim')
@@ -366,12 +356,12 @@ def main(cfg):
     axs[1, 3].set_title('sim/real_quat4')
     axs[1, 3].legend()
     quat_error = np.square(sim_quat_list - real_quat_list)
-    print('sim_real/Quat1_error', np.mean(quat_error, axis=0)[0,0])
-    print('sim_real/Quat2_error', np.mean(quat_error, axis=0)[0,1])
-    print('sim_real/Quat3_error', np.mean(quat_error, axis=0)[0,2])
-    print('sim_real/Quat4_error', np.mean(quat_error, axis=0)[0,3])
+    # print('sim_real/Quat1_error', np.mean(quat_error, axis=0)[0,0])
+    # print('sim_real/Quat2_error', np.mean(quat_error, axis=0)[0,1])
+    # print('sim_real/Quat3_error', np.mean(quat_error, axis=0)[0,2])
+    # print('sim_real/Quat4_error', np.mean(quat_error, axis=0)[0,3])
     print('sim_real/Quat_error', np.mean(quat_error))
-    print('#'*55)
+    # print('#'*55)
 
     # vel x error
     axs[2, 0].scatter(steps[:], sim_vel_list[:, 0, 0], s=5, c='red', label='sim')
@@ -395,11 +385,11 @@ def main(cfg):
     axs[2, 2].set_title('sim/real_velz')
     axs[2, 2].legend()
     vel_error = np.square(sim_vel_list - real_vel_list)
-    print('sim_real/Velx_error', np.mean(vel_error, axis=0)[0,0])
-    print('sim_real/Vely_error', np.mean(vel_error, axis=0)[0,1])
-    print('sim_real/Velz_error', np.mean(vel_error, axis=0)[0,2])
+    # print('sim_real/Velx_error', np.mean(vel_error, axis=0)[0,0])
+    # print('sim_real/Vely_error', np.mean(vel_error, axis=0)[0,1])
+    # print('sim_real/Velz_error', np.mean(vel_error, axis=0)[0,2])
     print('sim_real/Vel_error', np.mean(vel_error))
-    print('#'*55)
+    # print('#'*55)
 
     # angvel x error
     axs[3, 0].scatter(steps[:], sim_angvel_list[:, 0, 0], s=5, c='red', label='sim')
@@ -423,11 +413,11 @@ def main(cfg):
     axs[3, 2].set_title('sim/real_angvelz')
     axs[3, 2].legend()
     angvel_error = np.square(sim_angvel_list - real_angvel_list)
-    print('sim_real/Angvelx_error', np.mean(angvel_error, axis=0)[0,0])
-    print('sim_real/Angvely_error', np.mean(angvel_error, axis=0)[0,1])
-    print('sim_real/Angvelz_error', np.mean(angvel_error, axis=0)[0,2])
+    # print('sim_real/Angvelx_error', np.mean(angvel_error, axis=0)[0,0])
+    # print('sim_real/Angvely_error', np.mean(angvel_error, axis=0)[0,1])
+    # print('sim_real/Angvelz_error', np.mean(angvel_error, axis=0)[0,2])
     print('sim_real/Angvel_error', np.mean(angvel_error))
-    print('#'*55)
+    # print('#'*55)
     
     # body rate x error
     axs[4, 0].scatter(steps[:], sim_body_rate_list[:, 0, 0], s=5, c='red', label='sim')
@@ -448,47 +438,72 @@ def main(cfg):
     axs[4, 2].set_ylabel('rad/s')
     axs[4, 2].set_title('sim/real_bodyratez')
     bodyrate_error = np.square(sim_body_rate_list - real_body_rate_list)
-    print('sim_real/Bodyratex_error', np.mean(bodyrate_error, axis=0)[0,0])
-    print('sim_real/Bodyratey_error', np.mean(bodyrate_error, axis=0)[0,1])
-    print('sim_real/Bodyratez_error', np.mean(bodyrate_error, axis=0)[0,2])
+    # print('sim_real/Bodyratex_error', np.mean(bodyrate_error, axis=0)[0,0])
+    # print('sim_real/Bodyratey_error', np.mean(bodyrate_error, axis=0)[0,1])
+    # print('sim_real/Bodyratez_error', np.mean(bodyrate_error, axis=0)[0,2])
     print('sim_real/Bodyrate_error', np.mean(bodyrate_error))
-    print('#'*55)
+    # print('#'*55)
+    
+    # # sim & target
+    # axs[5, 0].scatter(steps[:], sim_body_rate_list[:, 0, 0], s=5, c='red', label='sim')
+    # axs[5, 0].scatter(steps[:], target_body_rate_list[:, 0, 0], s=5, c='green', label='target')
+    # axs[5, 0].set_xlabel('steps')
+    # axs[5, 0].set_ylabel('rad/s')
+    # axs[5, 0].set_title('sim/target_bodyratex')
+    # # body rate y error
+    # axs[5, 1].scatter(steps[:], sim_body_rate_list[:, 0, 1], s=5, c='red', label='sim')
+    # axs[5, 1].scatter(steps[:], target_body_rate_list[:, 0, 1], s=5, c='green', label='target')
+    # axs[5, 1].set_xlabel('steps')
+    # axs[5, 1].set_ylabel('rad/s')
+    # axs[5, 1].set_title('sim/target_bodyratey')
+    # # body rate z error
+    # axs[5, 2].scatter(steps[:], sim_body_rate_list[:, 0, 2], s=5, c='red', label='sim')
+    # axs[5, 2].scatter(steps[:], target_body_rate_list[:, 0, 2], s=5, c='green', label='target')
+    # axs[5, 2].set_xlabel('steps')
+    # axs[5, 2].set_ylabel('rad/s')
+    # axs[5, 2].set_title('sim/target_bodyratez')
+    # target_bodyrate_error = np.square(sim_body_rate_list - target_body_rate_list)
+    # # print('sim_target/Bodyratex_error', np.mean(target_bodyrate_error, axis=0)[0,0])
+    # # print('sim_target/Bodyratey_error', np.mean(target_bodyrate_error, axis=0)[0,1])
+    # # print('sim_target/Bodyratez_error', np.mean(target_bodyrate_error, axis=0)[0,2])
+    # print('sim_target/Bodyrate_error', np.mean(target_bodyrate_error))
+    # # print('#'*55)
     
     # motor thrust error
     if not use_real_action:
-        axs[5, 0].scatter(steps[:], sim_motor[:, 0, 0], s=5, c='red', label='controller')
-        axs[5, 0].scatter(steps[:], real_motor[:, 0, 0], s=5, c='green', label='real')
-        axs[5, 0].set_xlabel('steps')
-        axs[5, 0].set_ylabel('ratio')
-        axs[5, 0].set_title('sim/real_motor_1')
-        axs[5, 0].legend()
+        axs[6, 0].scatter(steps[:], sim_motor[:, 0, 0], s=5, c='red', label='controller')
+        axs[6, 0].scatter(steps[:], real_motor[:, 0, 0], s=5, c='green', label='real')
+        axs[6, 0].set_xlabel('steps')
+        axs[6, 0].set_ylabel('ratio')
+        axs[6, 0].set_title('sim/real_motor_1')
+        axs[6, 0].legend()
         
-        axs[5, 1].scatter(steps[:], sim_motor[:, 0, 1], s=5, c='red', label='controller')
-        axs[5, 1].scatter(steps[:], real_motor[:, 0, 1], s=5, c='green', label='real')
-        axs[5, 1].set_xlabel('steps')
-        axs[5, 1].set_ylabel('ratio')
-        axs[5, 1].set_title('sim/real_motor_2')
-        axs[5, 1].legend()
+        axs[6, 1].scatter(steps[:], sim_motor[:, 0, 1], s=5, c='red', label='controller')
+        axs[6, 1].scatter(steps[:], real_motor[:, 0, 1], s=5, c='green', label='real')
+        axs[6, 1].set_xlabel('steps')
+        axs[6, 1].set_ylabel('ratio')
+        axs[6, 1].set_title('sim/real_motor_2')
+        axs[6, 1].legend()
         
-        axs[5, 2].scatter(steps[:], sim_motor[:, 0, 2], s=5, c='red', label='controller')
-        axs[5, 2].scatter(steps[:], real_motor[:, 0, 2], s=5, c='green', label='real')
-        axs[5, 2].set_xlabel('steps')
-        axs[5, 2].set_ylabel('ratio')
-        axs[5, 2].set_title('sim/real_motor_3')
-        axs[5, 2].legend()
+        axs[6, 2].scatter(steps[:], sim_motor[:, 0, 2], s=5, c='red', label='controller')
+        axs[6, 2].scatter(steps[:], real_motor[:, 0, 2], s=5, c='green', label='real')
+        axs[6, 2].set_xlabel('steps')
+        axs[6, 2].set_ylabel('ratio')
+        axs[6, 2].set_title('sim/real_motor_3')
+        axs[6, 2].legend()
 
-        axs[5, 3].scatter(steps[:], sim_motor[:, 0, 3], s=5, c='red', label='controller')
-        axs[5, 3].scatter(steps[:], real_motor[:, 0, 3], s=5, c='green', label='real')
-        axs[5, 3].set_xlabel('steps')
-        axs[5, 3].set_ylabel('ratio')
-        axs[5, 3].set_title('sim/real_motor_4')
-        axs[5, 3].legend()
+        axs[6, 3].scatter(steps[:], sim_motor[:, 0, 3], s=5, c='red', label='controller')
+        axs[6, 3].scatter(steps[:], real_motor[:, 0, 3], s=5, c='green', label='real')
+        axs[6, 3].set_xlabel('steps')
+        axs[6, 3].set_ylabel('ratio')
+        axs[6, 3].set_title('sim/real_motor_4')
+        axs[6, 3].legend()
         
         motor_thrust_error = np.square(sim_motor - real_motor)
-        print('sim_real/motor1_error', np.mean(motor_thrust_error, axis=0)[0,0])
-        print('sim_real/motor2_error', np.mean(motor_thrust_error, axis=0)[0,1])
-        print('sim_real/motor3_error', np.mean(motor_thrust_error, axis=0)[0,2])
-        print('sim_real/motor4_error', np.mean(motor_thrust_error, axis=0)[0,3])
+        # print('sim_real/motor1_error', np.mean(motor_thrust_error, axis=0)[0,0])
+        # print('sim_real/motor2_error', np.mean(motor_thrust_error, axis=0)[0,1])
+        # print('sim_real/motor3_error', np.mean(motor_thrust_error, axis=0)[0,2])
+        # print('sim_real/motor4_error', np.mean(motor_thrust_error, axis=0)[0,3])
         print('sim_real/motor_error', np.mean(motor_thrust_error))
     
     plt.tight_layout()
