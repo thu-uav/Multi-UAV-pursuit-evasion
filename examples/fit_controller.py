@@ -307,8 +307,8 @@ def main(cfg):
         params_mask[10:] = 1
 
     params_range = []
-    lower = 0.5
-    upper = 2.0
+    lower = 0.1
+    upper = 1.1
     count = 0
     for param, mask in zip(params, params_mask):
         if mask == 1:
