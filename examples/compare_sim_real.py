@@ -92,32 +92,58 @@ def main(cfg):
         drone: crazyflie
         controller: the predefined controller
     """
-    # origin
+    # # origin
+    # params = [
+    #     0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
+    #     2.88e-8, 2315, 7.24e-10, 0.2, 0.43,
+    #     # controller
+    #     250.0, 250.0, 120.0, # kp
+    #     2.5, 2.5, # kd
+    #     500.0, 500.0, 16.7, # ki
+    #     33.3, 33.3, 166.7 # ilimit
+    # ]
+    # # opt1
+    # params = [
+    #     0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
+    #     2.88e-9, 2315, 7.24e-11, 0.2, 0.43,
+    #     # controller
+    #     250.0, 250.0, 120.0, # kp
+    #     2.5, 2.5, # kd
+    #     500.0, 500.0, 16.7, # ki
+    #     33.3, 33.3, 166.7 # ilimit
+    # ]
+    
+    # # opt2
+    # params = [
+    #     0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
+    #     2.88e-8, 2315, 7.24e-10, 0.2, 0.43,
+    #     # controller
+    #     25.0, 25.0, 12.0, # kp
+    #     0.25, 0.25, # kd
+    #     50.0, 98.8252677986697, 1.67, # ki
+    #     3.33, 91.26722448663426, 1667.0 # ilimit
+    # ]
+
+    # # opt1 and opt2
+    # params = [
+    #     0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
+    #     3.168e-08, 2315, 7.964000000000001e-10, 0.2, 0.43,
+    #     # controller
+    #     25.0, 46.25109841359267, 12.0, # kp
+    #     0.25, 1.8214389844842152, # kd
+    #     50.0, 50.0, 1.67, # ki
+    #     29.59774460620317, 36.63, 16.669999999999998 # ilimit
+    # ]
+    
+    # opt all, loss = body rate error
     params = [
-        0.03,
-        1.4e-5,
-        1.4e-5,
-        2.17e-5,
-        0.043,
-        2.88e-8,
-        # 2.88e-09, # opt
-        2315,
-        7.24e-10,
-        # 7.24e-11, # opt
-        0.2,
-        0.43,
-        # origin
-        250.0, # kp
-        250.0, 
-        120.0,
-        2.5, # kd 
-        2.5, 
-        500.0, # ki
-        500.0, 
-        16.7,
-        33.3, # ilimit
-        33.3, 
-        166.7
+        0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
+        2.88e-9, 2315, 7.24e-11, 0.2, 0.43,
+        # controller
+        25.0, 25.0, 12.0, # kp
+        0.25, 0.25, # kd
+        50.0, 50.0, 1.67, # ki
+        3.33, 3.33, 1667.0 # ilimit
     ]
     
     tunable_parameters = {
@@ -191,7 +217,7 @@ def main(cfg):
     sim_motor = []
     real_motor = []
 
-    use_real_action = True
+    use_real_action = False
     trajectory_len = real_data.shape[0] - 1
     
     for i in range(trajectory_len):
@@ -295,9 +321,9 @@ def main(cfg):
     
     # error
     if use_real_action:
-        fig, axs = plt.subplots(6, 4, figsize=(20, 12))  # 6 * 4 
+        fig, axs = plt.subplots(7, 4, figsize=(20, 12))  # 6 * 4 
     else:
-        fig, axs = plt.subplots(7, 4, figsize=(20, 12))  # 7 * 4 
+        fig, axs = plt.subplots(8, 4, figsize=(20, 12))  # 7 * 4 
     fig.subplots_adjust()
     # x error
     axs[0, 0].scatter(steps, sim_pos_list[:, 0, 0], s=5, c='red', label='sim')
@@ -417,7 +443,7 @@ def main(cfg):
     # print('sim_real/Angvely_error', np.mean(angvel_error, axis=0)[0,1])
     # print('sim_real/Angvelz_error', np.mean(angvel_error, axis=0)[0,2])
     print('sim_real/Angvel_error', np.mean(angvel_error))
-    # print('#'*55)
+    # # print('#'*55)
     
     # body rate x error
     axs[4, 0].scatter(steps[:], sim_body_rate_list[:, 0, 0], s=5, c='red', label='sim')
@@ -425,18 +451,21 @@ def main(cfg):
     axs[4, 0].set_xlabel('steps')
     axs[4, 0].set_ylabel('rad/s')
     axs[4, 0].set_title('sim/real_bodyratex')
+    axs[4, 0].legend()
     # body rate y error
     axs[4, 1].scatter(steps[:], sim_body_rate_list[:, 0, 1], s=5, c='red', label='sim')
     axs[4, 1].scatter(steps[:], real_body_rate_list[:, 0, 1], s=5, c='green', label='real')
     axs[4, 1].set_xlabel('steps')
     axs[4, 1].set_ylabel('rad/s')
     axs[4, 1].set_title('sim/real_bodyratey')
+    axs[4, 1].legend()
     # body rate z error
     axs[4, 2].scatter(steps[:], sim_body_rate_list[:, 0, 2], s=5, c='red', label='sim')
     axs[4, 2].scatter(steps[:], real_body_rate_list[:, 0, 2], s=5, c='green', label='real')
     axs[4, 2].set_xlabel('steps')
     axs[4, 2].set_ylabel('rad/s')
     axs[4, 2].set_title('sim/real_bodyratez')
+    axs[4, 2].legend()
     bodyrate_error = np.square(sim_body_rate_list - real_body_rate_list)
     # print('sim_real/Bodyratex_error', np.mean(bodyrate_error, axis=0)[0,0])
     # print('sim_real/Bodyratey_error', np.mean(bodyrate_error, axis=0)[0,1])
@@ -444,60 +473,91 @@ def main(cfg):
     print('sim_real/Bodyrate_error', np.mean(bodyrate_error))
     # print('#'*55)
     
-    # # sim & target
-    # axs[5, 0].scatter(steps[:], sim_body_rate_list[:, 0, 0], s=5, c='red', label='sim')
-    # axs[5, 0].scatter(steps[:], target_body_rate_list[:, 0, 0], s=5, c='green', label='target')
-    # axs[5, 0].set_xlabel('steps')
-    # axs[5, 0].set_ylabel('rad/s')
-    # axs[5, 0].set_title('sim/target_bodyratex')
-    # # body rate y error
-    # axs[5, 1].scatter(steps[:], sim_body_rate_list[:, 0, 1], s=5, c='red', label='sim')
-    # axs[5, 1].scatter(steps[:], target_body_rate_list[:, 0, 1], s=5, c='green', label='target')
-    # axs[5, 1].set_xlabel('steps')
-    # axs[5, 1].set_ylabel('rad/s')
-    # axs[5, 1].set_title('sim/target_bodyratey')
-    # # body rate z error
-    # axs[5, 2].scatter(steps[:], sim_body_rate_list[:, 0, 2], s=5, c='red', label='sim')
-    # axs[5, 2].scatter(steps[:], target_body_rate_list[:, 0, 2], s=5, c='green', label='target')
-    # axs[5, 2].set_xlabel('steps')
-    # axs[5, 2].set_ylabel('rad/s')
-    # axs[5, 2].set_title('sim/target_bodyratez')
-    # target_bodyrate_error = np.square(sim_body_rate_list - target_body_rate_list)
-    # # print('sim_target/Bodyratex_error', np.mean(target_bodyrate_error, axis=0)[0,0])
-    # # print('sim_target/Bodyratey_error', np.mean(target_bodyrate_error, axis=0)[0,1])
-    # # print('sim_target/Bodyratez_error', np.mean(target_bodyrate_error, axis=0)[0,2])
-    # print('sim_target/Bodyrate_error', np.mean(target_bodyrate_error))
-    # # print('#'*55)
+    # sim & target
+    axs[5, 0].scatter(steps[:], sim_body_rate_list[:, 0, 0], s=5, c='red', label='sim')
+    axs[5, 0].scatter(steps[:], target_body_rate_list[:, 0, 0], s=5, c='green', label='target')
+    axs[5, 0].set_xlabel('steps')
+    axs[5, 0].set_ylabel('rad/s')
+    axs[5, 0].set_title('sim/target_bodyratex')
+    axs[5, 0].legend()
+    # body rate y error
+    axs[5, 1].scatter(steps[:], sim_body_rate_list[:, 0, 1], s=5, c='red', label='sim')
+    axs[5, 1].scatter(steps[:], target_body_rate_list[:, 0, 1], s=5, c='green', label='target')
+    axs[5, 1].set_xlabel('steps')
+    axs[5, 1].set_ylabel('rad/s')
+    axs[5, 1].set_title('sim/target_bodyratey')
+    axs[5, 1].legend()
+    # body rate z error
+    axs[5, 2].scatter(steps[:], sim_body_rate_list[:, 0, 2], s=5, c='red', label='sim')
+    axs[5, 2].scatter(steps[:], target_body_rate_list[:, 0, 2], s=5, c='green', label='target')
+    axs[5, 2].set_xlabel('steps')
+    axs[5, 2].set_ylabel('rad/s')
+    axs[5, 2].set_title('sim/target_bodyratez')
+    axs[5, 2].legend()
+    target_bodyrate_error = np.square(sim_body_rate_list - target_body_rate_list)
+    # print('sim_target/Bodyratex_error', np.mean(target_bodyrate_error, axis=0)[0,0])
+    # print('sim_target/Bodyratey_error', np.mean(target_bodyrate_error, axis=0)[0,1])
+    # print('sim_target/Bodyratez_error', np.mean(target_bodyrate_error, axis=0)[0,2])
+    print('sim_target/Bodyrate_error', np.mean(target_bodyrate_error))
+    # print('#'*55)
+
+    # real & target
+    axs[6, 0].scatter(steps[:], real_body_rate_list[:, 0, 0], s=5, c='red', label='real')
+    axs[6, 0].scatter(steps[:], target_body_rate_list[:, 0, 0], s=5, c='green', label='target')
+    axs[6, 0].set_xlabel('steps')
+    axs[6, 0].set_ylabel('rad/s')
+    axs[6, 0].set_title('real/target_bodyratex')
+    axs[6, 0].legend()
+    # body rate y error
+    axs[6, 1].scatter(steps[:], real_body_rate_list[:, 0, 1], s=5, c='red', label='real')
+    axs[6, 1].scatter(steps[:], target_body_rate_list[:, 0, 1], s=5, c='green', label='target')
+    axs[6, 1].set_xlabel('steps')
+    axs[6, 1].set_ylabel('rad/s')
+    axs[6, 1].set_title('real/target_bodyratey')
+    axs[6, 1].legend()
+    # body rate z error
+    axs[6, 2].scatter(steps[:], real_body_rate_list[:, 0, 2], s=5, c='red', label='real')
+    axs[6, 2].scatter(steps[:], target_body_rate_list[:, 0, 2], s=5, c='green', label='target')
+    axs[6, 2].set_xlabel('steps')
+    axs[6, 2].set_ylabel('rad/s')
+    axs[6, 2].set_title('real/target_bodyratez')
+    axs[6, 2].legend()
+    real_target_bodyrate_error = np.square(real_body_rate_list - target_body_rate_list)
+    # print('sim_target/Bodyratex_error', np.mean(target_bodyrate_error, axis=0)[0,0])
+    # print('sim_target/Bodyratey_error', np.mean(target_bodyrate_error, axis=0)[0,1])
+    # print('sim_target/Bodyratez_error', np.mean(target_bodyrate_error, axis=0)[0,2])
+    print('real_target/Bodyrate_error', np.mean(real_target_bodyrate_error))
+    # print('#'*55)
     
     # motor thrust error
     if not use_real_action:
-        axs[6, 0].scatter(steps[:], sim_motor[:, 0, 0], s=5, c='red', label='controller')
-        axs[6, 0].scatter(steps[:], real_motor[:, 0, 0], s=5, c='green', label='real')
-        axs[6, 0].set_xlabel('steps')
-        axs[6, 0].set_ylabel('ratio')
-        axs[6, 0].set_title('sim/real_motor_1')
-        axs[6, 0].legend()
+        axs[7, 0].scatter(steps[:], sim_motor[:, 0, 0], s=5, c='red', label='controller')
+        axs[7, 0].scatter(steps[:], real_motor[:, 0, 0], s=5, c='green', label='real')
+        axs[7, 0].set_xlabel('steps')
+        axs[7, 0].set_ylabel('ratio')
+        axs[7, 0].set_title('sim/real_motor_1')
+        axs[7, 0].legend()
         
-        axs[6, 1].scatter(steps[:], sim_motor[:, 0, 1], s=5, c='red', label='controller')
-        axs[6, 1].scatter(steps[:], real_motor[:, 0, 1], s=5, c='green', label='real')
-        axs[6, 1].set_xlabel('steps')
-        axs[6, 1].set_ylabel('ratio')
-        axs[6, 1].set_title('sim/real_motor_2')
-        axs[6, 1].legend()
+        axs[7, 1].scatter(steps[:], sim_motor[:, 0, 1], s=5, c='red', label='controller')
+        axs[7, 1].scatter(steps[:], real_motor[:, 0, 1], s=5, c='green', label='real')
+        axs[7, 1].set_xlabel('steps')
+        axs[7, 1].set_ylabel('ratio')
+        axs[7, 1].set_title('sim/real_motor_2')
+        axs[7, 1].legend()
         
-        axs[6, 2].scatter(steps[:], sim_motor[:, 0, 2], s=5, c='red', label='controller')
-        axs[6, 2].scatter(steps[:], real_motor[:, 0, 2], s=5, c='green', label='real')
-        axs[6, 2].set_xlabel('steps')
-        axs[6, 2].set_ylabel('ratio')
-        axs[6, 2].set_title('sim/real_motor_3')
-        axs[6, 2].legend()
+        axs[7, 2].scatter(steps[:], sim_motor[:, 0, 2], s=5, c='red', label='controller')
+        axs[7, 2].scatter(steps[:], real_motor[:, 0, 2], s=5, c='green', label='real')
+        axs[7, 2].set_xlabel('steps')
+        axs[7, 2].set_ylabel('ratio')
+        axs[7, 2].set_title('sim/real_motor_3')
+        axs[7, 2].legend()
 
-        axs[6, 3].scatter(steps[:], sim_motor[:, 0, 3], s=5, c='red', label='controller')
-        axs[6, 3].scatter(steps[:], real_motor[:, 0, 3], s=5, c='green', label='real')
-        axs[6, 3].set_xlabel('steps')
-        axs[6, 3].set_ylabel('ratio')
-        axs[6, 3].set_title('sim/real_motor_4')
-        axs[6, 3].legend()
+        axs[7, 3].scatter(steps[:], sim_motor[:, 0, 3], s=5, c='red', label='controller')
+        axs[7, 3].scatter(steps[:], real_motor[:, 0, 3], s=5, c='green', label='real')
+        axs[7, 3].set_xlabel('steps')
+        axs[7, 3].set_ylabel('ratio')
+        axs[7, 3].set_title('sim/real_motor_4')
+        axs[7, 3].legend()
         
         motor_thrust_error = np.square(sim_motor - real_motor)
         # print('sim_real/motor1_error', np.mean(motor_thrust_error, axis=0)[0,0])

@@ -47,7 +47,7 @@ def compute_parameters(
     force_constants = torch.as_tensor(rotor_config["force_constants"])
     moment_constants = torch.as_tensor(rotor_config["moment_constants"])
     directions = torch.as_tensor(rotor_config["directions"])
-    max_rot_vel = torch.as_tensor(rotor_config["max_rotation_velocities"])
+    # max_rot_vel = torch.as_tensor(rotor_config["max_rotation_velocities"])
     A = torch.stack(
         [
             torch.sin(rotor_angles) * arm_lengths,
@@ -417,7 +417,7 @@ class PIDRateController(nn.Module):
         self.max_thrusts = nn.Parameter(max_rot_vel.square() * force_constants)
         I = torch.diag_embed(
             torch.tensor([inertia["xx"], inertia["yy"], inertia["zz"], 1])
-        )
+        ).float()
 
         self.mixer = nn.Parameter(compute_parameters(rotor_config, I))
         # self.gain_angular_rate = nn.Parameter(
@@ -447,7 +447,7 @@ class PIDRateController(nn.Module):
         # gain = tunable_parameters['gain']
         I = torch.diag_embed(
             torch.tensor([inertia_xx, inertia_yy, inertia_zz, 1])
-        )
+        ).float()
 
         self.rotor_config['arm_lengths'] = [tunable_parameters['arm_lengths']] * 4
         self.rotor_config['force_constants'] = [tunable_parameters['force_constants']] * 4

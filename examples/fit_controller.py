@@ -259,36 +259,19 @@ def main(cfg):
             loss += 0.0 * np.mean(np.square(sim_vel_list - real_vel_list))
         else:
             # opt for controller
-            loss = np.mean(np.square(sim_action_list - real_action_list))
+            # loss = np.mean(np.square(sim_action_list - real_action_list))
+            loss = np.mean(np.square(sim_body_rate_list - real_body_rate_list))
 
         return loss
 
-    # start from the yaml
     params = [
-        0.03,
-        1.4e-5,
-        1.4e-5,
-        2.17e-5,
-        0.043,
-        # 2.88e-8, # kf
-        2.88e-9, # opt
-        2315,
-        # 7.24e-10, # km
-        7.24e-11, # opt
-        0.2,
-        0.43, # tau
-        # origin
-        250.0, # kp
-        250.0, 
-        120.0,
-        2.5, # kd 
-        2.5, 
-        500.0, # ki
-        500.0, 
-        16.7,
-        33.3, # ilimit
-        33.3, 
-        166.7
+        0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
+        2.88e-8, 2315, 7.24e-10, 0.2, 0.43,
+        # controller
+        250.0, 250.0, 120.0, # kp
+        2.5, 2.5, # kd
+        500.0, 500.0, 16.7, # ki
+        33.3, 33.3, 166.7 # ilimit
     ]
 
     """
@@ -316,11 +299,16 @@ def main(cfg):
         # params_mask[9] = 1
     else:
         # update controller params
+        # params_mask[1] = 1
+        # params_mask[2] = 1
+        # params_mask[3] = 1
+        params_mask[5] = 1
+        params_mask[7] = 1
         params_mask[10:] = 1
 
     params_range = []
-    lower = 0.1
-    upper = 1.1
+    lower = 0.5
+    upper = 2.0
     count = 0
     for param, mask in zip(params, params_mask):
         if mask == 1:
