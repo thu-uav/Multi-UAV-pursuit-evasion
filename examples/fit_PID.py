@@ -264,6 +264,7 @@ def main(cfg):
 
         return loss
 
+    # PID
     params = [
         0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
         2.88e-8, 2315, 7.24e-10, 0.2, 0.43,
@@ -291,7 +292,7 @@ def main(cfg):
         'pid_ki': params[15:18],
         'iLimit': params[18:21],
     """
-    params_mask = np.array([0] * 21)
+    params_mask = np.array([0] * len(params))
     if use_real_action:
         # update rotor params
         params_mask[5] = 1
