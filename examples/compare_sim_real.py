@@ -92,16 +92,16 @@ def main(cfg):
         drone: crazyflie
         controller: the predefined controller
     """
-    # origin
-    params = [
-        0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
-        2.88e-8, 2315, 7.24e-10, 0.2, 0.43,
-        # controller
-        250.0, 250.0, 120.0, # kp
-        2.5, 2.5, # kd
-        500.0, 500.0, 16.7, # ki
-        33.3, 33.3, 166.7 # ilimit
-    ]
+    # # origin
+    # params = [
+    #     0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
+    #     2.88e-8, 2315, 7.24e-10, 0.2, 0.43,
+    #     # controller
+    #     250.0, 250.0, 120.0, # kp
+    #     2.5, 2.5, # kd
+    #     500.0, 500.0, 16.7, # ki
+    #     33.3, 33.3, 166.7 # ilimit
+    # ]
     # # opt1
     # params = [
     #     0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
@@ -146,7 +146,7 @@ def main(cfg):
     #     3.33, 3.33, 1667.0 # ilimit
     # ]
     
-    # # opt all, loss = sim action - real action
+    # # opt all, loss = sim action - real action,cf7 100Hz
     # params = [
     #     0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
     #     3.168e-08, 2315, 7.964000000000001e-10, 0.2, 0.43,
@@ -156,6 +156,17 @@ def main(cfg):
     #     50.0, 50.0, 1.67, # ki
     #     3.33, 3.33, 183.37 # ilimit
     # ]
+
+    # opt all, loss = sim action - real action,cf7 50Hz
+    params = [
+        0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
+        3.168e-08, 2315, 7.964000000000001e-10, 0.2, 0.43,
+        # controller
+        25.0, 25.0, 12.0, # kp
+        0.25, 0.25, # kd
+        50.0, 50.0, 1.67, # ki
+        36.63, 3.33, 183.37 # ilimit
+    ]
     
     tunable_parameters = {
         'mass': params[0],
