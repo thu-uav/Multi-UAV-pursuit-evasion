@@ -372,15 +372,16 @@ class PIDRateController(nn.Module):
         # PID param
         self.dt = nn.Parameter(torch.tensor(0.02))
         # origin
-        # self.kp = nn.Parameter(torch.tensor([250.0, 250.0, 120.0]))
-        # self.kd = nn.Parameter(torch.tensor([2.5, 2.5, 0.0]))
-        # self.ki = nn.Parameter(torch.tensor([500.0, 500.0, 16.7]))
-        # self.iLimit = nn.Parameter(torch.tensor([33.3, 33.3, 166.7]))
-        # cf7 opt
-        self.kp = nn.Parameter(torch.tensor([25.0, 25.0, 12.0]))
-        self.kd = nn.Parameter(torch.tensor([0.25, 0.25, 0.0]))
-        self.ki = nn.Parameter(torch.tensor([50.0, 50.0, 1.67]))
-        self.iLimit = nn.Parameter(torch.tensor([3.33, 3.33, 183.37]))
+        self.kp = nn.Parameter(torch.tensor([250.0, 250.0, 120.0]))
+        self.kd = nn.Parameter(torch.tensor([2.5, 2.5, 0.0]))
+        self.ki = nn.Parameter(torch.tensor([500.0, 500.0, 16.7]))
+        self.iLimit = nn.Parameter(torch.tensor([33.3, 33.3, 166.7]))
+        # # cf7 opt
+        # self.kp = nn.Parameter(torch.tensor([25.0, 25.0, 12.0]))
+        # self.kd = nn.Parameter(torch.tensor([0.25, 0.25, 0.0]))
+        # self.ki = nn.Parameter(torch.tensor([50.0, 50.0, 1.67]))
+        # self.iLimit = nn.Parameter(torch.tensor([3.33, 3.33, 183.37]))
+        
         self.kff = nn.Parameter(torch.tensor([0.0, 0.0, 0.0]))
         self.count = 0 # if = 0, integ, last_rate_error = 0.0
         self.outputLimit = 0.0
