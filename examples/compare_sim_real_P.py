@@ -92,13 +92,29 @@ def main(cfg):
         drone: crazyflie
         controller: the predefined controller
     """
-    # origin
+    # # origin
+    # params = [
+    #     0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
+    #     2.88e-8, 2315, 7.24e-10, 0.2, 0.43,
+    #     # controller
+    #     0.0052, 0.0052, 0.00025
+    # ]
+    
+    # opt for dynamics (kf, km)
     params = [
         0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
-        4.519483725231148e-08, 2315, 3.4283698464397085e-09, 0.2, 0.43,
+        2.88e-9, 2315, 7.24e-11, 0.2, 0.43,
         # controller
-        0.00052, 0.00052, 2.5e-05
+        0.0052, 0.0052, 0.00025
     ]
+    
+    # # opt for controller gain
+    # params = [
+    #     0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
+    #     2.88e-8, 2315, 7.24e-10, 0.2, 0.43,
+    #     # controller
+    #    0.00052, 0.0009756599593733796, 2.5e-05
+    # ]
     
     tunable_parameters = {
         'mass': params[0],
@@ -210,7 +226,7 @@ def main(cfg):
         
         sim_motor.append(action.detach().to('cpu').numpy())
         
-        real_action = real_motor_thrust.to(sim.device) / (2**16) * max_thrust * 2 - 1
+        real_action = real_motor_thrust.to(sim.device) / (2**16) * 2 - 1
         
         real_motor.append(real_action.detach().to('cpu').numpy())
         

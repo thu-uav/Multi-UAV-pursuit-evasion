@@ -303,13 +303,13 @@ def main(cfg):
         # params_mask[1] = 1
         # params_mask[2] = 1
         # params_mask[3] = 1
-        params_mask[5] = 1
-        params_mask[7] = 1
+        # params_mask[5] = 1
+        # params_mask[7] = 1
         params_mask[10:] = 1
 
     params_range = []
     lower = 0.1
-    upper = 1.1
+    upper = 10.0
     count = 0
     for param, mask in zip(params, params_mask):
         if mask == 1:

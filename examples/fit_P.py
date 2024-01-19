@@ -94,7 +94,7 @@ def main(cfg):
     
     # apply_action, if True, opt for rotor
     # if False, opt for controller
-    use_real_action = False
+    use_real_action = True
 
     def evaluate(params, real_data):
         """
@@ -211,7 +211,7 @@ def main(cfg):
             
             sim_action_list.append(action.detach().to('cpu').numpy())
             
-            real_action = next_real_motor_thrust.to(sim.device) / (2**16) * max_thrust * 2 - 1
+            real_action = next_real_motor_thrust.to(sim.device) / (2**16) * 2 - 1
             real_action_list.append(real_action.detach().to('cpu').numpy())
             
             if use_real_action:
@@ -292,8 +292,8 @@ def main(cfg):
         # params_mask[1] = 1
         # params_mask[2] = 1
         # params_mask[3] = 1
-        params_mask[5] = 1
-        params_mask[7] = 1
+        # params_mask[5] = 1
+        # params_mask[7] = 1
         params_mask[10:] = 1
 
     params_range = []
