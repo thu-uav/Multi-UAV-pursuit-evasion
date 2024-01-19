@@ -359,9 +359,9 @@ class RateController(Transform):
         target_thrust = ((target_thrust + 1) / 2).clip(0.) * self.max_thrust
         cmds = self.controller(
             drone_state, 
-            # target_rate=target_rate * torch.pi,
+            target_rate=target_rate * torch.pi,
             # target_rate=target_rate * torch.pi / 6, # rate is between [-30, 30] degree/s
-            target_rate=target_rate * torch.pi / 3,
+            # target_rate=target_rate * torch.pi / 3,
             # target_rate=target_rate * torch.pi / 2,
             target_thrust=target_thrust
         )
