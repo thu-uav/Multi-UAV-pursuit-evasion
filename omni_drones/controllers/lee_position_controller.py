@@ -425,7 +425,7 @@ class PIDRateController(nn.Module):
         # )
         
         # PID param
-        self.dt = nn.Parameter(torch.tensor(0.01))
+        self.dt = nn.Parameter(torch.tensor(0.02))
         self.pid_kp = nn.Parameter(torch.tensor([250.0, 250.0, 120.0]))
         self.pid_kd = nn.Parameter(torch.tensor([2.5, 2.5, 0.0]))
         self.pid_ki = nn.Parameter(torch.tensor([500.0, 500.0, 16.7]))
@@ -462,7 +462,7 @@ class PIDRateController(nn.Module):
         # )
         
         # PID param
-        self.dt = nn.Parameter(torch.tensor(0.01))
+        self.dt = nn.Parameter(torch.tensor(0.02))
         self.pid_kp = nn.Parameter(torch.tensor(tunable_parameters['pid_kp']))
         self.pid_kd = nn.Parameter(torch.tensor(tunable_parameters['pid_kd'] + [0.0])) # set coeff_yaw = 0.0
         self.pid_ki = nn.Parameter(torch.tensor(tunable_parameters['pid_ki']))
