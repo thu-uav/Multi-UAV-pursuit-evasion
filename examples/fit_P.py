@@ -94,7 +94,7 @@ def main(cfg):
     
     # apply_action, if True, opt for rotor
     # if False, opt for controller
-    use_real_action = False
+    use_real_action = True
 
     def evaluate(params, real_data):
         """
@@ -263,7 +263,9 @@ def main(cfg):
     # P
     params = [
         0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
-        2.88e-8, 2315, 7.24e-10, 0.2, 0.43,
+        2.88e-8, 2315, 7.24e-10, 0.2, 
+        # time const
+        0.046,
         # controller
         0.0052, 0.0052, 0.00025
     ]
@@ -285,8 +287,8 @@ def main(cfg):
     if use_real_action:
         # update rotor params
         params_mask[5] = 1
-        params_mask[7] = 1
-        # params_mask[9] = 1
+        # params_mask[7] = 1
+        params_mask[9] = 1
     else:
         # update controller params
         # params_mask[1] = 1
