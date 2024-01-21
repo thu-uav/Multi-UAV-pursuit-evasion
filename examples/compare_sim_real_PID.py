@@ -92,80 +92,15 @@ def main(cfg):
         drone: crazyflie
         controller: the predefined controller
     """
-    # # origin
-    # params = [
-    #     0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
-    #     2.88e-8, 2315, 7.24e-10, 0.2, 0.43,
-    #     # controller
-    #     250.0, 250.0, 120.0, # kp
-    #     2.5, 2.5, # kd
-    #     500.0, 500.0, 16.7, # ki
-    #     33.3, 33.3, 166.7 # ilimit
-    # ]
-    # # opt1
-    # params = [
-    #     0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
-    #     2.88e-9, 2315, 7.24e-11, 0.2, 0.43,
-    #     # controller
-    #     250.0, 250.0, 120.0, # kp
-    #     2.5, 2.5, # kd
-    #     500.0, 500.0, 16.7, # ki
-    #     33.3, 33.3, 166.7 # ilimit
-    # ]
-    
-    # # opt2
-    # params = [
-    #     0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
-    #     2.88e-8, 2315, 7.24e-10, 0.2, 0.43,
-    #     # controller
-    #     25.0, 25.0, 12.0, # kp
-    #     0.25, 0.25, # kd
-    #     50.0, 98.8252677986697, 1.67, # ki
-    #     3.33, 91.26722448663426, 1667.0 # ilimit
-    # ]
-
-    # # opt1 and opt2
-    # params = [
-    #     0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
-    #     3.168e-08, 2315, 7.964000000000001e-10, 0.2, 0.43,
-    #     # controller
-    #     25.0, 46.25109841359267, 12.0, # kp
-    #     0.25, 1.8214389844842152, # kd
-    #     50.0, 50.0, 1.67, # ki
-    #     29.59774460620317, 36.63, 16.669999999999998 # ilimit
-    # ]
-    
-    # # opt all, loss = body rate error
-    # params = [
-    #     0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
-    #     2.88e-9, 2315, 7.24e-11, 0.2, 0.43,
-    #     # controller
-    #     25.0, 25.0, 12.0, # kp
-    #     0.25, 0.25, # kd
-    #     50.0, 50.0, 1.67, # ki
-    #     3.33, 3.33, 1667.0 # ilimit
-    # ]
-    
-    # # opt all, loss = sim action - real action,cf7 100Hz
-    # params = [
-    #     0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
-    #     3.168e-08, 2315, 7.964000000000001e-10, 0.2, 0.43,
-    #     # controller
-    #     25.0, 25.0, 12.0, # kp
-    #     0.25, 0.25, # kd
-    #     50.0, 50.0, 1.67, # ki
-    #     3.33, 3.33, 183.37 # ilimit
-    # ]
-
-    # opt all, loss = sim action - real action,cf7 50Hz
+    # origin
     params = [
         0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
-        3.168e-08, 2315, 7.964000000000001e-10, 0.2, 0.43,
+        2.88e-8, 2315, 7.24e-10, 0.2, 0.43,
         # controller
-        25.0, 25.0, 12.0, # kp
-        0.25, 0.25, # kd
-        50.0, 50.0, 1.67, # ki
-        36.63, 3.33, 183.37 # ilimit
+        250.0, 250.0, 120.0, # kp
+        2.5, 2.5, # kd
+        500.0, 500.0, 16.7, # ki
+        33.3, 33.3, 166.7 # ilimit
     ]
     
     tunable_parameters = {
@@ -272,17 +207,17 @@ def main(cfg):
         target_rate = torch.tensor(real_data[i, :, 23:26]).to(device=sim.device).float()
         real_rate = real_rate.to(device=sim.device).float()
         real_next_rate = real_next_rate.to(device=sim.device).float()
-        target_rate[:, 1] = -target_rate[:, 1]
+        # target_rate[:, 1] = -target_rate[:, 1]
+        current_rate[:, 1] = -current_rate[:, 1]
         action = controller.sim_step(
             current_rate=current_rate,
             target_rate=target_rate / 180 * torch.pi,
-            # target_rate=real_next_rate,
-            target_thrust=target_thrust.unsqueeze(1) / (2**16) * max_thrust
+            target_thrust=target_thrust.unsqueeze(1) / 2**16
         )
         
         sim_motor.append(action.detach().to('cpu').numpy())
         
-        real_action = real_motor_thrust.to(sim.device) / (2**16) * max_thrust * 2 - 1
+        real_action = real_motor_thrust.to(sim.device) / (2**16) * 2 - 1
         
         real_motor.append(real_action.detach().to('cpu').numpy())
         

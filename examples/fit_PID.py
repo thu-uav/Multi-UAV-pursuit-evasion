@@ -210,12 +210,12 @@ def main(cfg):
             action = controller.sim_step(
                 current_rate=current_rate,
                 target_rate=target_rate / 180 * torch.pi,
-                target_thrust=target_thrust.unsqueeze(1) / (2**16) * max_thrust
+                target_thrust=target_thrust.unsqueeze(1)
             )
             
             sim_action_list.append(action.detach().to('cpu').numpy())
             
-            real_action = next_real_motor_thrust.to(sim.device) / (2**16) * max_thrust * 2 - 1
+            real_action = next_real_motor_thrust.to(sim.device) / (2**16) * 2 - 1
             real_action_list.append(real_action.detach().to('cpu').numpy())
             
             if use_real_action:

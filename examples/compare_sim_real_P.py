@@ -92,28 +92,28 @@ def main(cfg):
         drone: crazyflie
         controller: the predefined controller
     """
-    # # origin
-    # params = [
-    #     0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
-    #     2.88e-8, 2315, 7.24e-10, 0.2, 0.43,
-    #     # controller
-    #     0.0052, 0.0052, 0.00025
-    # ]
-    
-    # opt for dynamics (kf, km)
+    # origin
     params = [
         0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
-        2.88e-9, 2315, 7.24e-11, 0.2, 0.43,
+        2.88e-8, 2315, 7.24e-10, 0.2, 0.43,
         # controller
         0.0052, 0.0052, 0.00025
     ]
+    
+    # # opt for dynamics (kf, km)
+    # params = [
+    #     0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
+    #     2.88e-9, 2315, 7.24e-11, 0.2, 0.43,
+    #     # controller
+    #     0.0052, 0.0052, 0.00025
+    # ]
     
     # # opt for controller gain
     # params = [
     #     0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
     #     2.88e-8, 2315, 7.24e-10, 0.2, 0.43,
     #     # controller
-    #    0.00052, 0.0009756599593733796, 2.5e-05
+    #    5.2e-06, 5.2e-06, 2.5e-07
     # ]
     
     tunable_parameters = {
@@ -183,7 +183,7 @@ def main(cfg):
     sim_motor = []
     real_motor = []
 
-    use_real_action = False
+    use_real_action = True
     trajectory_len = real_data.shape[0] - 1
     
     for i in range(trajectory_len):
@@ -217,6 +217,7 @@ def main(cfg):
         real_rate = real_rate.to(device=sim.device).float()
         real_next_rate = real_next_rate.to(device=sim.device).float()
         target_rate[:, 1] = -target_rate[:, 1]
+        # current_rate[:, 1] = -current_rate[:, 1]
         action = controller.sim_step(
             current_rate=current_rate,
             target_rate=target_rate / 180 * torch.pi,
@@ -316,7 +317,7 @@ def main(cfg):
     # print('sim_real/X_error', np.mean(pos_error, axis=0)[0,0])
     # print('sim_real/Y_error', np.mean(pos_error, axis=0)[0,1])
     # print('sim_real/Z_error', np.mean(pos_error, axis=0)[0,2])
-    print('sim_real/Pos_error', np.mean(pos_error))
+    print('sim_real/Pos_error', np.mean(np.sum(pos_error, axis=-1)))
     # print('#'*55)
     
     # quat1 error
@@ -352,7 +353,7 @@ def main(cfg):
     # print('sim_real/Quat2_error', np.mean(quat_error, axis=0)[0,1])
     # print('sim_real/Quat3_error', np.mean(quat_error, axis=0)[0,2])
     # print('sim_real/Quat4_error', np.mean(quat_error, axis=0)[0,3])
-    print('sim_real/Quat_error', np.mean(quat_error))
+    print('sim_real/Quat_error', np.mean(np.sum(quat_error, axis=-1)))
     # print('#'*55)
 
     # vel x error
@@ -380,7 +381,7 @@ def main(cfg):
     # print('sim_real/Velx_error', np.mean(vel_error, axis=0)[0,0])
     # print('sim_real/Vely_error', np.mean(vel_error, axis=0)[0,1])
     # print('sim_real/Velz_error', np.mean(vel_error, axis=0)[0,2])
-    print('sim_real/Vel_error', np.mean(vel_error))
+    print('sim_real/Vel_error', np.mean(np.sum(vel_error, axis=-1)))
     # print('#'*55)
 
     # angvel x error
@@ -408,7 +409,7 @@ def main(cfg):
     # print('sim_real/Angvelx_error', np.mean(angvel_error, axis=0)[0,0])
     # print('sim_real/Angvely_error', np.mean(angvel_error, axis=0)[0,1])
     # print('sim_real/Angvelz_error', np.mean(angvel_error, axis=0)[0,2])
-    print('sim_real/Angvel_error', np.mean(angvel_error))
+    print('sim_real/Angvel_error', np.mean(np.sum(angvel_error, axis=-1)))
     # # print('#'*55)
     
     # body rate x error
@@ -436,7 +437,7 @@ def main(cfg):
     # print('sim_real/Bodyratex_error', np.mean(bodyrate_error, axis=0)[0,0])
     # print('sim_real/Bodyratey_error', np.mean(bodyrate_error, axis=0)[0,1])
     # print('sim_real/Bodyratez_error', np.mean(bodyrate_error, axis=0)[0,2])
-    print('sim_real/Bodyrate_error', np.mean(bodyrate_error))
+    print('sim_real/Bodyrate_error', np.mean(np.sum(bodyrate_error, axis=-1)))
     # print('#'*55)
     
     # sim & target
@@ -464,7 +465,7 @@ def main(cfg):
     # print('sim_target/Bodyratex_error', np.mean(target_bodyrate_error, axis=0)[0,0])
     # print('sim_target/Bodyratey_error', np.mean(target_bodyrate_error, axis=0)[0,1])
     # print('sim_target/Bodyratez_error', np.mean(target_bodyrate_error, axis=0)[0,2])
-    print('sim_target/Bodyrate_error', np.mean(target_bodyrate_error))
+    print('sim_target/Bodyrate_error', np.mean(np.sum(target_bodyrate_error, axis=-1)))
     # print('#'*55)
 
     # real & target
@@ -492,7 +493,7 @@ def main(cfg):
     # print('sim_target/Bodyratex_error', np.mean(target_bodyrate_error, axis=0)[0,0])
     # print('sim_target/Bodyratey_error', np.mean(target_bodyrate_error, axis=0)[0,1])
     # print('sim_target/Bodyratez_error', np.mean(target_bodyrate_error, axis=0)[0,2])
-    print('real_target/Bodyrate_error', np.mean(real_target_bodyrate_error))
+    print('real_target/Bodyrate_error', np.mean(np.sum(real_target_bodyrate_error, axis=-1)))
     # print('#'*55)
     
     # motor thrust error
@@ -530,7 +531,8 @@ def main(cfg):
         # print('sim_real/motor2_error', np.mean(motor_thrust_error, axis=0)[0,1])
         # print('sim_real/motor3_error', np.mean(motor_thrust_error, axis=0)[0,2])
         # print('sim_real/motor4_error', np.mean(motor_thrust_error, axis=0)[0,3])
-        print('sim_real/motor_error', np.mean(motor_thrust_error))
+        print('sim_real/motor_error', np.mean(np.sum(motor_thrust_error, axis=-1)))
+        # print('sim_real/motor_error', np.mean(motor_thrust_error))
     
     plt.tight_layout()
     plt.savefig('comparison_sim_real')

@@ -94,7 +94,7 @@ def main(cfg):
     
     # apply_action, if True, opt for rotor
     # if False, opt for controller
-    use_real_action = True
+    use_real_action = False
 
     def evaluate(params, real_data):
         """
@@ -255,7 +255,7 @@ def main(cfg):
             loss += 0.0 * np.mean(np.square(sim_vel_list - real_vel_list))
         else:
             # opt for controller
-            loss = np.mean(np.square(sim_action_list - real_action_list))
+            loss = np.mean(np.sum(np.square(sim_action_list - real_action_list), axis=-1))
             # loss = np.mean(np.square(sim_body_rate_list - real_body_rate_list))
 
         return loss
@@ -297,8 +297,8 @@ def main(cfg):
         params_mask[10:] = 1
 
     params_range = []
-    lower = 0.1
-    upper = 10.0
+    lower = 0.001
+    upper = 1000.0
     count = 0
     for param, mask in zip(params, params_mask):
         if mask == 1:

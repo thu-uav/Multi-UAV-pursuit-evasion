@@ -408,22 +408,12 @@ class PIDRateController(nn.Module):
         super().__init__()
         rotor_config = uav_params["rotor_configuration"]
         self.rotor_config = rotor_config
-        inertia = uav_params["inertia"]
         force_constants = torch.as_tensor(rotor_config["force_constants"])
         max_rot_vel = torch.as_tensor(rotor_config["max_rotation_velocities"])
-        gain = uav_params['controller_configuration']['gain']
 
         self.g = nn.Parameter(torch.tensor(g))
         self.max_thrusts = nn.Parameter(max_rot_vel.square() * force_constants)
-        I = torch.diag_embed(
-            torch.tensor([inertia["xx"], inertia["yy"], inertia["zz"], 1])
-        ).float()
 
-        self.mixer = nn.Parameter(compute_parameters(rotor_config, I))
-        # self.gain_angular_rate = nn.Parameter(
-        #     torch.tensor(gain) @ I[:3, :3].inverse()
-        # )
-        
         # PID param
         self.dt = nn.Parameter(torch.tensor(0.02))
         self.pid_kp = nn.Parameter(torch.tensor([250.0, 250.0, 120.0]))
@@ -512,10 +502,10 @@ class PIDRateController(nn.Module):
         # TODO, w.o.lpf2pApply filter to output
         output[torch.isnan(output)] = 0.0
         
-        angacc_thrust = torch.cat([output, target_thrust], dim=1)
-        cmd = (self.mixer @ angacc_thrust.T).T
-        cmd = (cmd / self.max_thrusts) * 2 - 1
-        cmd = cmd.reshape(*batch_shape, -1)
+        # angacc_thrust = torch.cat([output, target_thrust], dim=1)
+        # cmd = (self.mixer @ angacc_thrust.T).T
+        # cmd = (cmd / self.max_thrusts) * 2 - 1
+        # cmd = cmd.reshape(*batch_shape, -1)
         
         # set last error
         self.last_rate_error = rate_error.clone()
@@ -527,7 +517,12 @@ class PIDRateController(nn.Module):
         target_rate: torch.Tensor,
         target_thrust: torch.Tensor,
     ):
-        # assert root_state.shape[:-1] == target_rate.shape[:-1]
+        # current_rate : rad / s
+        # target_rate : rad / s
+        # target_thrust : 0 ~ 1
+        current_rate = current_rate * 180.0 / torch.pi
+        target_rate = target_rate * 180.0 / torch.pi
+        target_thrust = target_thrust * 2**16
 
         batch_shape = current_rate.shape[:-1]
         # root_state = root_state.reshape(-1, 13)
@@ -539,9 +534,6 @@ class PIDRateController(nn.Module):
             self.last_rate_error = torch.zeros(size=(batch_shape[0], 3)).to(device)
             self.integ = torch.zeros(size=(batch_shape[0], 3)).to(device)
         self.count += 1
-
-        # pos, rot, linvel, angvel = root_state.split([3, 4, 3, 3], dim=1)
-        # body_rate = quat_rotate_inverse(rot, angvel)
 
         rate_error = target_rate - current_rate
         
@@ -562,11 +554,17 @@ class PIDRateController(nn.Module):
         output = (outputP + outputD + outputI + outputFF).float()
         # TODO, w.o.lpf2pApply filter to output
         output[torch.isnan(output)] = 0.0
-        
-        angacc_thrust = torch.cat([output, target_thrust], dim=1)
-        cmd = (self.mixer @ angacc_thrust.T).T
-        cmd = (cmd / self.max_thrusts) * 2 - 1
-        cmd = cmd.reshape(*batch_shape, -1)
+
+        # output: r, p, y
+        r = output[:, 0] / 2.0
+        p = output[:, 1] / 2.0
+        y = output[:, 2]
+        m1 = target_thrust - r + p + y
+        m2 = target_thrust - r - p - y
+        m3 = target_thrust + r - p + y
+        m4 = target_thrust + r + p - y
+
+        cmd = torch.concat([m1,m2,m3,m4], dim=1) / 2**16 * 2 - 1
         
         # set last error
         self.last_rate_error = rate_error.clone()
