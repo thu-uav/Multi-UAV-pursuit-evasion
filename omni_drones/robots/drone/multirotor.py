@@ -542,6 +542,7 @@ class MultirotorBase(RobotBase):
                 quat_rotate(self.rot, self.thrusts.sum(-2)),
                 kz=0.3
             ).sum(-2)
+            
         self.forces[:] += (self.drag_coef * self.masses) * self.vel[..., :3]
 
         self.rotors_view.apply_forces_and_torques_at_pos(

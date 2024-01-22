@@ -22,7 +22,7 @@ rotor_configuration:
   - -1.0
   - 1.0
   force_constants:
-  - 2.88e-8 # kf
+  - 2.88e-8 # KF = 4 * max_rot_vel**2 * force_constants / mg
   - 2.88e-8
   - 2.88e-8
   - 2.88e-8

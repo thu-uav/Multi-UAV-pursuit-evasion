@@ -21,10 +21,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 rosbags = [
-    # '/home/jiayu/OmniDrones/realdata/crazyflie/train_figure8.csv',
     # '/home/jiayu/OmniDrones/realdata/crazyflie/cf1_figure8.csv',
-    '/home/jiayu/OmniDrones/realdata/crazyflie/cf7_figure8.csv',
+    # '/home/jiayu/OmniDrones/realdata/crazyflie/cf7_figure8.csv',
     # '/home/jiayu/OmniDrones/realdata/crazyflie/cf9_figure8.csv',
+    '/home/jiayu/OmniDrones/realdata/crazyflie/cf7_hover1.csv',
+    # '/home/jiayu/OmniDrones/realdata/crazyflie/cf7_hover2.csv',
+    # '/home/jiayu/OmniDrones/realdata/crazyflie/cf9_hover1.csv',
 ]
 
 @hydra.main(version_base=None, config_path=".", config_name="real2sim")
@@ -35,34 +37,30 @@ def main(cfg):
     """
     df = pd.read_csv(rosbags[0], skip_blank_lines=True)
     df = np.array(df)
-    # preprocess, motor > 0
     use_preprocess = True
     if use_preprocess:
         preprocess_df = []
         for df_one in df:
-            if df_one[-1] > 0:
+            if df_one[-1] > 0: # req motor thrust > 0 means fly
                 preprocess_df.append(df_one)
         preprocess_df = np.array(preprocess_df)
     else:
         preprocess_df = df
-    # episode_length = preprocess_df.shape[0]
-    episode_length = 1400
+    episode_len = preprocess_df.shape[0] # hover
+    # episode_len = 1400 # TODO, apply to all trajectories
     real_data = []
-    # real_date: [episode_length, num_trajectory, dim]
     T = 1
-    for i in range(0, episode_length-T):
+    skip = 1
+    for i in range(0, episode_len-T, skip):
         _slice = slice(i, i+T)
         real_data.append(preprocess_df[_slice])
     real_data = np.array(real_data)
     
     # add real next_body_rate
     next_body_rate = real_data[1:,:,18:21]
-    # add real next motor_thrust
-    next_motor_thrust = real_data[1:,:,28:32]
     # add real next_vel
     next_vel = real_data[1:,:,10:13]
     real_data = np.concatenate([real_data[:-1],next_body_rate], axis=-1)
-    real_data = np.concatenate([real_data, next_motor_thrust], axis=-1)
     real_data = np.concatenate([real_data, next_vel], axis=-1)
 
     # start sim
@@ -163,9 +161,9 @@ def main(cfg):
             'target_rate.time','target_rate.r', 'target_rate.p', 'target_rate.y', 
             'target_rate.thrust',(23:27)
             'motor.time', 'motor.m1', 'motor.m2', 'motor.m3', 'motor.m4',(28:32)
-            'next_real_rate.r', 'next_real_rate.p', 'next_real_rate.y', (33:35)
-            'next_motor1', 'next_motor2', 'next_motor3', 'next_motor4', (35:39)
-            'next_vel.x', 'next_vel.y', 'next_vel.z', (39:42)]
+            'motor.time', 'motor.m1req', 'motor.m2req', 'motor.m3req', 'motor.m4req',(33:37)
+            'next_real_rate.r', 'next_real_rate.p', 'next_real_rate.y', (37:40)
+            'next_vel.x', 'next_vel.y', 'next_vel.z', (40:43)]
             dtype='object')
         '''
         # for i in range(max(1, real_data.shape[1]-1)):
@@ -184,9 +182,9 @@ def main(cfg):
             quat = torch.tensor(real_data[i, :, 5:9])
             vel = torch.tensor(real_data[i, :, 10:13])
             real_rate = torch.tensor(real_data[i, :, 18:21])
-            next_real_rate = torch.tensor(real_data[i, :, 32:35])
-            next_real_motor_thrust = torch.tensor(real_data[i, :, 35:39])
-            next_vel = torch.tensor(real_data[i, :, 39:42])
+            next_real_rate = torch.tensor(real_data[i, :, 37:40])
+            req_real_motor_thrust = torch.tensor(real_data[i, :, 33:37])
+            next_vel = torch.tensor(real_data[i, :, 40:43])
             real_rate[:, 1] = -real_rate[:, 1]
             next_real_rate[:, 1] = -next_real_rate[:, 1]
             # get angvel
@@ -211,13 +209,15 @@ def main(cfg):
             
             sim_action_list.append(action.detach().to('cpu').numpy())
             
-            real_action = next_real_motor_thrust.to(sim.device) / (2**16) * 2 - 1
+            real_action = req_real_motor_thrust.to(sim.device) / (2**16) * 2 - 1
             real_action_list.append(real_action.detach().to('cpu').numpy())
             
             if use_real_action:
-                drone.apply_action(real_action)
+                # drone.apply_action(real_action)
+                _, next_sim_motor_thrust, torques = drone.apply_action_foropt(real_action)
             else:
-                drone.apply_action(action)
+                # drone.apply_action(action)
+                _, next_sim_motor_thrust, torques = drone.apply_action_foropt(action)
             sim.step(render=True)
             
             if sim.is_stopped():
@@ -251,8 +251,8 @@ def main(cfg):
         
         if use_real_action:
             # opt for rotor
-            loss = np.mean(np.square(sim_body_rate_list - real_body_rate_list))
-            loss += 0.0 * np.mean(np.square(sim_vel_list - real_vel_list))
+            loss = np.mean(np.sum(np.square(sim_body_rate_list - real_body_rate_list), axis=-1))
+            loss += 1.0 * np.mean(np.square(sim_vel_list - real_vel_list))
         else:
             # opt for controller
             loss = np.mean(np.sum(np.square(sim_action_list - real_action_list), axis=-1))
@@ -288,7 +288,7 @@ def main(cfg):
         # update rotor params
         params_mask[5] = 1
         # params_mask[7] = 1
-        params_mask[9] = 1
+        # params_mask[9] = 1
     else:
         # update controller params
         # params_mask[1] = 1
@@ -299,13 +299,15 @@ def main(cfg):
         params_mask[10:] = 1
 
     params_range = []
-    lower = 0.001
-    upper = 1000.0
+    lower = 0.1
+    upper = 10.0
     count = 0
-    for param, mask in zip(params, params_mask):
-        if mask == 1:
-            params_range.append((lower * param, upper * param))
-        count += 1
+    # for param, mask in zip(params, params_mask):
+    #     if mask == 1:
+    #         params_range.append((lower * param, upper * param))
+    #     count += 1
+    params_range = [(2.0e-8, 3.5e-8), (0.01, 0.5)]
+    # params_range = [(2.0e-8, 3.5e-8)]
     opt = Optimizer(
         dimensions=params_range,
         base_estimator='gp',  # Gaussian Process is a common choice
