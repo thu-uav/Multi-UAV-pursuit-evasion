@@ -22,11 +22,12 @@ import numpy as np
 
 rosbags = [
     # '/home/jiayu/OmniDrones/realdata/crazyflie/cf1_figure8.csv',
-    '/home/jiayu/OmniDrones/realdata/crazyflie/cf7_figure8.csv',
+    # '/home/jiayu/OmniDrones/realdata/crazyflie/cf7_figure8.csv',
     # '/home/jiayu/OmniDrones/realdata/crazyflie/cf9_figure8.csv',
     # '/home/jiayu/OmniDrones/realdata/crazyflie/cf7_hover1.csv',
     # '/home/jiayu/OmniDrones/realdata/crazyflie/cf7_hover2.csv',
     # '/home/jiayu/OmniDrones/realdata/crazyflie/cf9_hover1.csv',
+    '/home/jiayu/OmniDrones/realdata/crazyflie/cf9_figure8.csv'
 ]
 
 @hydra.main(version_base=None, config_path=".", config_name="real2sim")
@@ -91,24 +92,24 @@ def main(cfg):
         drone: crazyflie
         controller: the predefined controller
     """
-    # origin
-    params = [
-        0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
-        2.88e-8, 2315, 7.24e-10, 0.2, 
-        # time const
-        0.046,
-        # controller
-        0.0052, 0.0052, 0.00025
-    ]
-    
-    # # opt for dynamics (kf, km)
+    # # origin
     # params = [
     #     0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
-    #     2e-08, 2315, 7.24e-11, 0.2, 
-    #     0.01,
+    #     2.88e-8, 2315, 7.24e-10, 0.2, 
+    #     # time const
+    #     0.046,
     #     # controller
     #     0.0052, 0.0052, 0.00025
     # ]
+    
+    # opt for dynamics (kf, km)
+    params = [
+        0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
+        2e-08, 2315, 7.24e-11, 0.2, 
+        0.5,
+        # controller
+        0.0052, 0.0052, 0.00025
+    ]
     
     # # opt for controller gain
     # params = [
