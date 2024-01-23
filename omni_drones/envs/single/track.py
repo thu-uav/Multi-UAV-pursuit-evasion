@@ -36,7 +36,7 @@ from tensordict.tensordict import TensorDict, TensorDictBase
 from torchrl.data import UnboundedContinuousTensorSpec, CompositeSpec
 from omni.isaac.debug_draw import _debug_draw
 
-from ..utils import lemniscate, scale_time
+from ..utils import lemniscate, pentagram, scale_time
 import collections
 
 class Track(IsaacEnv):
@@ -364,12 +364,4 @@ class Track(IsaacEnv):
         target_pos = vmap(torch_utils.quat_rotate)(traj_rot, target_pos) * self.traj_scale[env_ids].unsqueeze(1)
 
         return self.origin + target_pos
-
-def pentagram(t, c):
-    # TODO: use c
-    x = -1.5 * torch.sin(2 * t) - 0.5 * torch.sin(3 * t)
-    y = 1.5 * torch.cos(2 * t) - 0.5 * torch.cos(3 * t)
-    z = torch.zeros_like(t)
-
-    return torch.stack([x, y, z], dim=-1)
 

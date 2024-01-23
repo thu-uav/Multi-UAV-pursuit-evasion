@@ -150,6 +150,16 @@ def lemniscate(t, c):
 
     return x
 
+def pentagram(t, c):
+    # TODO: use c
+    a = 1.5
+    b = 0.5
+    x = (-a * torch.sin(2 * t) - b * torch.sin(3 * t)) / (a + b)
+    y = (a * torch.cos(2 * t) - b * torch.cos(3 * t)) / (a + b)
+    z = torch.zeros_like(t)
+
+    return torch.stack([x, y, z], dim=-1)
+
 def scale_time(t, a: float=1.0):
     return t / (1 + 1/(a*torch.abs(t)))
 

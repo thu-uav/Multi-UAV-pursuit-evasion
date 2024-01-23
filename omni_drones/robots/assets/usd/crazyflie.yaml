@@ -21,10 +21,14 @@ rotor_configuration:
   - -1.0
   - 1.0
   force_constants:
-  - 2.88e-8 # kf
-  - 2.88e-8
-  - 2.88e-8
-  - 2.88e-8
+  - 2.0e-8 # kf
+  - 2.0e-8
+  - 2.0e-8
+  - 2.0e-8
+  # - 2.88e-8 # kf
+  # - 2.88e-8
+  # - 2.88e-8
+  # - 2.88e-8
   max_rotation_velocities:     
   - 2315      # 16mm dc motor -- 14000 rpm/v 3.7V --> 863 rps
   - 2315
@@ -41,7 +45,7 @@ rotor_configuration:
   - 2.35619449
   - 3.92699082
   - 5.49778714
-  time_constant: 0.43
+  time_constant: 0.5
 controller_configuration:
   gain:
   - 0.00052

@@ -31,7 +31,7 @@ class RotorGroup(nn.Module):
         force_constants = torch.as_tensor(rotor_config["force_constants"])
         moment_constants = torch.as_tensor(rotor_config["moment_constants"])
         max_rot_vels = torch.as_tensor(rotor_config["max_rotation_velocities"]).float()
-        time_constant = torch.as_tensor(rotor_config["time_constant"])
+        time_constant = torch.as_tensor(rotor_config["time_constant"]).float()
         self.num_rotors = len(force_constants)
 
         self.dt = dt
@@ -57,6 +57,9 @@ class RotorGroup(nn.Module):
 
         tau = torch.where(target_throttle > self.throttle, self.tau_up, self.tau_down)
         tau = torch.clamp(tau, 0, 1)
+        # jiayu: replace tau by dt / time_constant
+        tau = 1.0 - torch.exp(- self.dt / tau)
+        # tau = self.dt / tau
         self.throttle.add_(tau * (target_throttle - self.throttle))
 
         noise = torch.randn_like(self.throttle) * self.noise_scale * 0.
