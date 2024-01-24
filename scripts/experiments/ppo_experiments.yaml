@@ -1,4 +1,4 @@
-program: train.py
+program: train_without_controller.py
 name: SinglePPO
 project: gpu-onpolicy
 entity: marl-drones
@@ -12,13 +12,11 @@ parameters:
 
   task: 
     values: 
-    # - Hover
-    # - InvertedPendulum
-    - FlyThrough
-    - InvertedPendulumFlyThrough
+    - Hover
+    - InvertedPendulum
 
   total_frames: 
-    value: 150_000_000
+    value: 120_000_000
 
   headless:
     value: true
@@ -27,14 +25,14 @@ parameters:
     values: [0, 42, 81]
 
   task.drone_model:
-    values: [Firefly, Hummingbird]
+    values: [Firefly, Hummingbird, Omav]
 
   task.action_transform:
     values:
       - None # sweep does not support passing "null"
-      # - multidiscrete:2
+      - multidiscrete:2
       - multidiscrete:5
-      - discrete:2
+      # - discrete:2
 
   # algo.num_minibatches:
   #   values: [16, 32]
@@ -52,8 +50,8 @@ parameters:
   #   max: 0.01
   #   min: 0.0001
 
-  # algo.entropy_coef:
-  #   values: [0.001, 0.0001]
+  algo.entropy_coef:
+    values: [0.001, 0.0001]
 
 command:
   - ${env}

@@ -41,7 +41,7 @@ class FakeRobot():
         self.cfg = cfg
         if name == "Hummingbird":
             self.num_rotors = 4
-        elif name == "Crazyflie":
+        elif name == "crazyflie":
             self.num_rotors = 4
         elif name == "Firefly":
             self.num_rotors = 6

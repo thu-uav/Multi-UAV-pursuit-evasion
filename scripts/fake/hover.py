@@ -25,8 +25,9 @@ class FakeHover(FakeEnv):
         
 
     def _set_specs(self):
-        drone_state_dim = self.drone.state_spec.shape[-1]
-        observation_dim = drone_state_dim
+        # drone_state_dim = self.drone.state_spec.shape[-1]
+        # observation_dim = drone_state_dim
+        observation_dim = 3 + 3 + 4 + 3 + 3
 
         if self.cfg.task.time_encoding:
             self.time_encoding_dim = 4
