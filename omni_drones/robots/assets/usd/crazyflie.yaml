@@ -1,3 +1,4 @@
+update_sim: True
 name: crazyflie
 inertia:
   xx: 1.4e-5
@@ -6,7 +7,7 @@ inertia:
   yy: 1.4e-5
   yz: 0.0
   zz: 2.17e-5
-mass: 0.03254
+mass: 0.03 # only set to controller
 l: 0.096
 drag_coef: 0.2
 rotor_configuration:
@@ -21,14 +22,10 @@ rotor_configuration:
   - -1.0
   - 1.0
   force_constants:
-  - 2.0e-8 # kf
-  - 2.0e-8
-  - 2.0e-8
-  - 2.0e-8
-  # - 2.88e-8 # kf
-  # - 2.88e-8
-  # - 2.88e-8
-  # - 2.88e-8
+  - 2.88e-8 # KF = 4 * max_rot_vel**2 * force_constants / mg
+  - 2.88e-8
+  - 2.88e-8
+  - 2.88e-8
   max_rotation_velocities:     
   - 2315      # 16mm dc motor -- 14000 rpm/v 3.7V --> 863 rps
   - 2315
@@ -45,8 +42,8 @@ rotor_configuration:
   - 2.35619449
   - 3.92699082
   - 5.49778714
-  time_constant: 0.0178
-  # time_constant: 0.5
+  # time_constant: 0.43 # old version
+  time_constant: 0.0178 # 1.0 - torch.exp(self.dt / tau)
 controller_configuration:
   gain:
   - 0.0052
