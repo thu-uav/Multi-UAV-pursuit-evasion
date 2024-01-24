@@ -61,8 +61,11 @@ def main(cfg):
     next_body_rate = real_data[1:,:,18:21]
     # add real next_vel
     next_vel = real_data[1:,:,10:13]
+    # add real next_motor_thrust_ratio
+    next_motor_thrust_ratio = real_data[1:,:,28:32]
     real_data = np.concatenate([real_data[:-1],next_body_rate], axis=-1)
     real_data = np.concatenate([real_data, next_vel], axis=-1)
+    real_data = np.concatenate([real_data, next_motor_thrust_ratio], axis=-1)
 
     # start sim
     OmegaConf.resolve(cfg)
@@ -164,7 +167,8 @@ def main(cfg):
             'motor.time', 'motor.m1', 'motor.m2', 'motor.m3', 'motor.m4',(28:32)
             'motor.time', 'motor.m1req', 'motor.m2req', 'motor.m3req', 'motor.m4req',(33:37)
             'next_real_rate.r', 'next_real_rate.p', 'next_real_rate.y', (37:40)
-            'next_vel.x', 'next_vel.y', 'next_vel.z', (40:43)]
+            'next_vel.x', 'next_vel.y', 'next_vel.z', (40:43)
+            'next_motor.m1', 'next_motor.m2', 'next_motor.m3', 'next_motor.m4' (43:47)]
             dtype='object')
         '''
         # for i in range(max(1, real_data.shape[1]-1)):
@@ -174,24 +178,28 @@ def main(cfg):
         
         sim_body_rate_list = []
         real_body_rate_list = []
+        
+        sim_motor_thrust_ratio = []
+        real_motor_thrust_ratio = []
 
         sim_vel_list = []
         real_vel_list = []
         
         for i in range(real_data.shape[0]):
-            pos = torch.tensor(real_data[i, :, 1:4])
-            quat = torch.tensor(real_data[i, :, 5:9])
-            vel = torch.tensor(real_data[i, :, 10:13])
+            real_pos = torch.tensor(real_data[i, :, 1:4])
+            real_quat = torch.tensor(real_data[i, :, 5:9])
+            real_vel = torch.tensor(real_data[i, :, 10:13])
             real_rate = torch.tensor(real_data[i, :, 18:21])
             next_real_rate = torch.tensor(real_data[i, :, 37:40])
             req_real_motor_thrust = torch.tensor(real_data[i, :, 33:37])
             next_vel = torch.tensor(real_data[i, :, 40:43])
+            next_real_motor_thrust = torch.tensor(real_data[i, :, 43:47]) / 2**16
             real_rate[:, 1] = -real_rate[:, 1]
             next_real_rate[:, 1] = -next_real_rate[:, 1]
             # get angvel
-            ang_vel = quat_rotate(quat, real_rate)
+            real_ang_vel = quat_rotate(real_quat, real_rate)
             # if i == 0 :
-            set_drone_state(pos, quat, vel, ang_vel)
+            set_drone_state(real_pos, real_quat, real_vel, real_ang_vel)
 
             drone_state = drone.get_state()[..., :13].reshape(-1, 13)
             # get current_rate
@@ -237,6 +245,8 @@ def main(cfg):
 
             sim_body_rate_list.append(next_body_rate.cpu().detach().numpy())
             real_body_rate_list.append(next_real_rate.cpu().detach().numpy())
+            sim_motor_thrust_ratio.append((next_sim_motor_thrust / drone.KF).squeeze(1).cpu().detach().numpy())
+            real_motor_thrust_ratio.append(next_real_motor_thrust.numpy())
             
             sim_vel_list.append(sim_vel.cpu().detach().numpy())
             real_vel_list.append(next_vel.cpu().detach().numpy())
@@ -250,10 +260,17 @@ def main(cfg):
         sim_vel_list = np.array(sim_vel_list).reshape(-1, 3)
         real_vel_list = np.array(real_vel_list).reshape(-1, 3)
         
+        sim_motor_thrust_ratio = np.array(sim_motor_thrust_ratio).reshape(-1, 4)
+        real_motor_thrust_ratio = np.array(real_motor_thrust_ratio).reshape(-1, 4)
+        
         if use_real_action:
             # opt for rotor
+            # x, y, z, for kf and km
             loss = np.mean(np.sum(np.square(sim_body_rate_list - real_body_rate_list), axis=-1))
-            loss += 1.0 * np.mean(np.square(sim_vel_list - real_vel_list))
+            loss += 1.0 * np.mean(np.sum(np.square(sim_vel_list - real_vel_list), axis=-1))
+            
+            # only for Tm
+            # loss = np.mean(np.sum(np.square(sim_motor_thrust_ratio - real_motor_thrust_ratio), axis=-1))
         else:
             # opt for controller
             loss = np.mean(np.sum(np.square(sim_action_list - real_action_list), axis=-1))
@@ -266,7 +283,7 @@ def main(cfg):
         0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
         2.88e-8, 2315, 7.24e-10, 0.2, 
         # time const
-        0.0178,
+        0.01,
         # controller
         0.0052, 0.0052, 0.00025
     ]
@@ -288,7 +305,7 @@ def main(cfg):
     if use_real_action:
         # update rotor params
         params_mask[5] = 1
-        # params_mask[7] = 1
+        params_mask[7] = 1
         # params_mask[9] = 1
     else:
         # update controller params
@@ -307,8 +324,9 @@ def main(cfg):
     #     if mask == 1:
     #         params_range.append((lower * param, upper * param))
     #     count += 1
-    # params_range = [(2.0e-8, 3.5e-8), (0.01, 0.5)]
-    params_range = [(2.0e-8, 3.5e-8)]
+    # params_range = [(2.0e-8, 3.5e-8), (7.24e-11, 7.24e-9), (0.01, 0.5)]
+    params_range = [(2.0e-8, 3.5e-8), (7.24e-11, 7.24e-9)]
+    # params_range = [(0.01, 0.05)]
     opt = Optimizer(
         dimensions=params_range,
         base_estimator='gp',  # Gaussian Process is a common choice
@@ -331,6 +349,7 @@ def main(cfg):
         print(f'Start with epoch: {epoch}')
         
         x = np.array(opt.ask(), dtype=float)
+        # x = np.array([2.88e-8, 7.24e-10])
         # set real params
         set_idx = 0
         for idx, mask in enumerate(params_mask):
