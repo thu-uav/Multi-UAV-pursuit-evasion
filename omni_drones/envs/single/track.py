@@ -319,12 +319,11 @@ class Track(IsaacEnv):
         # spin reward, fixed z
         spin = torch.square(self.drone.vel[..., -1])
         reward_spin = 0.5 / (1.0 + torch.square(spin))
-        not_spin_bonus = torch.abs(torch.square(self.drone.vel[..., -1])) < 1e-5
+        # not_spin_bonus = torch.abs(torch.square(self.drone.vel[..., -1])) < 1e-5
 
         reward = (
             reward_pose 
             + reward_pose * (reward_up + reward_spin)
-            + not_spin_bonus
             + reward_effort
             + reward_action_smoothness
         )

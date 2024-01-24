@@ -7,7 +7,7 @@ defaults:
 
 env:
   num_envs: 4096
-  max_episode_length: 1000
+  max_episode_length: 600
 
 drone_model: Crazyflie
 force_sensor: false
@@ -19,14 +19,14 @@ latency: false
 reset_thres: 1.
 future_traj_steps: 4
 
-reward_effort_weight: 0.1
+reward_effort_weight: 0.
 reward_action_smoothness_weight: 0.
 reward_motion_smoothness_weight: 0.
 reward_distance_scale: 1.6
 
 action_transform: rate
 # action_transform: PIDrate
-history: true
+# history: true
 randomization:
   drone:
     train:

@@ -22,7 +22,7 @@ rotor_configuration:
   - -1.0
   - 1.0
   force_constants:
-  # - 2.0e-8 # KF = 4 * max_rot_vel**2 * force_constants / mg
+  # - 2.0e-8 # opt
   # - 2.0e-8
   # - 2.0e-8
   # - 2.0e-8
@@ -36,6 +36,10 @@ rotor_configuration:
   - 2315
   - 2315
   moment_constants:
+  # - 7.24e-11 # opt
+  # - 7.24e-11
+  # - 7.24e-11
+  # - 7.24e-11
   - 7.24e-10
   - 7.24e-10
   - 7.24e-10
@@ -46,10 +50,16 @@ rotor_configuration:
   - 2.35619449
   - 3.92699082
   - 5.49778714
-  # time_constant: 0.43 # old version
-  time_constant: 0.0178 # 1.0 - torch.exp(self.dt / tau)
+  # time_constant: 0.0178 # 1.0 - torch.exp(self.dt / tau)
+  time_constant: 0.01 # opt
 controller_configuration:
   gain:
+  # - 0.00052 # opt medium
+  # - 0.00052
+  # - 2.5e-05
+  # - 5.2e-06 # opt best
+  # - 0.0010592696236279627
+  # - 2.5e-07
   - 0.0052
   - 0.0052
   - 0.00025

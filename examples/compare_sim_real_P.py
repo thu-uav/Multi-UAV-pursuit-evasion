@@ -102,22 +102,23 @@ def main(cfg):
     #     0.0052, 0.0052, 0.00025
     # ]
     
-    # opt for dynamics (kf, km)
+    # # opt for dynamics (kf, km, Tm)
+    # params = [
+    #     0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
+    #     2e-08, 2315, 7.24e-11, 0.2, 
+    #     0.01,
+    #     # controller
+    #     0.0052, 0.0052, 0.00025
+    # ]
+    
+    # opt for dynamics (kf, km, Tm) + controller (gain)
     params = [
         0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
         2e-08, 2315, 7.24e-11, 0.2, 
         0.01,
         # controller
-        0.0052, 0.0052, 0.00025
+        0.00052, 0.00052, 2.5e-05
     ]
-    
-    # # opt for controller gain
-    # params = [
-    #     0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
-    #     2.88e-8, 2315, 7.24e-10, 0.2, 0.43,
-    #     # controller
-    #    5.2e-06, 5.2e-06, 2.5e-07
-    # ]
     
     tunable_parameters = {
         'mass': params[0],
@@ -190,7 +191,7 @@ def main(cfg):
     sim_req_motor_thrust_ratio_list = []
     real_req_motor_thrust_ratio_list = []
 
-    use_real_action = True
+    use_real_action = False
     trajectory_len = real_data.shape[0] - 1
     
     for i in range(trajectory_len):

@@ -96,7 +96,7 @@ def main(cfg):
     
     # apply_action, if True, opt for rotor
     # if False, opt for controller
-    use_real_action = True
+    use_real_action = False
 
     def evaluate(params, real_data):
         """
@@ -281,7 +281,7 @@ def main(cfg):
     # P
     params = [
         0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
-        2.88e-8, 2315, 7.24e-10, 0.2, 
+        2.0e-8, 2315, 7.24e-11, 0.2, 
         # time const
         0.01,
         # controller
@@ -309,11 +309,6 @@ def main(cfg):
         # params_mask[9] = 1
     else:
         # update controller params
-        # params_mask[1] = 1
-        # params_mask[2] = 1
-        # params_mask[3] = 1
-        # params_mask[5] = 1
-        # params_mask[7] = 1
         params_mask[10:] = 1
 
     params_range = []
@@ -325,8 +320,8 @@ def main(cfg):
     #         params_range.append((lower * param, upper * param))
     #     count += 1
     # params_range = [(2.0e-8, 3.5e-8), (7.24e-11, 7.24e-9), (0.01, 0.5)]
-    params_range = [(2.0e-8, 3.5e-8), (7.24e-11, 7.24e-9)]
-    # params_range = [(0.01, 0.05)]
+    # params_range = [(2.0e-8, 3.5e-8), (7.24e-11, 7.24e-9)]
+    params_range = [(5.2e-4, 5.2e-2), (5.2e-4, 5.2e-2), (2.5e-05, 2.5e-03)]
     opt = Optimizer(
         dimensions=params_range,
         base_estimator='gp',  # Gaussian Process is a common choice
@@ -349,7 +344,6 @@ def main(cfg):
         print(f'Start with epoch: {epoch}')
         
         x = np.array(opt.ask(), dtype=float)
-        # x = np.array([2.88e-8, 7.24e-10])
         # set real params
         set_idx = 0
         for idx, mask in enumerate(params_mask):
