@@ -154,8 +154,8 @@ def pentagram(t, c):
     # TODO: use c
     a = 1.5
     b = 0.5
-    x = (-a * torch.sin(2 * t) - b * torch.sin(3 * t)) / (a + b)
-    y = (a * torch.cos(2 * t) - b * torch.cos(3 * t)) / (a + b)
+    x = -a * torch.sin(2 * t) - b * torch.sin(3 * t)
+    y = a * torch.cos(2 * t) - b * torch.cos(3 * t)
     z = torch.zeros_like(t)
 
     return torch.stack([x, y, z], dim=-1)
