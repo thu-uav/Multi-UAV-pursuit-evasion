@@ -289,7 +289,7 @@ def main(cfg):
         # update rotor params
         params_mask[5] = 1
         # params_mask[7] = 1
-        params_mask[9] = 1
+        # params_mask[9] = 1
     else:
         # update controller params
         # params_mask[1] = 1
@@ -307,8 +307,8 @@ def main(cfg):
     #     if mask == 1:
     #         params_range.append((lower * param, upper * param))
     #     count += 1
-    params_range = [(2.0e-8, 3.5e-8), (0.01, 0.5)]
-    # params_range = [(2.0e-8, 3.5e-8)]
+    # params_range = [(2.0e-8, 3.5e-8), (0.01, 0.5)]
+    params_range = [(2.0e-8, 3.5e-8)]
     opt = Optimizer(
         dimensions=params_range,
         base_estimator='gp',  # Gaussian Process is a common choice

@@ -7,7 +7,7 @@ inertia:
   yy: 1.4e-5
   yz: 0.0
   zz: 2.17e-5
-mass: 0.03 # only set to controller
+mass: 0.03
 l: 0.096
 drag_coef: 0.2
 rotor_configuration:
@@ -22,10 +22,14 @@ rotor_configuration:
   - -1.0
   - 1.0
   force_constants:
-  - 2.88e-8 # KF = 4 * max_rot_vel**2 * force_constants / mg
-  - 2.88e-8
-  - 2.88e-8
-  - 2.88e-8
+  - 2.0e-8 # KF = 4 * max_rot_vel**2 * force_constants / mg
+  - 2.0e-8
+  - 2.0e-8
+  - 2.0e-8
+  # - 2.88e-8 # KF = 4 * max_rot_vel**2 * force_constants / mg
+  # - 2.88e-8
+  # - 2.88e-8
+  # - 2.88e-8
   max_rotation_velocities:     
   - 2315      # 16mm dc motor -- 14000 rpm/v 3.7V --> 863 rps
   - 2315
