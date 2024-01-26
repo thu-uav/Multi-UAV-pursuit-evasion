@@ -77,7 +77,7 @@ def main(cfg):
     from omni_drones.utils.torch import euler_to_quaternion, quaternion_to_euler
     from omni_drones.sensors.camera import Camera, PinholeCameraCfg
 
-    average_dt = 0.01
+    average_dt = 0.02
     sim = SimulationContext(
         stage_units_in_meters=1.0,
         physics_dt=average_dt,

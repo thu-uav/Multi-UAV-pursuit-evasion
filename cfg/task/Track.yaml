@@ -7,7 +7,7 @@ defaults:
 
 env:
   num_envs: 4096
-  max_episode_length: 600
+  max_episode_length: 1000
 
 drone_model: Crazyflie
 force_sensor: false
@@ -30,5 +30,5 @@ action_transform: rate
 randomization:
   drone:
     train:
-      mass_scale: [1., 1.1]
+      mass_scale: [1., 1.3]
 #       inertia_scale: [0.7, 1.3]
