@@ -21,13 +21,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 rosbags = [
-    # '/home/jiayu/OmniDrones/realdata/crazyflie/cf1_figure8.csv',
-    # '/home/jiayu/OmniDrones/realdata/crazyflie/cf7_figure8.csv',
-    # '/home/jiayu/OmniDrones/realdata/crazyflie/cf9_figure8.csv',
-    # '/home/jiayu/OmniDrones/realdata/crazyflie/cf7_hover1.csv',
-    # '/home/jiayu/OmniDrones/realdata/crazyflie/cf7_hover2.csv',
-    # '/home/jiayu/OmniDrones/realdata/crazyflie/cf9_hover1.csv',
-    '/home/jiayu/OmniDrones/realdata/crazyflie/cf9_figure8.csv'
+    '/home/jiayu/OmniDrones/realdata/crazyflie/cf9_origin_figure8_1.csv',
+    # '/home/jiayu/OmniDrones/realdata/crazyflie/cf9_origin_figure8_2.csv',
+    # '/home/jiayu/OmniDrones/realdata/crazyflie/cf9_origin_figure8_3.csv',
 ]
 
 @hydra.main(version_base=None, config_path=".", config_name="real2sim")
@@ -67,7 +63,7 @@ def main(cfg):
     from omni_drones.utils.torch import euler_to_quaternion, quaternion_to_euler
     from omni_drones.sensors.camera import Camera, PinholeCameraCfg
 
-    average_dt = 0.02
+    average_dt = 0.01
     sim = SimulationContext(
         stage_units_in_meters=1.0,
         physics_dt=average_dt,
@@ -191,7 +187,7 @@ def main(cfg):
     sim_req_motor_thrust_ratio_list = []
     real_req_motor_thrust_ratio_list = []
 
-    use_real_action = False
+    use_real_action = True
     trajectory_len = real_data.shape[0] - 1
     
     for i in range(trajectory_len):
@@ -296,6 +292,29 @@ def main(cfg):
     real_angvel_list = np.array(real_angvel_list)
     
     steps = np.arange(0, sim_pos_list.shape[0])
+    
+    # fig, axs = plt.subplots(3, 1, figsize=(20, 20))
+    # fig.subplots_adjust()
+    # # x error
+    # axs[0].scatter(steps, target_body_rate_list[:, 0, 0], s=1, c='red', label='target')
+    # axs[0].set_xlabel('steps')
+    # axs[0].set_ylabel('m')
+    # axs[0].set_title('target_body_rate_X')
+    # axs[0].legend()
+    # # y error
+    # axs[1].scatter(steps, target_body_rate_list[:, 0, 1], s=1, c='red', label='target')
+    # axs[1].set_xlabel('steps')
+    # axs[1].set_ylabel('m')
+    # axs[1].set_title('target_body_rate_Y')
+    # axs[1].legend()
+    # # z error
+    # axs[2].scatter(steps, target_body_rate_list[:, 0, 2], s=1, c='red', label='target')
+    # axs[2].set_xlabel('steps')
+    # axs[2].set_ylabel('m')
+    # axs[2].set_title('target_body_rate_Z')
+    # axs[2].legend()
+    # plt.savefig('debug')
+    # breakpoint()
     
     # error
     if use_real_action:
