@@ -141,7 +141,7 @@ class Track(IsaacEnv):
             torch.tensor(0.8, device=self.device),
             torch.tensor(1.1, device=self.device)
         )
-        self.origin = torch.tensor([0., 0., 2.], device=self.device)
+        self.origin = torch.tensor([0., 0., 1.], device=self.device)
 
         self.traj_t0 = torch.pi / 2
         self.traj_c = torch.zeros(self.num_envs, device=self.device)
