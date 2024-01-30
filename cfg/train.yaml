@@ -24,8 +24,10 @@ viewer:
   lookat: [0., 0., 1.]
 
 wandb:
-  group: ${oc.select:..task.name}
-  run_name: ${oc.select:..task.name,test}-${oc.select:..algo.name,none}
+  # group: ${oc.select:..task.name}
+  # run_name: ${oc.select:..task.name,test}-${oc.select:..algo.name,none}
+  group: ${oc.select:..task.name}-new
+  run_name: Original
   job_type: train
   entity: nics_marl
   project: omnidrones

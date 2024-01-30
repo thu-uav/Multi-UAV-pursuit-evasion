@@ -11,6 +11,7 @@ import time
 from functorch import vmap
 from omni_drones.utils.torch import cpos, off_diag, quat_axis, others
 import torch.distributions as D
+from torch.masked import masked_tensor, as_masked_tensor
 
 import omni.isaac.core.objects as objects
 # from omni.isaac.core.objects import VisualSphere, DynamicSphere, FixedCuboid, VisualCylinder, FixedCylinder, DynamicCylinder
@@ -224,6 +225,8 @@ class HideAndSeek(IsaacEnv):
         self.central_env_pos = Float3(
             *self.envs_positions[self.central_env_idx].tolist()
         )
+
+        self.mask_value = -1.0
 
         # CL
         self.curriculum_buffer = CurriculumBuffer()
@@ -655,12 +658,19 @@ class HideAndSeek(IsaacEnv):
         target_rpos = target_pos - drone_pos # [N, n, 3]
         target_rvel = target_vel - drone_vel # [N, n, 6]
         target_mask = torch.norm(target_rpos, dim=-1) > self.detect_range # [N, n]
-        target_pmask = target_mask.unsqueeze(-1).expand(-1, -1, 3)
-        target_vmask = target_mask.unsqueeze(-1).expand(-1, -1, 6)
+        target_mask = target_mask.all(1).unsqueeze(1).expand_as(target_mask) # [N, n]
+
+        target_pmask = target_mask.unsqueeze(-1).expand_as(target_rpos) # [N, n, 3]
+        target_vmask = target_mask.unsqueeze(-1).expand_as(target_rvel) # [N, n, 6]
         target_rpos_masked = target_rpos.clone()
-        target_rpos_masked[target_pmask] = 0.0
+        # target_rpos_masked[target_pmask] = 0.0
+        target_rpos_masked.masked_fill_(target_pmask, self.mask_value)
         target_rvel_masked = target_rvel.clone()
-        target_rvel_masked[target_vmask] = 0.0
+        # target_rvel_masked[target_vmask] = 0.0
+        target_rvel_masked.masked_fill_(target_vmask, self.mask_value)
+        # target_rpos_masked = masked_tensor(target_rpos, target_pmask) # [N, n, 3]
+        # target_rvel_masked = masked_tensor(target_rvel, target_vmask) # [N, n, 6]
+
         
         # get full target state
         if self.time_encoding:
@@ -688,31 +698,38 @@ class HideAndSeek(IsaacEnv):
 
         obs["state_others"] = self.drone_rpos
 
-        frame_state = target_state.unsqueeze(1).expand(-1, self.drone.n, 1, -1)
-        target_smask = target_mask.unsqueeze(-1).unsqueeze(-1).expand(-1, -1, 1, 13)
+        frame_state = target_state.unsqueeze(1).expand(-1, self.drone.n, -1, -1)
+        target_smask = target_mask.unsqueeze(-1).unsqueeze(-1).expand_as(frame_state)
         frame_state_masked = frame_state.clone()
-        frame_state_masked[target_smask] = 0.0
+        # frame_state_masked[target_smask] = 0.0
+        frame_state_masked.masked_fill_(target_smask, self.mask_value)
+        # frame_state_masked = masked_tensor(frame_state, target_smask)
         obs["state_frame"] = frame_state_masked
+        # breakpoint()
         
         # get masked obstacle relative position and velocity
         obstacles_pos, _ = self.get_env_poses(self.obstacles.get_world_poses())
         obstacles_rpos = vmap(cpos)(drone_pos, obstacles_pos)
         obstacles_mask = torch.norm(obstacles_rpos, dim=-1) > self.detect_range
+        obstacles_mask = obstacles_mask.all(1).unsqueeze(1).expand_as(obstacles_mask)
         obstacles_pmask = obstacles_mask.unsqueeze(-1).expand(-1, -1, -1, 3)
         obstacles_rpos_masked = obstacles_rpos.clone()
-        obstacles_rpos_masked[obstacles_pmask] = 0.0
+        # obstacles_rpos_masked[obstacles_pmask] = 0.0
+        obstacles_rpos_masked.masked_fill_(obstacles_pmask, self.mask_value)
+        # obstacles_rpos_masked = masked_tensor(obstacles_rpos, obstacles_pmask)
 
         obstacles_vel = self.obstacles.get_velocities()[..., :3]
         obstacles_rvel = vmap(cpos)(drone_vel[..., :3], obstacles_vel)
         obstacles_vmask = obstacles_mask.unsqueeze(-1).expand(-1, -1, -1, 3)
         obstacles_rvel_masked = obstacles_rvel.clone()
-        obstacles_rvel_masked[obstacles_vmask] = 0.0
+        # obstacles_rvel_masked[obstacles_vmask] = 0.0
+        obstacles_rvel_masked.masked_fill_(obstacles_vmask, self.mask_value)
+        # obstacles_rvel_masked = masked_tensor(obstacles_rvel, obstacles_vmask)
+
         # obstacle_rpos + vel
         obs["obstacles"] = torch.concat([
-            # vmap(cpos)(drone_pos, obstacle_pos), 
-            # obstacles_vel.unsqueeze(1).expand(-1, self.drone.n, -1, -1)
-            obstacles_rpos,
-            obstacles_rvel
+            obstacles_rpos_masked,
+            obstacles_rvel_masked
         ], dim=-1)
 
         # get masked cylinder relative position
@@ -736,10 +753,14 @@ class HideAndSeek(IsaacEnv):
                                        torch.max(cylinders_mdist_z, torch.zeros_like(cylinders_mdist_z))
                                        ], dim=-1)
         cylinders_mask = torch.norm(cylinders_mdist, dim=-1) > self.detect_range
+        cylinders_mask = cylinders_mask.all(1).unsqueeze(1).expand_as(cylinders_mask)
         cylinders_smask = cylinders_mask.unsqueeze(-1).expand(-1, -1, -1, 5)
         cylinders_state_masked = cylinders_state.clone()
-        cylinders_state_masked[cylinders_smask] = 0.0
+        # cylinders_state_masked[cylinders_smask] = 0.0
+        cylinders_state_masked.masked_fill_(cylinders_smask, self.mask_value)
+        # cylinders_state_masked = masked_tensor(cylinders_state, cylinders_smask)
         obs["cylinders"] = cylinders_state_masked
+        # breakpoint()
 
         state = TensorDict({}, [self.num_envs])
         state["state_drones"] = torch.cat(

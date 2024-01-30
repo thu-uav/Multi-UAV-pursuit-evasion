@@ -135,7 +135,7 @@ class SplitEmbedding(nn.Module):
             raise ValueError("Nesting is not supported.")
         self.input_spec = input_spec
         self.embed_dim = embed_dim
-        self.num_entities = sum(spec.shape[-2] for spec in self.input_spec.values())
+        # self.num_entities = sum(spec.shape[-2] for spec in self.input_spec.values())
 
         if embed_type == "linear":
             self.embed = nn.ModuleDict(
@@ -148,13 +148,14 @@ class SplitEmbedding(nn.Module):
             raise NotImplementedError(embed_type)
 
         if layer_norm:
-            # self.layer_norm = nn.LayerNorm(embed_dim)
-            self.layer_norm = nn.LayerNorm(
-                (self.num_entities, embed_dim)
-            )  # somehow faster
+            self.layer_norm = nn.LayerNorm(embed_dim)
+            # self.layer_norm = nn.LayerNorm(
+            #     (self.num_entities, embed_dim)
+            # )  # somehow faster
 
     def forward(self, tensordict: TensorDict):
         embeddings = torch.cat(
+            # [self.embed[key](torch.nan_to_num(tensordict[key], nan=0.0)) for key in self.input_spec.keys()], dim=-2
             [self.embed[key](tensordict[key]) for key in self.input_spec.keys()], dim=-2
         )
         if hasattr(self, "layer_norm"):
@@ -286,9 +287,20 @@ class PartialAttentionEncoder(nn.Module):
             padding_mask: (batch, N)
         """
         # breakpoint()
+        # get_mask = lambda key: torch.isnan(x[key]).any(-1) # (num_batch, num_drone, num_entity)
+        # mask = torch.cat(
+        #     [get_mask(key) for key in self.split_embed.input_spec.keys()], dim=-1
+        # )
+
         x = self.split_embed(x) # (num_batch, num_drone, num_entity, embed_dim)
         original_shape = x.shape[:-2]
         x = x.reshape(-1, x.shape[-2], x.shape[-1]) # (num_batch * num_drone, num_entity, embed_dim)
+        # mask = mask.reshape(-1, mask.shape[-1]) # (num_batch * num_drone, num_entity)
+        # if key_padding_mask is None:
+        #     key_padding_mask = mask
+            # key_padding_mask = torch.isnan(x).any(-1) # (num_batch * num_drone, num_entity)
+            # x = torch.nan_to_num(x, nan=0.0)
+        
         if self.norm_first:
             x = x[:, self.query_index] + self._pa_block(self.norm1(x), key_padding_mask)
             x = x + self._ff_block(self.norm2(x))
