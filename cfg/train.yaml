@@ -21,7 +21,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: Track_figure8_origin_100Hz_worandom
+  run_name: Track_star_opt1_100Hz_worandom
   # run_name: Track_star_cf9opt_dynamics_controller_clip60_100HZ_Pcontroller_woeffort
   # run_name: debug
   job_type: train

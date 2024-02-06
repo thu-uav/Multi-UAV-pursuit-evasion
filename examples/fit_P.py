@@ -27,7 +27,7 @@ rosbags = [
     # '/home/jiayu/OmniDrones/realdata/crazyflie/cf7_hover1.csv',
     # '/home/jiayu/OmniDrones/realdata/crazyflie/cf7_hover2.csv',
     # '/home/jiayu/OmniDrones/realdata/crazyflie/cf9_hover1.csv',
-    '/home/jiayu/OmniDrones/realdata/crazyflie/cf9_figure8.csv'
+    '/home/jiayu/OmniDrones/realdata/crazyflie/cf9_opt1_figure8_1.csv'
 ]
 
 @hydra.main(version_base=None, config_path=".", config_name="real2sim")
@@ -278,14 +278,13 @@ def main(cfg):
 
         return loss
 
-    # P
+    # opt for dynamics (kf, km, Tm) + controller (gain)
     params = [
         0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
-        2.0e-8, 2315, 7.24e-11, 0.2, 
-        # time const
-        0.01,
+        2e-08, 2315, 7.24e-11, 0.2, 
+        0.1,
         # controller
-        0.0052, 0.0052, 0.00025
+        0.00052, 0.00052, 2.5e-05
     ]
 
     """
@@ -306,22 +305,20 @@ def main(cfg):
         # update rotor params
         params_mask[5] = 1
         params_mask[7] = 1
-        # params_mask[9] = 1
+        params_mask[9] = 1
     else:
         # update controller params
         params_mask[10:] = 1
 
     params_range = []
-    lower = 0.1
-    upper = 10.0
+    lower = 0.0001
+    upper = 10000.0
     count = 0
-    # for param, mask in zip(params, params_mask):
-    #     if mask == 1:
-    #         params_range.append((lower * param, upper * param))
-    #     count += 1
-    # params_range = [(2.0e-8, 3.5e-8), (7.24e-11, 7.24e-9), (0.01, 0.5)]
-    # params_range = [(2.0e-8, 3.5e-8), (7.24e-11, 7.24e-9)]
-    params_range = [(5.2e-4, 5.2e-2), (5.2e-4, 5.2e-2), (2.5e-05, 2.5e-03)]
+    for param, mask in zip(params, params_mask):
+        if mask == 1:
+            params_range.append((lower * param, upper * param))
+        count += 1
+    # params_range = [(2.0e-8, 3.5e-8), (7.24e-11, 7.24e-9), (0.01, 0.1)]
     opt = Optimizer(
         dimensions=params_range,
         base_estimator='gp',  # Gaussian Process is a common choice

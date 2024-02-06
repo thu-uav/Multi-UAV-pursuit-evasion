@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 rosbags = [
-    '/home/jiayu/OmniDrones/realdata/crazyflie/cf9_origin_figure8_1.csv',
+    '/home/jiayu/OmniDrones/realdata/crazyflie/cf9_opt1_figure8_1.csv',
     # '/home/jiayu/OmniDrones/realdata/crazyflie/cf9_origin_figure8_2.csv',
     # '/home/jiayu/OmniDrones/realdata/crazyflie/cf9_origin_figure8_3.csv',
 ]
@@ -111,7 +111,7 @@ def main(cfg):
     params = [
         0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
         2e-08, 2315, 7.24e-11, 0.2, 
-        0.01,
+        0.1,
         # controller
         0.00052, 0.00052, 2.5e-05
     ]
@@ -187,7 +187,7 @@ def main(cfg):
     sim_req_motor_thrust_ratio_list = []
     real_req_motor_thrust_ratio_list = []
 
-    use_real_action = True
+    use_real_action = False
     trajectory_len = real_data.shape[0] - 1
     
     for i in range(trajectory_len):
