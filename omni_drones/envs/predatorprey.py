@@ -112,7 +112,7 @@ class CurriculumBuffer(object):
         result = zip(*sort_zipped)
         return [list(x) for x in result]
 
-class PredatorPrey_cl(IsaacEnv): 
+class PredatorPrey(IsaacEnv): 
     def __init__(self, cfg, headless):
         super().__init__(cfg, headless)
         self.drone.initialize()

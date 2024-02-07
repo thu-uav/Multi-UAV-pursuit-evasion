@@ -13,10 +13,10 @@ sim: ${task.sim}
 env: ${task.env}
 
 total_frames: 100_000_000_000
-max_iters: 30000
-eval_interval: 100
-save_interval: 100
-seed: 1
+max_iters: -1
+eval_interval: 10
+save_interval: 10
+seed: 0
 
 viewer:
   resolution: [960, 720]
@@ -24,19 +24,19 @@ viewer:
   lookat: [0., 0., 1.]
 
 wandb:
-  # group: ${oc.select:..task.name}
-  # run_name: ${oc.select:..task.name,test}-${oc.select:..algo.name,none}
-  group: ${oc.select:..task.name}-new
-  run_name: Original
+  group: ${oc.select:..task.name}
+  run_name: debug
   job_type: train
-  entity: nics_marl
-  project: omnidrones
-  mode: online # set to 'disabled' when debugging locally
+  entity: chenjy
+  project: PredatorPrey
+  mode: online
+  # mode: disabled # set to 'disabled' when debugging locally
   run_id: 
   monitor_gym: True
   tags: 
 
 defaults:
   - task: HideAndSeek
+  # - task: PredatorPrey
   - algo: mappo
   - _self_
