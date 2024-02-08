@@ -21,7 +21,7 @@ seed: 0
 viewer:
   resolution: [960, 720]
   eye: [4., 0., 4.]
-  lookat: [0., 0., 1.]
+  eye: [4., 0., 1.]
 
 wandb:
   group: ${oc.select:..task.name}
@@ -36,7 +36,7 @@ wandb:
   tags: 
 
 defaults:
-  - task: HideAndSeek
-  # - task: PredatorPrey
+  # - task: HideAndSeek
+  - task: HideAndSeek_static
   - algo: mappo
   - _self_
