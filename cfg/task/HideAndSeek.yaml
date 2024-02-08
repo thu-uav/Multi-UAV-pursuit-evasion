@@ -26,7 +26,7 @@ action_transform: multidiscrete:4
 
 # exp
 num_agents: 3
-num_obstacles: 5 # number of moving obstacles
+num_obstacles: 1 # number of moving obstacles
 obstacle_size: 0.05
 detect_range: 0.8
 

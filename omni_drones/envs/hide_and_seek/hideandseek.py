@@ -884,6 +884,13 @@ class HideAndSeek(IsaacEnv):
         direction_o = (prey_pos[..., :3] - obstacle_pos[..., :3]) / (dist_pos + 1e-5)
         force_o = direction_o * (1 / (dist_pos + 1e-5))
         force[..., :3] += torch.sum(force_o, dim=1)
+        
+        # cylinders
+        cylinder_pos, _ = self.cylinders.get_world_poses()
+        dist_pos = torch.norm(prey_pos[..., :3] - cylinder_pos[..., :3],dim=-1).unsqueeze(-1).expand(-1, -1, 3) # expand to 3-D
+        direction_c = (prey_pos[..., :3] - cylinder_pos[..., :3]) / (dist_pos + 1e-5)
+        force_c = direction_c * (1 / (dist_pos + 1e-5))
+        force[..., :3] += torch.sum(force_c, dim=1)
 
         # set force_z to 0
         return force.type(torch.float32)
