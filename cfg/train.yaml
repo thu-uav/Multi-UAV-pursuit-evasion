@@ -14,18 +14,19 @@ env: ${task.env}
 
 total_frames: 100_000_000_000
 max_iters: -1
-eval_interval: 10
-save_interval: 10
+eval_interval: 200
+save_interval: 200
 seed: 0
 
 viewer:
   resolution: [960, 720]
   eye: [4., 0., 4.]
-  eye: [4., 0., 1.]
+  lookat: [0., 0., 1.]
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: debug
+  run_name: size0_7_vel1_3_detect0_8_wocylinders
+  # run_name: debug
   job_type: train
   entity: chenjy
   project: PredatorPrey
@@ -37,6 +38,7 @@ wandb:
 
 defaults:
   # - task: HideAndSeek
-  - task: HideAndSeek_static
+  # - task: HideAndSeek_static
+  - task: HideAndSeek_sparse
   - algo: mappo
   - _self_
