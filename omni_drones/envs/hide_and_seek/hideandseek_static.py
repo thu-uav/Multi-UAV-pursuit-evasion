@@ -824,8 +824,8 @@ class HideAndSeek_static(IsaacEnv):
             xaxis=drone_xaxis[self.central_env_idx, 0, :],
             yaxis=drone_yaxis[self.central_env_idx, 0, :],
             zaxis=drone_zaxis[self.central_env_idx, 0, :],
-            # drange=self.detect_range,
-            drange=0.5,
+            drange=self.detect_range,
+            # drange=0.5,
         )
         point_list = [
             _carb_float3_add(p, self.central_env_pos) for p in point_list
