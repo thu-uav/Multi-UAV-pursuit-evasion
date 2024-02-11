@@ -665,7 +665,7 @@ class HideAndSeek_static(IsaacEnv):
              self.drone_states, 
              identity], dim=-1
         )   # [num_envs, drone.n, drone_state_dim]
-        state["state_frame"] = target_state                # [num_envs, 1, target_rpos_dim]
+        state["state_frame"] = target_state  # [num_envs, 1, target_rpos_dim]
         # breakpoint()
         return TensorDict(
             {
