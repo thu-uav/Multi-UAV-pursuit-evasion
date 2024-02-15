@@ -246,10 +246,12 @@ class HideAndSeek_sparse(IsaacEnv):
             "state_self": UnboundedContinuousTensorSpec((1, 3 + 6 + drone_state_dim + self.drone.n)),
             "state_others": UnboundedContinuousTensorSpec((self.drone.n-1, 3)), # pos
             "state_frame": UnboundedContinuousTensorSpec((1, frame_state_dim)),
+            "env": UnboundedContinuousTensorSpec((1, 3)), # detect_range + catch_radius + arena size
         }).to(self.device)
         state_spec = CompositeSpec({
             "state_drones": UnboundedContinuousTensorSpec((self.drone.n, 3 + 6 + drone_state_dim + self.drone.n)),
             "state_frame": UnboundedContinuousTensorSpec((1, frame_state_dim)),
+            "env": UnboundedContinuousTensorSpec((1, 3)), # detect_range + catch_radius + arena size
         }).to(self.device)
         
         self.observation_spec = CompositeSpec({
@@ -581,7 +583,11 @@ class HideAndSeek_sparse(IsaacEnv):
         frame_state_masked.masked_fill_(target_smask, self.mask_value)
         # frame_state_masked = masked_tensor(frame_state, target_smask)
         obs["state_frame"] = frame_state_masked
-        # breakpoint()
+        
+        obs_size = self.size_list.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1).expand(-1, self.drone.n, -1, -1)
+        obs_detect = torch.ones_like(obs_size) * self.detect_range
+        obs_catch = torch.ones_like(obs_size) * self.catch_radius
+        obs["env"] = torch.concat([obs_detect, obs_catch, obs_size], dim=-1)
 
         state = TensorDict({}, [self.num_envs])
         state["state_drones"] = torch.cat(
@@ -591,7 +597,7 @@ class HideAndSeek_sparse(IsaacEnv):
              identity], dim=-1
         )   # [num_envs, drone.n, drone_state_dim]
         state["state_frame"] = target_state                # [num_envs, 1, target_rpos_dim]
-        # breakpoint()
+        state["size"] = obs["env"].clone()
         return TensorDict(
             {
                 "agents": {
