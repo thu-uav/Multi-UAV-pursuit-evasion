@@ -25,13 +25,13 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: size0_8_vel1_3_detect0_8_static_loadsize0_7
-  run_name: debug
+  run_name: size0_7_vel1_3_detect0_8_sparse_extrainfo
+  # run_name: debug
   job_type: train
   entity: chenjy
   project: PredatorPrey
-  # mode: online
-  mode: disabled # set to 'disabled' when debugging locally
+  mode: online
+  # mode: disabled # set to 'disabled' when debugging locally
   run_id: 
   monitor_gym: True
   tags: 
