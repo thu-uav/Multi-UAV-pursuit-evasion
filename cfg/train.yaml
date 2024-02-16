@@ -14,8 +14,8 @@ env: ${task.env}
 
 total_frames: 100_000_000_000
 max_iters: -1
-eval_interval: 10
-save_interval: 10
+eval_interval: 200
+save_interval: 200
 seed: 0
 
 viewer:
@@ -25,7 +25,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: size0_7_vel1_3_detect0_8_newreward_ratecontroller
+  run_name: size0_7_vel1_3_detect0_8_newreward_ratecontroller_circle
   # run_name: debug
   job_type: train
   entity: chenjy

@@ -33,7 +33,8 @@ import copy
 
 from omni.isaac.debug_draw import _debug_draw
 
-from .draw import Float3, _COLOR_ACCENT, _carb_float3_add, draw_court, draw_traj, draw_detection
+from .draw import draw_traj, draw_detection
+from .draw_circle import Float3, _COLOR_ACCENT, _carb_float3_add, draw_court_circle
 
 
 # drones on land by default
@@ -437,8 +438,8 @@ class HideAndSeek_circle(IsaacEnv):
             )
             target_pos.append(target_pos_dist.sample())
 
-            # if idx == self.central_env_idx and self._should_render(0):
-            #     self._draw_court(size)
+            if idx == self.central_env_idx and self._should_render(0):
+                self._draw_court_circle(size)
 
         drone_pos = torch.concat(drone_pos, dim=0).type(torch.float32)
         target_pos = torch.stack(target_pos, dim=0).type(torch.float32)
@@ -513,10 +514,10 @@ class HideAndSeek_circle(IsaacEnv):
         # drone_rpos_masked = self.drone_rpos.clone()
         # drone_rpos_masked[drone_pmask] = 0.0
         
-        # # draw drone trajectory and detection range
-        # if self._should_render(0):
-        #     self._draw_traj()
-        #     self._draw_detection()            
+        # draw drone trajectory and detection range
+        if self._should_render(0):
+            self._draw_traj()
+            self._draw_detection()            
 
         drone_speed_norm = torch.norm(drone_vel[..., :3], dim=-1)
         if self.set_train:
@@ -633,7 +634,8 @@ class HideAndSeek_circle(IsaacEnv):
         capture_eval = capture_eval.mean(dim=1)
         self.stats['cover_rate'].set_((torch.sum(capture_eval >= 0.95) / self.task_space_len).unsqueeze(-1).expand_as(self.stats['capture']))
         self.stats['capture_per_step'].set_(self.stats['capture_episode'] / self.step_spec)
-        catch_reward = 10 * capture_flag.sum(-1).unsqueeze(-1).expand_as(capture_flag)
+        # catch_reward = 10 * capture_flag.sum(-1).unsqueeze(-1).expand_as(capture_flag)
+        catch_reward = 10 * capture_flag.type(torch.float32)
 
         # speed penalty
         if self.cfg.task.use_speed_penalty:
@@ -644,7 +646,8 @@ class HideAndSeek_circle(IsaacEnv):
             speed_reward = 0.0
 
         # distance reward
-        min_dist = (torch.min(target_dist, dim=-1)[0].unsqueeze(-1).expand_as(target_dist))
+        # min_dist = (torch.min(target_dist, dim=-1)[0].unsqueeze(-1).expand_as(target_dist))
+        min_dist = target_dist
         dist_reward_mask = (min_dist > self.catch_radius)
         distance_reward = - 1.0 * min_dist * dist_reward_mask
         
@@ -706,11 +709,11 @@ class HideAndSeek_circle(IsaacEnv):
         return force.type(torch.float32)
     
     # visualize functions
-    def _draw_court(self, size):
+    def _draw_court_circle(self, size):
         self.draw.clear_lines()
 
-        point_list_1, point_list_2, colors, sizes = draw_court(
-            2*size, 2*size, 2*size, line_size=5.0
+        point_list_1, point_list_2, colors, sizes = draw_court_circle(
+            size, 2*size, line_size=5.0
         )
         point_list_1 = [
             _carb_float3_add(p, self.central_env_pos) for p in point_list_1
@@ -718,7 +721,7 @@ class HideAndSeek_circle(IsaacEnv):
         point_list_2 = [
             _carb_float3_add(p, self.central_env_pos) for p in point_list_2
         ]
-        self.draw.draw_lines(point_list_1, point_list_2, colors, sizes)   
+        self.draw.draw_lines(point_list_1, point_list_2, colors, sizes)  
 
     def _draw_traj(self):
         drone_pos = self.drone_states[..., :3]
