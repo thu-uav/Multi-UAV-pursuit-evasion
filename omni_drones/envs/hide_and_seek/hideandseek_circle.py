@@ -358,7 +358,7 @@ class HideAndSeek_circle(IsaacEnv):
             translation= torch.tensor([0., 0., 0.], device=self.device),
             radius=size,
             height=0.001,
-            color=np.array([0.0, 0.0, 0.0])
+            color=np.array([0.0, 0.0, 0.0]),
         )
     
         kit_utils.set_rigid_body_properties(
