@@ -7,7 +7,7 @@ defaults:
   - /base/randomization_base@_here_
 
 env:
-  num_envs: 10
+  num_envs: 2048
   max_episode_length: 800
 
 drone_model: Crazyflie
