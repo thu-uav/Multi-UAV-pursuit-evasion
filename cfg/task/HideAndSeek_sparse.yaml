@@ -7,14 +7,15 @@ defaults:
   - /base/randomization_base@_here_
 
 env:
-  num_envs: 2048
+  num_envs: 10
   max_episode_length: 800
 
 drone_model: Crazyflie
 force_sensor: false
 time_encoding: true
 
-action_transform: multidiscrete:4
+# action_transform: multidiscrete:4
+action_transform: rate
 
 # exp
 num_agents: 3

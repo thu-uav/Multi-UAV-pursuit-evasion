@@ -624,8 +624,7 @@ class HideAndSeek_sparse(IsaacEnv):
         capture_eval = capture_eval.mean(dim=1)
         self.stats['cover_rate'].set_((torch.sum(capture_eval >= 0.95) / self.task_space_len).unsqueeze(-1).expand_as(self.stats['capture']))
         self.stats['capture_per_step'].set_(self.stats['capture_episode'] / self.step_spec)
-        # catch_reward = 10 * capture_flag.sum(-1).unsqueeze(-1).expand_as(capture_flag)
-        catch_reward = 10 * capture_flag.type(torch.float32)
+        catch_reward = 10 * capture_flag.sum(-1).unsqueeze(-1).expand_as(capture_flag)
 
         # speed penalty
         if self.cfg.task.use_speed_penalty:
@@ -636,7 +635,7 @@ class HideAndSeek_sparse(IsaacEnv):
             speed_reward = 0.0
 
         # distance reward
-        min_dist = target_dist
+        min_dist = (torch.min(target_dist, dim=-1)[0].unsqueeze(-1).expand_as(target_dist))
         dist_reward_mask = (min_dist > self.catch_radius)
         distance_reward = - 1.0 * min_dist * dist_reward_mask
         

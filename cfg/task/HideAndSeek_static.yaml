@@ -14,7 +14,8 @@ drone_model: Crazyflie
 force_sensor: false
 time_encoding: true
 
-action_transform: multidiscrete:4
+# action_transform: multidiscrete:4
+action_transform: rate
 
 # exp
 num_agents: 3
