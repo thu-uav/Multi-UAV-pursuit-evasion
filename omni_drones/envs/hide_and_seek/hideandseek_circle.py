@@ -528,12 +528,9 @@ class HideAndSeek_circle(IsaacEnv):
             self.eval_drone_max_speed = torch.max(torch.stack([self.eval_drone_max_speed, drone_speed_norm], dim=-1), dim=-1).values
         
         # record stats
-        self.stats['drone1_speed_per_step'].set_(self.drone_sum_speed[:,0].unsqueeze(-1) / self.step_spec)
-        self.stats['drone2_speed_per_step'].set_(self.drone_sum_speed[:,1].unsqueeze(-1) / self.step_spec)
-        self.stats['drone3_speed_per_step'].set_(self.drone_sum_speed[:,2].unsqueeze(-1) / self.step_spec)
-        self.stats['drone1_max_speed'].set_(self.drone_max_speed[:,0].unsqueeze(-1))
-        self.stats['drone2_max_speed'].set_(self.drone_max_speed[:,1].unsqueeze(-1))
-        self.stats['drone3_max_speed'].set_(self.drone_max_speed[:,2].unsqueeze(-1))
+        for i in range(self.drone.n):
+            self.stats['drone{}_speed_per_step'.format(i)].set_(self.drone_sum_speed[:,i].unsqueeze(-1) / self.step_spec)
+            self.stats['drone{}_max_speed'.format(i)].set_(self.drone_max_speed[:,i].unsqueeze(-1))
 
         # get target position and velocity        
         target_pos, _ = self.get_env_poses(self.target.get_world_poses())
