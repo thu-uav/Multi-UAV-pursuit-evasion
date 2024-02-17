@@ -182,6 +182,11 @@ def main(cfg):
     agent_spec: AgentSpec = env.agent_spec["drone"]
     policy = algos[cfg.algo.name.lower()](cfg.algo, agent_spec=agent_spec, device="cuda")
 
+    if cfg.model_dir is not None:
+        # torch.save(policy.state_dict(), ckpt_path)
+        policy.load_state_dict(torch.load(cfg.model_dir))
+        print("Successfully load model!")
+
     frames_per_batch = env.num_envs * int(cfg.algo.train_every)
     total_frames = cfg.get("total_frames", -1) // frames_per_batch * frames_per_batch
     max_iters = cfg.get("max_iters", -1)

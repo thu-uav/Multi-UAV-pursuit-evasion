@@ -18,7 +18,7 @@ time_encoding: true
 action_transform: rate
 
 # exp
-num_agents: 2
+num_agents: 3
 detect_range: 0.8
 
 size_min: 0.7
