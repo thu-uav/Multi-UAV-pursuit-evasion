@@ -283,6 +283,7 @@ class HideAndSeek_circle(IsaacEnv):
         # stats and infos
         stats_spec = CompositeSpec({
             "capture": UnboundedContinuousTensorSpec(1),
+            "first_capture_step": UnboundedContinuousTensorSpec(1),
             "capture_episode": UnboundedContinuousTensorSpec(1),
             "capture_per_step": UnboundedContinuousTensorSpec(1),
             "cover_rate": UnboundedContinuousTensorSpec(1),
@@ -465,7 +466,8 @@ class HideAndSeek_circle(IsaacEnv):
         self.step_spec = 0
 
         # reset stats
-        self.stats[env_ids] = 0.   
+        self.stats[env_ids] = 0.
+        self.stats['first_capture_step'].set_(torch.ones_like(self.stats['first_capture_step']) * self.max_episode_length)
 
     def _update_curriculum(self, capture):
         capture = capture.reshape(self.task_space_len,-1) # [eval_num_envs, task_space_len]
@@ -633,6 +635,8 @@ class HideAndSeek_circle(IsaacEnv):
         self.stats['capture_per_step'].set_(self.stats['capture_episode'] / self.step_spec)
         # catch_reward = 10 * capture_flag.sum(-1).unsqueeze(-1).expand_as(capture_flag)
         catch_reward = 10 * capture_flag.type(torch.float32)
+        catch_flag = torch.any(catch_reward, dim=1).unsqueeze(-1)
+        self.stats['first_capture_step'][catch_flag * (self.stats['first_capture_step'] >= self.step_spec)] = self.step_spec
 
         # speed penalty
         if self.cfg.task.use_speed_penalty:
