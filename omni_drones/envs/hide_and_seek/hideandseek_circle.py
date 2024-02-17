@@ -244,8 +244,7 @@ class HideAndSeek_circle(IsaacEnv):
             frame_state_dim += self.time_encoding_dim        
 
         observation_spec = CompositeSpec({
-            # "state_self": UnboundedContinuousTensorSpec((1, 3 + 6 + drone_state_dim + self.drone.n)),
-            "state_self": UnboundedContinuousTensorSpec((1, 3 + 6 + drone_state_dim)),
+            "state_self": UnboundedContinuousTensorSpec((1, 3 + 6 + drone_state_dim + self.drone.n)),
             "state_others": UnboundedContinuousTensorSpec((self.drone.n-1, 3)), # pos
             "state_frame": UnboundedContinuousTensorSpec((1, frame_state_dim)),
             "env": UnboundedContinuousTensorSpec((1, 3)), # detect_range + catch_radius + arena size
@@ -573,20 +572,15 @@ class HideAndSeek_circle(IsaacEnv):
                 target_vel
             ], dim=-1) # [num_envs, 1, 9]
 
-        # identity = torch.eye(self.drone.n, device=self.device).expand(self.num_envs, -1, -1)
+        identity = torch.eye(self.drone.n, device=self.device).expand(self.num_envs, -1, -1)
 
         obs = TensorDict({}, [self.num_envs, self.drone.n])
         obs["state_self"] = torch.cat(
             [-target_rpos_masked,
              -target_rvel_masked,
-             self.drone_states], dim=-1
+             self.drone_states, 
+             identity], dim=-1
         ).unsqueeze(2)
-        # obs["state_self"] = torch.cat(
-        #     [-target_rpos_masked,
-        #      -target_rvel_masked,
-        #      self.drone_states, 
-        #      identity], dim=-1
-        # ).unsqueeze(2)
 
         obs["state_others"] = self.drone_rpos
 
