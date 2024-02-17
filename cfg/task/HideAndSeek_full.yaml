@@ -1,4 +1,4 @@
-name: HideAndSeek_circle
+name: HideAndSeek_full
 
 defaults:
   # see https://hydra.cc/docs/advanced/overriding_packages/
@@ -19,7 +19,6 @@ action_transform: rate
 
 # exp
 num_agents: 3
-detect_range: 0.8
 
 size_min: 1.0
 size_max: 1.0

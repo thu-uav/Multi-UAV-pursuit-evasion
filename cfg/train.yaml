@@ -2,7 +2,7 @@
 prob_curriculum: 0.9
 prob_decay: 0.5
 
-# model_dir: /home/jiayu/OmniDrones/scripts/outputs/debug/02-17_17-37/wandb/run-20240217_173742-amslfurz/files/checkpoint_320.pt
+# model_dir: /home/jiayu/OmniDrones/scripts/outputs/size0_7_vel1_3_detect0_8_oldreward_ratecontroller_circle/02-16_22-28/wandb/run-20240216_222805-yujtf0kh/files/checkpoint_2595356672.pt
 model_dir: null
 
 # hydra.job.chdir: false
@@ -26,12 +26,12 @@ viewer:
 wandb:
   group: ${oc.select:..task.name}
   # run_name: size0_7_vel1_3_detect0_8_circle_2pursuer_load3pursuer
-  run_name: debug
+  run_name: check_load
   job_type: train
   entity: chenjy
   project: PredatorPrey
-  # mode: online
-  mode: disabled # set to 'disabled' when debugging locally
+  mode: online
+  # mode: disabled # set to 'disabled' when debugging locally
   run_id: 
   monitor_gym: True
   tags: 
@@ -40,6 +40,7 @@ defaults:
   # - task: HideAndSeek
   # - task: HideAndSeek_static
   # - task: HideAndSeek_sparse
-  - task: HideAndSeek_circle
+  # - task: HideAndSeek_circle
+  - task: HideAndSeek_full
   - algo: mappo
   - _self_
