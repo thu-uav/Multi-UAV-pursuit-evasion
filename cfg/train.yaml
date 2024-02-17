@@ -25,7 +25,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: size0_7_vel1_3_detect0_8_newreward_ratecontroller_circle
+  run_name: size0_7_vel1_3_detect0_8_oldreward_ratecontroller_circle
   # run_name: debug
   job_type: train
   entity: chenjy
