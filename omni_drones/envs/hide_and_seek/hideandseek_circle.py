@@ -529,8 +529,8 @@ class HideAndSeek_circle(IsaacEnv):
         
         # record stats
         for i in range(self.drone.n):
-            self.stats['drone{}_speed_per_step'.format(i)].set_(self.drone_sum_speed[:,i].unsqueeze(-1) / self.step_spec)
-            self.stats['drone{}_max_speed'.format(i)].set_(self.drone_max_speed[:,i].unsqueeze(-1))
+            self.stats['drone{}_speed_per_step'.format(i+1)].set_(self.drone_sum_speed[:,i].unsqueeze(-1) / self.step_spec)
+            self.stats['drone{}_max_speed'.format(i+1)].set_(self.drone_max_speed[:,i].unsqueeze(-1))
 
         # get target position and velocity        
         target_pos, _ = self.get_env_poses(self.target.get_world_poses())
@@ -742,6 +742,7 @@ class HideAndSeek_circle(IsaacEnv):
         drone_xaxis = quat_axis(drone_ori, 0)
         drone_yaxis = quat_axis(drone_ori, 1)
         drone_zaxis = quat_axis(drone_ori, 2)
+        # breakpoint()
         point_list, colors, sizes = draw_detection(
             pos=drone_pos[self.central_env_idx, :],
             xaxis=drone_xaxis[self.central_env_idx, 0, :],

@@ -139,7 +139,7 @@ def draw_range(
     color: _COLOR_T = (1.0, 1.0, 1.0, 0.05), size: float = 5.0, num: int = 100
 ):
     point_list = []
-    for i in range(xaxis.shape[0]):
+    for i in range(pos.shape[0]):
         posi = pos[i, :]
         for j in range(1, num):
             num_phi = round(num / 2 - abs(j - num / 2)) * 4
