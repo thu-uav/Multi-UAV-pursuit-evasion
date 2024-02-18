@@ -1,4 +1,4 @@
-name: HideAndSeek_static
+name: HideAndSeek_circle_static
 
 defaults:
   # see https://hydra.cc/docs/advanced/overriding_packages/
@@ -45,32 +45,32 @@ cylinder:
     height: 2.0
   cyl1:
     translation: 
-      x: -0.7
-      y: 0.7
+      x: -0.5
+      y: 0.5
       z: 1.
     axis: 'Z'
     radius: 0.1
     height: 2.0
   cyl2:
     translation: 
-      x: 0.7
-      y: 0.7
+      x: 0.5
+      y: 0.5
       z: 1.
     axis: 'Z'
     radius: 0.1
     height: 2.0
   cyl3:
     translation: 
-      x: 0.7
-      y: -0.7
+      x: 0.5
+      y: -0.5
       z: 1.
     axis: 'Z'
     radius: 0.1
     height: 2.0
   cyl4:
     translation: 
-      x: -0.7
-      y: -0.7
+      x: -0.5
+      y: -0.5
       z: 1.
     axis: 'Z'
     radius: 0.1

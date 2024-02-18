@@ -33,7 +33,7 @@ import copy
 
 from omni.isaac.debug_draw import _debug_draw
 
-from .draw import draw_traj, draw_detection
+from .draw import draw_traj
 from .draw_circle import Float3, _COLOR_ACCENT, _carb_float3_add, draw_court_circle
 
 
@@ -247,12 +247,12 @@ class HideAndSeek_circle(IsaacEnv):
             "state_self": UnboundedContinuousTensorSpec((1, 3 + 6 + drone_state_dim + self.drone.n)),
             "state_others": UnboundedContinuousTensorSpec((self.drone.n-1, 3)), # pos
             "state_frame": UnboundedContinuousTensorSpec((1, frame_state_dim)),
-            "env": UnboundedContinuousTensorSpec((1, 3)), # detect_range + catch_radius + arena size
+            "env": UnboundedContinuousTensorSpec((1, 2)), # catch_radius + arena size
         }).to(self.device)
         state_spec = CompositeSpec({
             "state_drones": UnboundedContinuousTensorSpec((self.drone.n, 3 + 6 + drone_state_dim + self.drone.n)),
             "state_frame": UnboundedContinuousTensorSpec((1, frame_state_dim)),
-            "env": UnboundedContinuousTensorSpec((1, 3)), # detect_range + catch_radius + arena size
+            "env": UnboundedContinuousTensorSpec((1, 2)), # catch_radius + arena size
         }).to(self.device)
         
         self.observation_spec = CompositeSpec({
@@ -307,7 +307,6 @@ class HideAndSeek_circle(IsaacEnv):
         
     def _design_scene(self):
         self.num_agents = self.cfg.task.num_agents
-        self.detect_range = self.cfg.task.detect_range
         self.size_min = self.cfg.task.size_min
         self.size_max = self.cfg.task.size_max
 
@@ -509,17 +508,10 @@ class HideAndSeek_circle(IsaacEnv):
         drone_vel = self.drone.get_velocities()
         self.drone_rpos = vmap(cpos)(drone_pos, drone_pos)
         self.drone_rpos = vmap(off_diag)(self.drone_rpos)
-
-        # # get masked drone relative position
-        # drone_mask = torch.norm(self.drone_rpos, dim=-1) > self.detect_range
-        # drone_pmask = drone_mask.unsqueeze(-1).expand(-1, -1, -1, 3)
-        # drone_rpos_masked = self.drone_rpos.clone()
-        # drone_rpos_masked[drone_pmask] = 0.0
         
-        # draw drone trajectory and detection range
+        # draw drone trajectory
         if self._should_render(0):
-            self._draw_traj()
-            self._draw_detection()            
+            self._draw_traj()         
 
         drone_speed_norm = torch.norm(drone_vel[..., :3], dim=-1)
         if self.set_train:
@@ -544,19 +536,6 @@ class HideAndSeek_circle(IsaacEnv):
         # get masked target relative position and velocity
         target_rpos = target_pos - drone_pos # [N, n, 3]
         target_rvel = target_vel - drone_vel # [N, n, 6]
-        target_mask = torch.norm(target_rpos, dim=-1) > self.detect_range # [N, n]
-        target_mask = target_mask.all(1).unsqueeze(1).expand_as(target_mask) # [N, n]
-
-        target_pmask = target_mask.unsqueeze(-1).expand_as(target_rpos) # [N, n, 3]
-        target_vmask = target_mask.unsqueeze(-1).expand_as(target_rvel) # [N, n, 6]
-        target_rpos_masked = target_rpos.clone()
-        # target_rpos_masked[target_pmask] = 0.0
-        target_rpos_masked.masked_fill_(target_pmask, self.mask_value)
-        target_rvel_masked = target_rvel.clone()
-        # target_rvel_masked[target_vmask] = 0.0
-        target_rvel_masked.masked_fill_(target_vmask, self.mask_value)
-        # target_rpos_masked = masked_tensor(target_rpos, target_pmask) # [N, n, 3]
-        # target_rvel_masked = masked_tensor(target_rvel, target_vmask) # [N, n, 6]
 
         # get full target state
         if self.time_encoding:
@@ -576,8 +555,8 @@ class HideAndSeek_circle(IsaacEnv):
 
         obs = TensorDict({}, [self.num_envs, self.drone.n])
         obs["state_self"] = torch.cat(
-            [-target_rpos_masked,
-             -target_rvel_masked,
+            [-target_rpos,
+             -target_rvel,
              self.drone_states, 
              identity], dim=-1
         ).unsqueeze(2)
@@ -585,17 +564,11 @@ class HideAndSeek_circle(IsaacEnv):
         obs["state_others"] = self.drone_rpos
 
         frame_state = target_state.unsqueeze(1).expand(-1, self.drone.n, -1, -1)
-        target_smask = target_mask.unsqueeze(-1).unsqueeze(-1).expand_as(frame_state)
-        frame_state_masked = frame_state.clone()
-        # frame_state_masked[target_smask] = 0.0
-        frame_state_masked.masked_fill_(target_smask, self.mask_value)
-        # frame_state_masked = masked_tensor(frame_state, target_smask)
-        obs["state_frame"] = frame_state_masked
+        obs["state_frame"] = frame_state
         
         obs_size = self.size_list.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1).expand(-1, self.drone.n, -1, -1)
-        obs_detect = torch.ones_like(obs_size) * self.detect_range
         obs_catch = torch.ones_like(obs_size) * self.catch_radius
-        obs["env"] = torch.concat([obs_detect, obs_catch, obs_size], dim=-1)
+        obs["env"] = torch.concat([obs_catch, obs_size], dim=-1)
 
         state = TensorDict({}, [self.num_envs])
         state["state_drones"] = torch.cat(
@@ -735,26 +708,4 @@ class HideAndSeek_circle(IsaacEnv):
             _carb_float3_add(p, self.central_env_pos) for p in point_list2
         ]
         self.draw.draw_lines(point_list1, point_list2, colors, sizes)   
-    
-    def _draw_detection(self):
-        self.draw.clear_points()
-
-        drone_pos = self.drone_states[..., :3]
-        drone_ori = self.drone_states[..., 3:7]
-        drone_xaxis = quat_axis(drone_ori, 0)
-        drone_yaxis = quat_axis(drone_ori, 1)
-        drone_zaxis = quat_axis(drone_ori, 2)
-        # breakpoint()
-        point_list, colors, sizes = draw_detection(
-            pos=drone_pos[self.central_env_idx, :],
-            xaxis=drone_xaxis[self.central_env_idx, 0, :],
-            yaxis=drone_yaxis[self.central_env_idx, 0, :],
-            zaxis=drone_zaxis[self.central_env_idx, 0, :],
-            drange=self.detect_range,
-            # drange=0.5,
-        )
-        point_list = [
-            _carb_float3_add(p, self.central_env_pos) for p in point_list
-        ]
-        self.draw.draw_points(point_list, colors, sizes)
     

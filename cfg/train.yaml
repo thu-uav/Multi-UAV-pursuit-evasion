@@ -25,8 +25,8 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: size1_0_vel1_3_static
-  # run_name: debug
+  run_name: size1_0_vel1_3_circle_static
+  run_name: debug
   job_type: train
   entity: chenjy
   project: PredatorPrey
@@ -38,10 +38,8 @@ wandb:
 
 defaults:
   # - task: HideAndSeek
-  - task: HideAndSeek_static
-  # - task: HideAndSeek_sparse
+  - task: HideAndSeek_circle_static
   # - task: HideAndSeek_circle
-  # - task: HideAndSeek_full
   # - task: HideAndSeek_multiprey
   - algo: mappo
   - _self_
