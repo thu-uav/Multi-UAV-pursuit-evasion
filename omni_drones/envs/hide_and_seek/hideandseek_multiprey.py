@@ -307,6 +307,7 @@ class HideAndSeek_multiprey(IsaacEnv):
         
     def _design_scene(self):
         self.num_agents = self.cfg.task.num_agents
+        self.num_targets = self.cfg.num_targets
         self.size_min = self.cfg.task.size_min
         self.size_max = self.cfg.task.size_max
 
@@ -323,16 +324,21 @@ class HideAndSeek_multiprey(IsaacEnv):
         self.drone.spawn(translation)
         
         # init prey
-        self.target_pos = torch.tensor([[0., 0.05, 0.5]], device=self.device)
-        objects.DynamicSphere(
-            prim_path="/World/envs/env_0/target",
-            name="target",
-            translation=self.target_pos,
-            radius=0.05,
-            # height=0.1,
-            color=torch.tensor([1., 0., 0.]),
-            mass=1.0
-        )
+        target_translation = torch.zeros(self.num_targets, 3)
+        target_translation[:, 0] = torch.arange(self.num_targets)
+        target_translation[:, 1] = torch.arange(self.num_targets)
+        target_translation[:, 2] = 0.5
+        # self.target_pos = torch.tensor([[0., 0.05, 0.5]], device=self.device)
+        for i in range(self.num_targets):
+            objects.DynamicSphere(
+                prim_path="/World/envs/env_0/target_{}".format(i),
+                name="target_{}".format(i),
+                translation=target_translation[i],
+                radius=0.05,
+                # height=0.1,
+                color=torch.tensor([1., 0., 0.]),
+                mass=1.0
+            )
 
         # init obstacle
         size_dist = D.Uniform(
@@ -345,14 +351,6 @@ class HideAndSeek_multiprey(IsaacEnv):
             torch.tensor([size, size, 0.0], device=self.device)
         )
         
-        # objects.VisualCuboid(
-        #     prim_path="/World/envs/env_0/ground",
-        #     name="ground",
-        #     translation= torch.tensor([0., 0., 0.], device=self.device),
-        #     scale=torch.tensor([size * 2, size * 2, 0.001], device=self.device),
-        #     color=torch.tensor([0., 0., 0.]),
-        # )
-
         objects.VisualCylinder(
             prim_path="/World/envs/env_0/Cylinder",
             name="ground",
@@ -362,10 +360,11 @@ class HideAndSeek_multiprey(IsaacEnv):
             color=np.array([0.0, 0.0, 0.0]),
         )
     
-        kit_utils.set_rigid_body_properties(
-            prim_path="/World/envs/env_0/target",
-            disable_gravity=True
-        )        
+        for i in range(self.num_targets):
+            kit_utils.set_rigid_body_properties(
+                prim_path="/World/envs/env_0/target_{}".format(i),
+                disable_gravity=True
+            )        
 
         kit_utils.create_ground_plane(
             "/World/defaultGroundPlane",
@@ -436,13 +435,13 @@ class HideAndSeek_multiprey(IsaacEnv):
                 torch.tensor([-size, -size, 0.0], device=self.device),
                 torch.tensor([size, size, 2 * size], device=self.device)
             )
-            target_pos.append(target_pos_dist.sample())
+            target_pos.append(target_pos_dist.sample((1, self.num_targets)))
 
             if idx == self.central_env_idx and self._should_render(0):
                 self._draw_court_circle(size)
 
         drone_pos = torch.concat(drone_pos, dim=0).type(torch.float32)
-        target_pos = torch.stack(target_pos, dim=0).type(torch.float32)
+        target_pos = torch.concat(target_pos, dim=0).type(torch.float32)
         self.v_prey = torch.Tensor(np.array(self.v_prey)).to(self.device)
         self.size_list = torch.Tensor(np.array(self.size_list)).to(self.device)
         # set position and velocity

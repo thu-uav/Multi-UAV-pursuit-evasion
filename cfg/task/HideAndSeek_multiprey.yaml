@@ -19,6 +19,7 @@ action_transform: rate
 
 # exp
 num_agents: 3
+num_targets: 5
 
 size_min: 1.0
 size_max: 1.0
