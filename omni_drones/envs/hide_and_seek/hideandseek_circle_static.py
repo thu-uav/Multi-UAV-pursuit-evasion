@@ -362,10 +362,10 @@ class HideAndSeek_circle_static(IsaacEnv):
             cyl = self.cfg.task.cylinder['cyl{}'.format(idx)]
             translation = orientation = None
             if 'translation' in cyl:
-                translation = (cyl.translation.x, cyl.translation.y, cyl.translation.z)
+                translation = (cyl.translation.x, cyl.translation.y, size)
             if 'orientation' in cyl:
                 orientation = (cyl.orientation.qw, cyl.orientation.qx, cyl.orientation.qy, cyl.orientation.qz)
-            attributes = {'axis': cyl.axis, 'radius': cyl.radius, 'height': cyl.height}
+            attributes = {'axis': cyl.axis, 'radius': cyl.radius, 'height': 2 * size}
             self.cylinders_size.append(cyl.radius)
             self.cylinders_prims[idx] = create_obstacle(
                 "/World/envs/env_0/cylinder_{}".format(idx), 
@@ -464,7 +464,7 @@ class HideAndSeek_circle_static(IsaacEnv):
             cylinder_pos_temp = torch.tensor([], device=self.device)
             for cyl_idx in range(self.num_cylinders):
                 cyl = self.cfg.task.cylinder['cyl{}'.format(cyl_idx)]
-                translation = [[[cyl.translation.x, cyl.translation.y, cyl.translation.z]]]
+                translation = [[[cyl.translation.x, cyl.translation.y, size]]]
                 cylinder_pos_temp = torch.concat(
                     (cylinder_pos_temp, torch.tensor(translation, device=self.device)), dim=1)
             cylinder_pos.append(cylinder_pos_temp)

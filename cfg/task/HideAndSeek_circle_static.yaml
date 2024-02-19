@@ -20,8 +20,8 @@ action_transform: rate
 # exp
 num_agents: 3
 
-size_min: 1.0
-size_max: 1.0
+size_min: 0.7
+size_max: 0.7
 v_drone: 1.0
 v_low: 1.3
 v_high: 1.3
@@ -34,44 +34,22 @@ collision_radius: 0.01
 use_dynamic: False
 
 cylinder:
-  num: 5
+  num: 3
   cyl0:
-    translation:
-      x: 0.
-      y: 0.
-      z: 1.
+    translation: 
+      x: 0.0
+      y: 0.35
     axis: 'Z'
-    radius: 0.2
-    height: 2.0
+    radius: 0.1
   cyl1:
     translation: 
-      x: -0.5
-      y: 0.5
-      z: 1.
+      x: 0.303
+      y: -0.175
     axis: 'Z'
     radius: 0.1
-    height: 2.0
   cyl2:
     translation: 
-      x: 0.5
-      y: 0.5
-      z: 1.
+      x: -0.303
+      y: -0.175
     axis: 'Z'
     radius: 0.1
-    height: 2.0
-  cyl3:
-    translation: 
-      x: 0.5
-      y: -0.5
-      z: 1.
-    axis: 'Z'
-    radius: 0.1
-    height: 2.0
-  cyl4:
-    translation: 
-      x: -0.5
-      y: -0.5
-      z: 1.
-    axis: 'Z'
-    radius: 0.1
-    height: 2.0
