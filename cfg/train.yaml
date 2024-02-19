@@ -26,7 +26,7 @@ viewer:
 wandb:
   group: ${oc.select:..task.name}
   run_name: size1_0_vel1_3_circle_static
-  run_name: debug
+  # run_name: debug
   job_type: train
   entity: chenjy
   project: PredatorPrey
