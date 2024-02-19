@@ -33,7 +33,7 @@ import copy
 
 from omni.isaac.debug_draw import _debug_draw
 
-from .draw import draw_traj
+from .draw import draw_traj, draw_catch
 from .draw_circle import Float3, _COLOR_ACCENT, _carb_float3_add, draw_court_circle
 
 
@@ -553,7 +553,8 @@ class HideAndSeek_circle_static(IsaacEnv):
         
         # draw drone trajectory
         if self._should_render(0):
-            self._draw_traj()         
+            self._draw_traj() 
+            self._draw_catch()     
 
         drone_speed_norm = torch.norm(drone_vel[..., :3], dim=-1)
         if self.set_train:
@@ -784,4 +785,24 @@ class HideAndSeek_circle_static(IsaacEnv):
             _carb_float3_add(p, self.central_env_pos) for p in point_list2
         ]
         self.draw.draw_lines(point_list1, point_list2, colors, sizes)   
-    
+
+    def _draw_catch(self):
+        self.draw.clear_points()
+
+        drone_pos = self.drone_states[..., :3]
+        drone_ori = self.drone_states[..., 3:7]
+        drone_xaxis = quat_axis(drone_ori, 0)
+        drone_yaxis = quat_axis(drone_ori, 1)
+        drone_zaxis = quat_axis(drone_ori, 2)
+        point_list, colors, sizes = draw_catch(
+            pos=drone_pos[self.central_env_idx, :],
+            xaxis=drone_xaxis[self.central_env_idx, 0, :],
+            yaxis=drone_yaxis[self.central_env_idx, 0, :],
+            zaxis=drone_zaxis[self.central_env_idx, 0, :],
+            drange=self.catch_radius,
+            # drange=0.5,
+        )
+        point_list = [
+            _carb_float3_add(p, self.central_env_pos) for p in point_list
+        ]
+        self.draw.draw_points(point_list, colors, sizes)

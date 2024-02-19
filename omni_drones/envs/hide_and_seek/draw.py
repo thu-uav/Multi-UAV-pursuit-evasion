@@ -194,6 +194,16 @@ def _draw_points_args_merger(*args):
         buf[2],
     )
 
+def draw_catch(
+    pos, xaxis, yaxis, zaxis, drange: float,
+    color: _COLOR_T = (1.0, 1.0, 1.0, 0.1), size_range: float = 20.0, num_range: int = 20,
+    size_axis: float = 5.0, num_axis: int = 20
+):
+    return _draw_points_args_merger(
+        draw_range(pos, xaxis, yaxis, zaxis, drange, color, size_range, num_range), 
+        # draw_axis(pos, xaxis, yaxis, zaxis, drange, size_axis, num_axis)
+    )
+
 def draw_detection(
     pos, xaxis, yaxis, zaxis, drange: float,
     color: _COLOR_T = (1.0, 1.0, 1.0, 0.1), size_range: float = 20.0, num_range: int = 20,
