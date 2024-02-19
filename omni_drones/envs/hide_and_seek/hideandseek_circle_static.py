@@ -358,13 +358,15 @@ class HideAndSeek_circle_static(IsaacEnv):
         
         self.cylinders_prims = [None] * self.num_cylinders
         self.cylinders_size = []
+        cyl = self.cfg.task.cylinder
         for idx in range(self.num_cylinders):
-            cyl = self.cfg.task.cylinder['cyl{}'.format(idx)]
             translation = orientation = None
-            if 'translation' in cyl:
-                translation = (cyl.translation.x, cyl.translation.y, size)
-            if 'orientation' in cyl:
-                orientation = (cyl.orientation.qw, cyl.orientation.qx, cyl.orientation.qy, cyl.orientation.qz)
+            if idx == 0:
+                translation = (0.0, 0.5 * size, size)
+            elif idx == 1:
+                translation = (0.25 * 3**(0.5) * size, -0.25 * size, size)
+            else:
+                translation = (-0.25 * 3**(0.5) * size, -0.25 * size, size)
             attributes = {'axis': cyl.axis, 'radius': cyl.radius, 'height': 2 * size}
             self.cylinders_size.append(cyl.radius)
             self.cylinders_prims[idx] = create_obstacle(
@@ -462,9 +464,13 @@ class HideAndSeek_circle_static(IsaacEnv):
             target_pos.append(target_pos_dist.sample())
 
             cylinder_pos_temp = torch.tensor([], device=self.device)
-            for cyl_idx in range(self.num_cylinders):
-                cyl = self.cfg.task.cylinder['cyl{}'.format(cyl_idx)]
-                translation = [[[cyl.translation.x, cyl.translation.y, size]]]
+            for cylinder_idx in range(self.num_cylinders):
+                if cylinder_idx == 0:
+                    translation = [[[0.0, 0.5 * size, size]]]
+                elif cylinder_idx == 1:
+                    translation = [[[0.25 * 3**(0.5) * size, -0.25 * size, size]]]
+                else:
+                    translation = [[[-0.25 * 3**(0.5) * size, -0.25 * size, size]]]
                 cylinder_pos_temp = torch.concat(
                     (cylinder_pos_temp, torch.tensor(translation, device=self.device)), dim=1)
             cylinder_pos.append(cylinder_pos_temp)
