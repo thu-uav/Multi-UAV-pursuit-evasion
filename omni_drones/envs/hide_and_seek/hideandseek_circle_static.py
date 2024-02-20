@@ -637,7 +637,8 @@ class HideAndSeek_circle_static(IsaacEnv):
              self.drone_states], dim=-1
         )   # [num_envs, drone.n, drone_state_dim]
         state["state_frame"] = target_state                # [num_envs, 1, target_rpos_dim]
-        state["size"] = obs["env"].clone()
+        state["cylinders"] = cylinders_state
+        state["env"] = obs["env"].clone()
         return TensorDict(
             {
                 "agents": {
