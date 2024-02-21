@@ -2,7 +2,7 @@
 prob_curriculum: 0.9
 prob_decay: 0.5
 
-# model_dir: /home/chenjy/OmniDrones/scripts/outputs/circle_vel1_3.pt
+# model_dir: /home/chenjy/OmniDrones/scripts/outputs/3agent_debug/02-21_15-45/wandb/run-20240221_154520-9si24h0h/files/checkpoint_640.pt
 model_dir: null
 
 # hydra.job.chdir: false
@@ -20,18 +20,22 @@ seed: 0
 
 viewer:
   resolution: [960, 720]
-  eye: [4., 0., 4.]
-  lookat: [0., 0., 1.]
+  # up
+  eye: [1., 0., 6.]
+  lookat: [0., 0., 2.]
+  # # front
+  # eye: [4., 0., 4.]
+  # lookat: [0., 0., 1.]
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: size1_0_vel1_3_catch0_5_circle_static
-  run_name: 003_debug
+  # run_name: size1_0_vel1_3_catch0_5_circle_static_valuenorm1
+  run_name: 4agent_debug
   job_type: train
   entity: chenjy
   project: PredatorPrey
-  # mode: online
-  mode: disabled # set to 'disabled' when debugging locally
+  mode: online
+  # mode: disabled # set to 'disabled' when debugging locally
   run_id: 
   monitor_gym: True
   tags: 

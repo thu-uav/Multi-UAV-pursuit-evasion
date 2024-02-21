@@ -619,12 +619,6 @@ class HideAndSeek(IsaacEnv):
         drone_vel = self.drone.get_velocities()
         self.drone_rpos = vmap(cpos)(drone_pos, drone_pos)
         self.drone_rpos = vmap(off_diag)(self.drone_rpos)
-
-        # # get masked drone relative position
-        # drone_mask = torch.norm(self.drone_rpos, dim=-1) > self.detect_range
-        # drone_pmask = drone_mask.unsqueeze(-1).expand(-1, -1, -1, 3)
-        # drone_rpos_masked = self.drone_rpos.clone()
-        # drone_rpos_masked[drone_pmask] = 0.0
         
         # draw drone trajectory and detection range
         if self._should_render(0):
