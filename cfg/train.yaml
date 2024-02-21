@@ -30,8 +30,8 @@ wandb:
   job_type: train
   entity: chenjy
   project: PredatorPrey
-  mode: online
-  # mode: disabled # set to 'disabled' when debugging locally
+  # mode: online
+  mode: disabled # set to 'disabled' when debugging locally
   run_id: 
   monitor_gym: True
   tags: 

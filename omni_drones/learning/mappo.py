@@ -209,6 +209,7 @@ class MAPPOPolicy(object):
             cls = getattr(valuenorm, cfg.value_norm["class"])
             self.value_normalizer: valuenorm.Normalizer = cls(
                 input_shape=self.agent_spec.reward_spec.shape[-2:],
+                # input_shape=self.agent_spec.reward_spec.shape[-1:],
                 **cfg.value_norm["kwargs"],
             ).to(self.device)
 

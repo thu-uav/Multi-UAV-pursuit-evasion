@@ -39,7 +39,7 @@ cylinder:
     translation:
       x: 0.
       y: -0.5
-      z: 1.
+      z: 0.5
     axis: 'Z'
     radius: 0.1
     height: 2.0
@@ -47,7 +47,7 @@ cylinder:
     translation: 
       x: 0.
       y: 0.5
-      z: 1.
+      z: 0.5
     axis: 'Z'
     radius: 0.1
     height: 2.0

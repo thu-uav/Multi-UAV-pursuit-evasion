@@ -729,14 +729,18 @@ class HideAndSeek_circle_static(IsaacEnv):
         # 3D
         prey_env_pos, _ = self.get_env_poses(self.target.get_world_poses())
         force_r = torch.zeros_like(force)
-        prey_origin_dist = torch.norm(prey_env_pos[:, :2],dim=-1)
-        force_r[..., 0] = - prey_env_pos[:,0] / ((self.size_list - prey_origin_dist)**2 + 1e-5)
-        force_r[..., 1] = - prey_env_pos[:,1] / ((self.size_list - prey_origin_dist)**2 + 1e-5)
-        # force_r[...,0] = 1 / (prey_env_pos[:,0] - (- self.size_list) + 1e-5) - 1 / (self.size_list - prey_env_pos[:,0] + 1e-5)
-        # force_r[...,1] = 1 / (prey_env_pos[:,1] - (- self.size_list) + 1e-5) - 1 / (self.size_list - prey_env_pos[:,1] + 1e-5)
+        force_r[...,0] = 1 / (prey_env_pos[:,0] - (- self.size_list) + 1e-5) - 1 / (self.size_list - prey_env_pos[:,0] + 1e-5)
+        force_r[...,1] = 1 / (prey_env_pos[:,1] - (- self.size_list) + 1e-5) - 1 / (self.size_list - prey_env_pos[:,1] + 1e-5)
         force_r[...,2] += 1 / (prey_env_pos[:,2] - 0 + 1e-5) - 1 / (2 * self.size_list - prey_env_pos[:,2] + 1e-5)
         force += force_r
         
+        # cylinders
+        cylinder_pos, _ = self.cylinders.get_world_poses()
+        dist_pos = torch.norm(prey_pos[..., :3] - cylinder_pos[..., :3],dim=-1).unsqueeze(-1).expand(-1, -1, 3) # expand to 3-D
+        direction_c = (prey_pos[..., :3] - cylinder_pos[..., :3]) / (dist_pos + 1e-5)
+        force_c = direction_c * (1 / (dist_pos + 1e-5))
+        force[..., :3] += torch.sum(force_c, dim=1)
+
         # set force_z to 0
         return force.type(torch.float32)
     
