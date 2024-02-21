@@ -7,7 +7,7 @@ defaults:
   - /base/randomization_base@_here_
 
 env:
-  num_envs: 1024
+  num_envs: 2048
   max_episode_length: 800
 
 drone_model: Crazyflie
@@ -34,24 +34,20 @@ collision_radius: 0.01
 use_dynamic: False
 
 cylinder:
-  num: 3
-  axis: 'Z'
-  radius: 0.1
-  # cyl0:
-  #   translation: 
-  #     x: 0.0
-  #     y: 0.35
-  #   axis: 'Z'
-  #   radius: 0.1
-  # cyl1:
-  #   translation: 
-  #     x: 0.303
-  #     y: -0.175
-  #   axis: 'Z'
-  #   radius: 0.1
-  # cyl2:
-  #   translation: 
-  #     x: -0.303
-  #     y: -0.175
-  #   axis: 'Z'
-  #   radius: 0.1
+  num: 2
+  cyl0:
+    translation:
+      x: 0.
+      y: -0.5
+      z: 1.
+    axis: 'Z'
+    radius: 0.1
+    height: 2.0
+  cyl1:
+    translation: 
+      x: 0.
+      y: 0.5
+      z: 1.
+    axis: 'Z'
+    radius: 0.1
+    height: 2.0

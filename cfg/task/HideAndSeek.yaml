@@ -7,7 +7,7 @@ defaults:
   - /base/randomization_base@_here_
 
 env:
-  num_envs: 10
+  num_envs: 2048
   max_episode_length: 800
 
 drone_model: Crazyflie
@@ -22,7 +22,7 @@ time_encoding: true
 # flatten_obs: true
 # flatten_state: true
 
-action_transform: multidiscrete:4
+action_transform: rate
 
 # exp
 num_agents: 3
@@ -42,7 +42,7 @@ obstacle_control_fre: 20
 fixed_config: False # if True, only eval max_config
 use_collision: 1
 use_speed_penalty: 1
-catch_radius: 0.15
+catch_radius: 0.5
 collision_radius: 0.01
 use_dynamic: False
 

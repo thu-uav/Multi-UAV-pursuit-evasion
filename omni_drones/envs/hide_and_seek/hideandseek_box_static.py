@@ -691,10 +691,6 @@ class HideAndSeek_box_static(IsaacEnv):
             (self.progress_buf >= self.max_episode_length).unsqueeze(-1)
         )
         
-        # # TODO, update buffer
-        # if torch.any(self.progress_buf >= self.max_episode_length):
-        #     # check metric
-        #     pdb.set_trace()
         
         self.progress_std = torch.std(self.progress_buf)
 
