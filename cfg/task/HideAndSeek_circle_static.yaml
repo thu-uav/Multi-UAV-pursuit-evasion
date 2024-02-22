@@ -7,7 +7,7 @@ defaults:
   - /base/randomization_base@_here_
 
 env:
-  num_envs: 10
+  num_envs: 2048
   max_episode_length: 800
 
 drone_model: Crazyflie
@@ -35,6 +35,6 @@ collision_radius: 0.01
 use_dynamic: False
 
 cylinder:
-  size: 0.2
+  size: 0.1
   num: 8
   num_active: 0
