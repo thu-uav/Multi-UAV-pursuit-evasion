@@ -420,7 +420,7 @@ class PIDRateController(nn.Module):
         self.pid_kd = nn.Parameter(torch.tensor([2.5, 2.5, 0.0]))
         self.pid_ki = nn.Parameter(torch.tensor([500.0, 500.0, 16.7]))
         self.kff = nn.Parameter(torch.tensor([0.0, 0.0, 0.0]))
-        self.count = 0 # if = 0, integ, last_rate_error = 0.0
+        self.count = 0 # if = 0, integ, last_body_rate = 0.0
         self.iLimit = nn.Parameter(torch.tensor([33.3, 33.3, 166.7]))
         self.outputLimit = 0.0
 
@@ -457,7 +457,7 @@ class PIDRateController(nn.Module):
         self.pid_kd = nn.Parameter(torch.tensor(tunable_parameters['pid_kd'] + [0.0])) # set coeff_yaw = 0.0
         self.pid_ki = nn.Parameter(torch.tensor(tunable_parameters['pid_ki']))
         self.kff = nn.Parameter(torch.tensor([0.0, 0.0, 0.0]))
-        self.count = 0 # if = 0, integ, last_rate_error = 0.0
+        self.count = 0 # if = 0, integ, last_body_rate = 0.0
         self.iLimit = nn.Parameter(torch.tensor(tunable_parameters['iLimit']))
         self.outputLimit = 0.0
     
@@ -475,7 +475,7 @@ class PIDRateController(nn.Module):
         target_thrust = target_thrust.reshape(-1, 1)
         device = root_state.device
         if self.count == 0:
-            self.last_rate_error = torch.zeros(size=(batch_shape[0], 3)).to(device)
+            self.last_body_rate = torch.zeros(size=(batch_shape[0], 3)).to(device)
             self.integ = torch.zeros(size=(batch_shape[0], 3)).to(device)
         self.count += 1
 
@@ -487,7 +487,7 @@ class PIDRateController(nn.Module):
         # P
         outputP = rate_error * self.pid_kp.view(1, -1)
         # D
-        deriv = (rate_error - self.last_rate_error) / self.dt
+        deriv = -(body_rate - self.last_body_rate) / self.dt
         # TODO, w.o.lpf2pApply filter to deriv
         deriv[torch.isnan(deriv)] = 0.0
         outputD = deriv * self.pid_kd.view(1, -1)
@@ -496,19 +496,25 @@ class PIDRateController(nn.Module):
         self.integ = torch.clip(self.integ, -self.iLimit, self.iLimit)
         outputI = self.integ * self.pid_ki.view(1, -1)
         # kff
-        outputFF = body_rate * self.kff.view(1, -1)
+        outputFF = target_rate * self.kff.view(1, -1)
         
         output = outputP + outputD + outputI + outputFF
         # TODO, w.o.lpf2pApply filter to output
         output[torch.isnan(output)] = 0.0
         
-        # angacc_thrust = torch.cat([output, target_thrust], dim=1)
-        # cmd = (self.mixer @ angacc_thrust.T).T
-        # cmd = (cmd / self.max_thrusts) * 2 - 1
-        # cmd = cmd.reshape(*batch_shape, -1)
+        # output: r, p, y
+        r = output[:, 0] / 2.0
+        p = output[:, 1] / 2.0
+        y = output[:, 2]
+        m1 = target_thrust - r + p + y
+        m2 = target_thrust - r - p - y
+        m3 = target_thrust + r - p + y
+        m4 = target_thrust + r + p - y
+
+        cmd = torch.concat([m1,m2,m3,m4], dim=1) / 2**16 * 2 - 1
         
         # set last error
-        self.last_rate_error = rate_error.clone()
+        self.last_body_rate = body_rate.clone()
         return cmd
 
     def sim_step(
@@ -531,7 +537,7 @@ class PIDRateController(nn.Module):
         target_thrust = target_thrust.reshape(-1, 1)
         device = current_rate.device
         if self.count == 0:
-            self.last_rate_error = torch.zeros(size=(batch_shape[0], 3)).to(device)
+            self.last_body_rate = torch.zeros(size=(batch_shape[0], 3)).to(device)
             self.integ = torch.zeros(size=(batch_shape[0], 3)).to(device)
         self.count += 1
 
@@ -540,7 +546,7 @@ class PIDRateController(nn.Module):
         # P
         outputP = rate_error * self.pid_kp.view(1, -1)
         # D
-        deriv = (rate_error - self.last_rate_error) / self.dt
+        deriv = -(current_rate - self.last_body_rate) / self.dt
         # TODO, w.o.lpf2pApply filter to deriv
         deriv[torch.isnan(deriv)] = 0.0
         outputD = deriv * self.pid_kd.view(1, -1)
@@ -567,5 +573,5 @@ class PIDRateController(nn.Module):
         cmd = torch.concat([m1,m2,m3,m4], dim=1) / 2**16 * 2 - 1
         
         # set last error
-        self.last_rate_error = rate_error.clone()
+        self.last_body_rate = current_rate.clone()
         return cmd
