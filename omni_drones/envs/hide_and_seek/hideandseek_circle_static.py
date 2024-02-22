@@ -40,6 +40,13 @@ from .draw_circle import Float3, _COLOR_ACCENT, _carb_float3_add, draw_court_cir
 # drones on land by default
 # only cubes are available as walls
 
+class InerCurriculum(object):
+    """
+    Naive CL, use [catch_radius, speed_ratio, num_agents]
+    """
+    def __init__(self) -> None:
+        pass
+
 class CurriculumBuffer(object):
     def __init__(self,):
         self.eps = 1e-10
@@ -116,9 +123,9 @@ class CurriculumBuffer(object):
         result = zip(*sort_zipped)
         return [list(x) for x in result]
 
-def rejection_sampling(arena_size, num_agents, num_obj, device):
+def rejection_sampling(arena_size, cylinder_size, num_agents, num_obj, device):
     # set objects by rejection sampling
-    grid_size = 0.2
+    grid_size = 2 * cylinder_size
     matrix_size = int(2 * arena_size / grid_size)
     origin_grid = [matrix_size // 2 - 1, matrix_size // 2 - 1]
     occupancy_matrix = np.zeros((matrix_size, matrix_size))
@@ -363,6 +370,7 @@ class HideAndSeek_circle_static(IsaacEnv):
         self.num_agents = self.cfg.task.num_agents
         self.num_cylinders = self.cfg.task.cylinder.num
         self.num_active_cylinders = self.cfg.task.cylinder.num_active
+        self.cylinder_size = self.cfg.task.cylinder.size
         self.detect_range = self.cfg.task.detect_range
         self.size_min = self.cfg.task.size_min
         self.size_max = self.cfg.task.size_max
@@ -374,7 +382,8 @@ class HideAndSeek_circle_static(IsaacEnv):
         size = size_dist.sample().item()
 
         # for render
-        objects_pos = rejection_sampling(arena_size=size, 
+        objects_pos = rejection_sampling(arena_size=size,
+                                         cylinder_size=self.cylinder_size,
                                          num_agents=self.num_agents,
                                          num_obj=self.num_agents + self.num_cylinders + 1, 
                                          device=self.device)
@@ -398,18 +407,16 @@ class HideAndSeek_circle_static(IsaacEnv):
             name="target",
             translation=target_pos.unsqueeze(0),
             radius=0.05,
-            # height=0.1,
             color=torch.tensor([1., 0., 0.]),
             mass=1.0
         )
-
 
         self.cylinders_prims = [None] * self.num_cylinders
         self.cylinders_size = []
         for idx in range(self.num_cylinders):
             orientation = None
-            attributes = {'axis': 'z', 'radius': 0.1, 'height': 2 * size}
-            self.cylinders_size.append(0.1)
+            attributes = {'axis': 'z', 'radius': self.cylinder_size, 'height': 2 * size}
+            self.cylinders_size.append(self.cylinder_size)
             self.cylinders_prims[idx] = create_obstacle(
                 "/World/envs/env_0/cylinder_{}".format(idx), 
                 prim_type="Cylinder",
@@ -495,6 +502,7 @@ class HideAndSeek_circle_static(IsaacEnv):
             
             # set objects by rejection sampling        
             objects_pos = rejection_sampling(arena_size=size,
+                                             cylinder_size=self.cylinder_size,
                                              num_agents=self.num_agents,
                                              num_obj=self.num_agents + self.num_cylinders + 1,
                                              device=self.device)
