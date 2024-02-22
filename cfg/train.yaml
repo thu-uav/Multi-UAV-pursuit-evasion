@@ -20,12 +20,12 @@ seed: 0
 
 viewer:
   resolution: [960, 720]
-  # # up
-  # eye: [1., 0., 6.]
-  # lookat: [0., 0., 2.]
-  # front
-  eye: [4., 0., 4.]
-  lookat: [0., 0., 1.]
+  # up
+  eye: [1., 0., 6.]
+  lookat: [0., 0., 2.]
+  # # front
+  # eye: [4., 0., 4.]
+  # lookat: [0., 0., 1.]
 
 wandb:
   group: ${oc.select:..task.name}

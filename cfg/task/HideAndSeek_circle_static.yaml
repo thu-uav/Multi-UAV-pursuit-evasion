@@ -35,6 +35,6 @@ collision_radius: 0.01
 use_dynamic: False
 
 cylinder:
-  size: 0.1
+  size: 0.2
   num: 8
-  num_active: 0
+  num_active: 8
