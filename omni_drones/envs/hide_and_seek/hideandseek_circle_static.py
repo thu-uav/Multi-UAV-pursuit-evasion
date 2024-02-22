@@ -116,6 +116,49 @@ class CurriculumBuffer(object):
         result = zip(*sort_zipped)
         return [list(x) for x in result]
 
+def rejection_sampling(arena_size, num_agents, num_obj, device):
+    # set objects by rejection sampling
+    grid_size = 0.2
+    matrix_size = int(2 * arena_size / grid_size)
+    origin_grid = [matrix_size // 2 - 1, matrix_size // 2 - 1]
+    occupancy_matrix = np.zeros((matrix_size, matrix_size))
+    # pos dist
+    angle_dist = D.Uniform(
+        torch.tensor([0.0], device=device),
+        torch.tensor([2 * torch.pi], device=device)
+    )
+    r_dist = D.Uniform(
+        torch.tensor([0.0], device=device),
+        torch.tensor([arena_size - 0.2], device=device)
+    )
+    objects_pos = []
+    for obj_idx in range(num_obj):
+        while True:
+            # Generate random angle and radius within the circular area
+            angle = angle_dist.sample()
+            r = r_dist.sample()
+
+            # Convert polar coordinates to Cartesian coordinates
+            x = r * torch.cos(angle)
+            y = r * torch.sin(angle)
+
+            # Convert coordinates to grid units
+            x_grid = int(x / grid_size) + origin_grid[0]
+            y_grid = int(y / grid_size) + origin_grid[1]
+
+            # Check if the new object overlaps with existing objects
+            if x_grid >= 0 and x_grid < matrix_size and y_grid >= 0 and y_grid < matrix_size:
+                if occupancy_matrix[x_grid, y_grid] == 0:
+                    if obj_idx >= num_agents + 1: # cylinders
+                        objects_pos.append(torch.tensor([x, y, 1.0], device=device))
+                    else:
+                        objects_pos.append(torch.tensor([x, y, 0.1], device=device))
+                    occupancy_matrix[x_grid, y_grid] = 1
+                    break
+
+    objects_pos = torch.stack(objects_pos)
+    return objects_pos
+
 class HideAndSeek_circle_static(IsaacEnv): 
     """
     HideAndSeek environment designed for curriculum learning.
@@ -323,62 +366,50 @@ class HideAndSeek_circle_static(IsaacEnv):
         self.size_min = self.cfg.task.size_min
         self.size_max = self.cfg.task.size_max
 
-        # init drone
-        drone_model = MultirotorBase.REGISTRY[self.cfg.task.drone_model]
-        cfg = drone_model.cfg_cls(force_sensor=self.cfg.task.force_sensor)
-        cfg.rigid_props.max_linear_velocity = self.cfg.task.v_drone
-        self.drone: MultirotorBase = drone_model(cfg=cfg)
-
-        translation = torch.zeros(self.num_agents, 3)
-        translation[:, 0] = torch.arange(self.num_agents)
-        translation[:, 1] = torch.arange(self.num_agents)
-        translation[:, 2] = 0.5
-        self.drone.spawn(translation)
-        
-        # init prey
-        self.target_pos = torch.tensor([[0., 0.05, 0.5]], device=self.device)
-        objects.DynamicSphere(
-            prim_path="/World/envs/env_0/target",
-            name="target",
-            translation=self.target_pos,
-            radius=0.05,
-            # height=0.1,
-            color=torch.tensor([1., 0., 0.]),
-            mass=1.0
-        )
-
         size_dist = D.Uniform(
             torch.tensor([self.size_min], device=self.device),
             torch.tensor([self.size_max], device=self.device)
         )
         size = size_dist.sample().item()
 
-        # pos dist
-        angle_dist = D.Uniform(
-            torch.tensor([0.0], device=self.device),
-            torch.tensor([2 * torch.pi], device=self.device)
+        # for render
+        objects_pos = rejection_sampling(arena_size=size, 
+                                         num_agents=self.num_agents,
+                                         num_obj=self.num_agents + self.num_cylinders + 1, 
+                                         device=self.device)
+        drone_pos = objects_pos[:self.num_agents]
+        target_pos = objects_pos[self.num_agents]
+        cylinder_pos = objects_pos[self.num_agents + 1:]
+
+        # init drone
+        drone_model = MultirotorBase.REGISTRY[self.cfg.task.drone_model]
+        cfg = drone_model.cfg_cls(force_sensor=self.cfg.task.force_sensor)
+        cfg.rigid_props.max_linear_velocity = self.cfg.task.v_drone
+        self.drone: MultirotorBase = drone_model(cfg=cfg)
+        self.drone.spawn(drone_pos)
+        
+        # init prey
+        objects.DynamicSphere(
+            prim_path="/World/envs/env_0/target",
+            name="target",
+            translation=target_pos.unsqueeze(0),
+            radius=0.05,
+            # height=0.1,
+            color=torch.tensor([1., 0., 0.]),
+            mass=1.0
         )
-        r_dist = D.Uniform(
-            torch.tensor([0.0], device=self.device),
-            torch.tensor([size - 0.15], device=self.device)
-        )
-        angle = angle_dist.sample((1, self.num_cylinders))
-        r = r_dist.sample((1, self.num_cylinders))
-        x = r * torch.cos(angle)
-        y = r * torch.sin(angle)
-        z = torch.ones_like(x)
-        cylinders_trans = torch.concat([x, y, z], dim=-1)
+
+
         self.cylinders_prims = [None] * self.num_cylinders
         self.cylinders_size = []
         for idx in range(self.num_cylinders):
-            # cyl = self.cfg.task.cylinder['cyl{}'.format(idx)]
             orientation = None
             attributes = {'axis': 'z', 'radius': 0.1, 'height': 2 * size}
             self.cylinders_size.append(0.1)
             self.cylinders_prims[idx] = create_obstacle(
                 "/World/envs/env_0/cylinder_{}".format(idx), 
                 prim_type="Cylinder",
-                translation=cylinders_trans[0, idx],
+                translation=cylinder_pos[idx],
                 orientation=orientation,
                 attributes=attributes
             ) # Use 'self.cylinders_prims[0].GetAttribute('radius').Get()' to get attributes
@@ -457,46 +488,11 @@ class HideAndSeek_circle_static(IsaacEnv):
             self.v_prey.append(prey_speed)
             self.size_list.append(size)
             
-            # pos dist
-            angle_dist = D.Uniform(
-                torch.tensor([0.0], device=self.device),
-                torch.tensor([2 * torch.pi], device=self.device)
-            )
-            r_dist = D.Uniform(
-                torch.tensor([0.0], device=self.device),
-                torch.tensor([size - 0.15], device=self.device)
-            )
-
-            # set objects by rejection sampling
-            grid_size = 0.2
-            matrix_size = int(size / grid_size)
-            occupancy_matrix = np.zeros((matrix_size, matrix_size))
-            objects_pos = []
-            for obj_idx in range(self.num_agents + 1 + self.num_cylinders):
-                while True:
-                    # Generate random angle and radius within the circular area
-                    angle = angle_dist.sample()
-                    r = r_dist.sample()
-
-                    # Convert polar coordinates to Cartesian coordinates
-                    x = r * torch.cos(angle)
-                    y = r * torch.sin(angle)
-
-                    # Convert coordinates to grid units
-                    x_grid = int(x / grid_size)
-                    y_grid = int(y / grid_size)
-
-                    # Check if the new object overlaps with existing objects
-                    if x_grid >= 0 and x_grid < matrix_size and y_grid >= 0 and y_grid < matrix_size:
-                        if occupancy_matrix[x_grid, y_grid] == 0:
-                            if obj_idx >= self.num_agents + 1: # cylinders
-                                objects_pos.append(torch.tensor([x, y, 1.0], device=self.device))
-                            else:
-                                objects_pos.append(torch.tensor([x, y, 0.0], device=self.device))
-                            occupancy_matrix[x_grid, y_grid] = 1
-                            break
-        
-            objects_pos = torch.stack(objects_pos)
+            # set objects by rejection sampling        
+            objects_pos = rejection_sampling(arena_size=size,
+                                             num_agents=self.num_agents,
+                                             num_obj=self.num_agents + self.num_cylinders + 1,
+                                             device=self.device)
             drone_pos.append(objects_pos[:self.num_agents])
             target_pos.append(objects_pos[self.num_agents])
             cylinder_pos.append(objects_pos[self.num_agents + 1:])

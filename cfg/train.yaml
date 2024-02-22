@@ -29,7 +29,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: size1_0_vel1_3_catch0_5_circle_static_valuenorm1
+  # run_name: size1_0_vel1_3_catch0_5_cylinder1
   run_name: 4agent_debug
   job_type: train
   entity: chenjy
