@@ -362,6 +362,7 @@ class HideAndSeek_circle_static(IsaacEnv):
     def _design_scene(self):
         self.num_agents = self.cfg.task.num_agents
         self.num_cylinders = self.cfg.task.cylinder.num
+        self.num_active_cylinders = self.cfg.task.cylinder.num_active
         self.detect_range = self.cfg.task.detect_range
         self.size_min = self.cfg.task.size_min
         self.size_max = self.cfg.task.size_max
@@ -380,6 +381,9 @@ class HideAndSeek_circle_static(IsaacEnv):
         drone_pos = objects_pos[:self.num_agents]
         target_pos = objects_pos[self.num_agents]
         cylinder_pos = objects_pos[self.num_agents + 1:]
+        num_inactive = self.num_cylinders - self.num_active_cylinders
+        for inactive_idx in range(num_inactive):
+            cylinder_pos[inactive_idx + self.num_active_cylinders, 2] = -1.0
 
         # init drone
         drone_model = MultirotorBase.REGISTRY[self.cfg.task.drone_model]
@@ -472,6 +476,7 @@ class HideAndSeek_circle_static(IsaacEnv):
         target_pos = []
         self.v_prey = []
         self.size_list = []
+        self.cylinders_mask = []
         # reset size
         for idx in range(n_envs):            
             if initial_states[idx] is not None:
@@ -495,7 +500,16 @@ class HideAndSeek_circle_static(IsaacEnv):
                                              device=self.device)
             drone_pos.append(objects_pos[:self.num_agents])
             target_pos.append(objects_pos[self.num_agents])
-            cylinder_pos.append(objects_pos[self.num_agents + 1:])
+            # TODO: adapt to CL
+            num_inactive = self.num_cylinders - self.num_active_cylinders
+            temp_cylinder_pos = objects_pos[self.num_agents + 1:]
+            for inactive_idx in range(num_inactive):
+                temp_cylinder_pos[inactive_idx + self.num_active_cylinders, 2] = -1.0
+            cylinder_pos.append(temp_cylinder_pos)
+            # TODO: adapt to CL
+            cylinder_mask_one = torch.ones(self.num_cylinders, device=self.device)
+            cylinder_mask_one[self.num_active_cylinders:] = 0.0
+            self.cylinders_mask.append(cylinder_mask_one)
 
             if idx == self.central_env_idx and self._should_render(0):
                 self._draw_court_circle(size)
@@ -505,6 +519,7 @@ class HideAndSeek_circle_static(IsaacEnv):
         cylinder_pos = torch.stack(cylinder_pos, dim=0).type(torch.float32)
         self.v_prey = torch.Tensor(np.array(self.v_prey)).to(self.device)
         self.size_list = torch.Tensor(np.array(self.size_list)).to(self.device)
+        self.cylinders_mask = torch.stack(self.cylinders_mask, dim=0).type(torch.float32) # 1 means active, 0 means inactive
         # set position and velocity
         self.drone.set_world_poses(
             drone_pos + self.envs_positions[env_ids].unsqueeze(1), rot[env_ids], env_ids
@@ -673,11 +688,12 @@ class HideAndSeek_circle_static(IsaacEnv):
         else:
             cylinders_mask = torch.norm(cylinders_mdist, dim=-1) > self.detect_range
             cylinders_mask = cylinders_mask.all(1).unsqueeze(1).expand_as(cylinders_mask)
+            # add physical mask, for inactive cylinders
+            cylinders_inactive_mask = ~ self.cylinders_mask.unsqueeze(1).expand(-1, self.num_agents, -1).type(torch.bool)
+            cylinders_mask = cylinders_mask + cylinders_inactive_mask
         cylinders_smask = cylinders_mask.unsqueeze(-1).expand(-1, -1, -1, 5)
         cylinders_state_masked = cylinders_state.clone()
-        # cylinders_state_masked[cylinders_smask] = 0.0
         cylinders_state_masked.masked_fill_(cylinders_smask, self.mask_value)
-        # cylinders_state_masked = masked_tensor(cylinders_state, cylinders_smask)
         obs["cylinders"] = cylinders_state_masked
 
         state = TensorDict({}, [self.num_envs])
@@ -731,7 +747,7 @@ class HideAndSeek_circle_static(IsaacEnv):
         coll_reward = torch.zeros(self.num_envs, self.num_agents, device=self.device)
         
         cylinder_pos, _ = self.cylinders.get_world_poses()
-        for i in range(self.num_cylinders):
+        for i in range(self.num_active_cylinders):
             relative_pos = drone_pos[..., :2] - cylinder_pos[:, i, :2].unsqueeze(-2)
             norm_r = torch.norm(relative_pos, dim=-1)
             if_coll = (norm_r < (self.collision_radius + self.cylinders_size[i])).type(torch.float32)
