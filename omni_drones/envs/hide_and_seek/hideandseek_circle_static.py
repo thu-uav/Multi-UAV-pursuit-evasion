@@ -40,12 +40,54 @@ from .draw_circle import Float3, _COLOR_ACCENT, _carb_float3_add, draw_court_cir
 # drones on land by default
 # only cubes are available as walls
 
-class InerCurriculum(object):
+class InnerCurriculum(object):
     """
     Naive CL, use [catch_radius, speed_ratio, num_agents]
     """
     def __init__(self) -> None:
-        pass
+        self.start_catch_radius = 0.5
+        self.start_speed = 1.3
+        # self.start_num_agents = 4
+        
+    def set_target_task(self, **kwargs):
+        self.end_catch_radius = kwargs['catch_radius']
+        self.end_speed = kwargs['speed']
+        step_catch = (self.end_catch_radius - self.start_catch_radius) / 5
+        step_speed = (self.end_speed - self.start_speed) / 5
+        # self.end_num_agents = kwargs['num_agents']
+        self.training_order = []
+        self.training_phase = 0
+        training_catch_radius = np.arange(self.start_catch_radius, \
+                                        self.end_catch_radius + step_catch, \
+                                        step_catch)
+        training_speed = np.arange(self.start_speed, \
+                                        self.end_speed + step_speed, \
+                                        step_speed)
+        # training_num_agents = np.linspace(self.start_num_agents, 
+        #                                   self.end_num_agents, 
+        #                                   self.end_num_agents - self.start_num_agents, dtype=int)
+
+        catch_idx = 0
+        speed_idx = 0
+        num_agents_idx = 0
+        # while (num_agents_idx < training_num_agents.shape[0]):
+        while (speed_idx < training_speed.shape[0]):
+            while (catch_idx < training_catch_radius.shape[0]):
+                self.training_order.append([training_catch_radius[catch_idx], \
+                                            training_speed[speed_idx]
+                                            ])
+                catch_idx += 1
+            catch_idx = training_catch_radius.shape[0] - 1
+            self.training_order.append([training_catch_radius[catch_idx], \
+                            training_speed[speed_idx]
+                            ])
+            speed_idx += 1
+        speed_idx = training_speed.shape[0] - 1
+ 
+    def get_training_task(self):
+        current_phase = self.training_order[min(len(self.training_order), self.training_phase)]
+        self.training_phase += 1
+        return current_phase
 
 class CurriculumBuffer(object):
     def __init__(self,):
@@ -262,36 +304,12 @@ class HideAndSeek_circle_static(IsaacEnv):
         self.mask_value = -1.0
 
         # CL
-        self.curriculum_buffer = CurriculumBuffer()
-        self.sigma_min = 0.5
-        self.sigma_max = 0.95
-        self.prob_curriculum = self.cfg.prob_curriculum
-        self.prob_decay = self.cfg.prob_decay
-        self.set_train = True
-        self.update_iter = 0
-        self.max_iters = self.cfg.max_iters
-        self.use_dynamic = self.cfg.task.use_dynamic
-        self.fixed_config = self.cfg.task.fixed_config
-        
-        # init task_space
-        speed_num = 1 if self.v_low == self.v_high else 5
-        task_speed = np.linspace(start = self.v_low, stop = self.v_high, num = speed_num, endpoint=True)
-        self.curriculum_buffer._task_space['speed'] = task_speed
-        
-        size_num = 1 if self.size_min == self.size_max else 5
-        task_size = np.linspace(start = self.size_min, stop = self.size_max, num = size_num, endpoint=True)
-        self.curriculum_buffer._task_space['size'] = task_size
- 
-        self.task_space_len = (speed_num - 1) * (size_num - 1)
-        if self.task_space_len == 0:
-            self.task_space_len = 1
-                    
-        # init phase
-        start_speed, start_size = self.v_low, self.size_min
-        self.curriculum_buffer.insert(np.array([[start_speed, start_size]]))
-        self.curriculum_buffer.update_states()
-        weights = np.ones(len(self.curriculum_buffer._state_buffer), dtype=np.float32)
-        self.curriculum_buffer.update_weights(weights)
+        self.curriculum_module = InnerCurriculum()
+        self.curriculum_module.set_target_task(
+            catch_radius=self.catch_radius,
+            speed=self.v_high,
+            num_agents=self.num_agents
+            )
         
         self.draw = _debug_draw.acquire_debug_draw_interface()
 
