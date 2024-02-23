@@ -13,6 +13,7 @@ from omni_drones import init_simulation_app
 from tensordict import TensorDict
 import pandas as pd
 import pdb
+import quaternion
 import numpy as np
 import yaml
 from skopt import Optimizer
@@ -23,9 +24,26 @@ import numpy as np
 rosbags = [
     # '/home/jiayu/OmniDrones/realdata/crazyflie/train_figure8.csv',
     # '/home/jiayu/OmniDrones/realdata/crazyflie/cf1_figure8.csv',
-    '/home/jiayu/OmniDrones/realdata/crazyflie/cf7_figure8.csv',
+    '/home/jingjie/Downloads/OmniDrones-sim2real_final/realdata/crazyflie/cf9_figure8.csv',
     # '/home/jiayu/OmniDrones/realdata/crazyflie/cf9_figure8.csv',
 ]
+
+def quat_diff(quat_last, quat, dt):
+    omega_x = 0
+    omega_y = 0
+    omega_z = 0        
+    if quat_last is not None:
+        quat_err = quat_last.inverse() * quat
+        if quat_err.w >= 0:
+            scale =  2.0
+        else:
+            scale = -2.0
+        omega_x = scale * quat_err.x / dt
+        omega_y = scale * quat_err.y / dt
+        omega_z = scale * quat_err.z / dt
+    quat_last = quat
+
+    return omega_x, omega_y, omega_z
 
 @hydra.main(version_base=None, config_path=".", config_name="real2sim")
 def main(cfg):
@@ -176,6 +194,9 @@ def main(cfg):
 
     use_real_action = False
     trajectory_len = real_data.shape[0] - 1
+
+    quat_last = None
+    sim_quat_last = None
     
     for i in range(trajectory_len):
         real_pos = torch.tensor(real_data[i, :, 1:4])
@@ -199,16 +220,33 @@ def main(cfg):
         real_body_rate_list.append(real_next_rate.numpy())
         real_angvel_list.append(real_ang_vel.numpy())
 
-        drone_state = drone.get_state()[..., :13].reshape(-1, 13)
+        drone_state = drone.get_state()[..., :13].squeeze(0)
         # get current_rate
         pos, rot, linvel, angvel = drone_state.split([3, 4, 3, 3], dim=1)
-        current_rate = quat_rotate_inverse(rot, angvel)
+
+        angvel = torch.zeros_like(angvel)
+        quat = np.quaternion(rot[0, 0].item(), rot[0, 1].item(), rot[0, 2].item(), rot[0, 3].item())
+        if quat_last is not None:
+            angvel_x, \
+            angvel_y, \
+            angvel_z  \
+                = quat_diff(quat_last, quat, 0.02)
+        else:
+            angvel_x = 0
+            angvel_y = 0
+            angvel_z = 0
+        quat_last = quat
+        angvel[0, 0] = angvel_x
+        angvel[0, 1] = angvel_y
+        angvel[0, 2] = angvel_z
+        current_rate = angvel
+
         target_thrust = torch.tensor(real_data[i, :, 26]).to(device=sim.device).float()
         target_rate = torch.tensor(real_data[i, :, 23:26]).to(device=sim.device).float()
         real_rate = real_rate.to(device=sim.device).float()
         real_next_rate = real_next_rate.to(device=sim.device).float()
         # target_rate[:, 1] = -target_rate[:, 1]
-        current_rate[:, 1] = -current_rate[:, 1]
+        current_rate[:, 1] = current_rate[:, 1]
         action = controller.sim_step(
             current_rate=current_rate,
             target_rate=target_rate / 180 * torch.pi,
@@ -240,7 +278,23 @@ def main(cfg):
         sim_quat = sim_state[..., 3:7]
         sim_vel = sim_state[..., 7:10]
         sim_omega = sim_state[..., 10:13]
-        next_body_rate = quat_rotate_inverse(sim_quat, sim_omega)
+
+        sim_omega = torch.zeros_like(sim_omega)
+        sim_q = np.quaternion(sim_quat[0, 0].item(), sim_quat[0, 1].item(), sim_quat[0, 2].item(), sim_quat[0, 3].item())
+        if sim_quat_last is not None:
+            sim_omega_x, \
+            sim_omega_y, \
+            sim_omega_z  \
+                = quat_diff(sim_quat_last, sim_q, 0.02)
+        else:
+            sim_omega_x = 0
+            sim_omega_y = 0
+            sim_omega_z = 0
+        sim_quat_last = sim_q
+        sim_omega[0, 0] = sim_omega_x
+        sim_omega[0, 1] = sim_omega_y
+        sim_omega[0, 2] = sim_omega_z
+        next_body_rate = sim_omega
 
         sim_pos_list.append(sim_pos.cpu().detach().numpy())
         sim_quat_list.append(sim_quat.cpu().detach().numpy())
@@ -439,7 +493,7 @@ def main(cfg):
     axs[5, 0].legend()
     # body rate y error
     axs[5, 1].scatter(steps[:], sim_body_rate_list[:, 0, 1], s=5, c='red', label='sim')
-    axs[5, 1].scatter(steps[:], target_body_rate_list[:, 0, 1], s=5, c='green', label='target')
+    axs[5, 1].scatter(steps[:], -target_body_rate_list[:, 0, 1], s=5, c='green', label='target')
     axs[5, 1].set_xlabel('steps')
     axs[5, 1].set_ylabel('rad/s')
     axs[5, 1].set_title('sim/target_bodyratey')
@@ -451,6 +505,7 @@ def main(cfg):
     axs[5, 2].set_ylabel('rad/s')
     axs[5, 2].set_title('sim/target_bodyratez')
     axs[5, 2].legend()
+    target_body_rate_list[:, 0, 1] = -target_body_rate_list[:, 0, 1]
     target_bodyrate_error = np.square(sim_body_rate_list - target_body_rate_list)
     # print('sim_target/Bodyratex_error', np.mean(target_bodyrate_error, axis=0)[0,0])
     # print('sim_target/Bodyratey_error', np.mean(target_bodyrate_error, axis=0)[0,1])
