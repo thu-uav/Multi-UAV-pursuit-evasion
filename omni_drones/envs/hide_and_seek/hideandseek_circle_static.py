@@ -714,9 +714,9 @@ class HideAndSeek_circle_static(IsaacEnv):
         else:
             cylinders_mask = torch.norm(cylinders_mdist, dim=-1) > self.detect_range
             cylinders_mask = cylinders_mask.all(1).unsqueeze(1).expand_as(cylinders_mask)
-            # add physical mask, for inactive cylinders
-            cylinders_inactive_mask = ~ self.cylinders_mask.unsqueeze(1).expand(-1, self.num_agents, -1).type(torch.bool)
-            cylinders_mask = cylinders_mask + cylinders_inactive_mask
+        # add physical mask, for inactive cylinders
+        cylinders_inactive_mask = ~ self.cylinders_mask.unsqueeze(1).expand(-1, self.num_agents, -1).type(torch.bool)
+        cylinders_mask = cylinders_mask + cylinders_inactive_mask
         cylinders_smask = cylinders_mask.unsqueeze(-1).expand(-1, -1, -1, 5)
         cylinders_state_masked = cylinders_state.clone()
         cylinders_state_masked.masked_fill_(cylinders_smask, self.mask_value)
@@ -839,6 +839,8 @@ class HideAndSeek_circle_static(IsaacEnv):
         dist_pos = torch.norm(prey_pos[..., :3] - cylinder_pos[..., :3],dim=-1).unsqueeze(-1).expand(-1, -1, 3) # expand to 3-D
         direction_c = (prey_pos[..., :3] - cylinder_pos[..., :3]) / (dist_pos + 1e-5)
         force_c = direction_c * (1 / (dist_pos + 1e-5))
+        cylinder_force_mask = self.cylinders_mask.unsqueeze(-1).expand(-1, -1, 3)
+        force_c = force_c * cylinder_force_mask
         force[..., :3] += torch.sum(force_c, dim=1)
 
         # set force_z to 0
