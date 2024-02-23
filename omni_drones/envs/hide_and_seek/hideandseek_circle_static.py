@@ -322,10 +322,6 @@ class HideAndSeek_circle_static(IsaacEnv):
         size = self.arena_size
 
         # drone pos
-        # drone_pos_dist = D.Uniform(
-        #     torch.tensor([-0.7 * size, -0.7 * size, 0.1], device=self.device),
-        #     torch.tensor([-0.3 * size, -0.3 * size, 0.1], device=self.device)
-        # )
         drone_pos_dist = D.Uniform(
             torch.tensor([-size, -size, 0.1], device=self.device),
             torch.tensor([size, size, 0.1], device=self.device)
@@ -432,15 +428,14 @@ class HideAndSeek_circle_static(IsaacEnv):
         self.cylinders_mask = []
         # reset size
         for idx in range(n_envs):
-            # drone pos
-            # drone_pos_dist = D.Uniform(
-            #     torch.tensor([-0.7 * size, -0.7 * size, 0.1], device=self.device),
-            #     torch.tensor([-0.3 * size, -0.3 * size, 0.1], device=self.device)
-            # )
             size = self.arena_size
+            # drone_pos_dist = D.Uniform(
+            #     torch.tensor([-size, -size, 0.1], device=self.device),
+            #     torch.tensor([size, size, 0.1], device=self.device)
+            # )
             drone_pos_dist = D.Uniform(
                 torch.tensor([-size, -size, 0.1], device=self.device),
-                torch.tensor([size, size, 0.1], device=self.device)
+                torch.tensor([size, size, 2 * size], device=self.device)
             )
             drone_pos.append((drone_pos_dist.sample((1,n))).squeeze(0))
             
@@ -453,11 +448,16 @@ class HideAndSeek_circle_static(IsaacEnv):
                 torch.tensor([0.0], device=self.device),
                 torch.tensor([size - 0.2], device=self.device)
             )
+            z_dist = D.Uniform(
+                torch.tensor([0.1], device=self.device),
+                torch.tensor([2 * size - 0.1], device=self.device)
+            )
             target_angle = angle_dist.sample()
             target_r = r_dist.sample()
+            target_z = z_dist.sample()
             target_pos.append(
                 torch.tensor([target_r * torch.cos(target_angle), \
-                    target_r * torch.sin(target_angle), 0.1], device=self.device)
+                    target_r * torch.sin(target_angle), target_z], device=self.device)
             )
             
             # set objects by rejection sampling        
