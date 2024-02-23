@@ -304,12 +304,13 @@ class HideAndSeek_circle_static(IsaacEnv):
         self.mask_value = -1.0
 
         # CL
+        self.set_train = True
         self.curriculum_module = InnerCurriculum()
-        self.curriculum_module.set_target_task(
-            catch_radius=self.catch_radius,
-            speed=self.v_high,
-            num_agents=self.num_agents
-            )
+        # self.curriculum_module.set_target_task(
+        #     catch_radius=self.catch_radius,
+        #     speed=self.v_high,
+        #     num_agents=self.num_agents
+        #     )
         
         self.draw = _debug_draw.acquire_debug_draw_interface()
 
@@ -362,7 +363,7 @@ class HideAndSeek_circle_static(IsaacEnv):
             "capture": UnboundedContinuousTensorSpec(1),
             "capture_episode": UnboundedContinuousTensorSpec(1),
             "capture_per_step": UnboundedContinuousTensorSpec(1),
-            "cover_rate": UnboundedContinuousTensorSpec(1),
+            # "cover_rate": UnboundedContinuousTensorSpec(1),
             "p": UnboundedContinuousTensorSpec(1),
             "return": UnboundedContinuousTensorSpec(1),
             "drone1_speed_per_step": UnboundedContinuousTensorSpec(1),
@@ -397,9 +398,13 @@ class HideAndSeek_circle_static(IsaacEnv):
         size = size_dist.sample().item()
 
         # drone pos
+        # drone_pos_dist = D.Uniform(
+        #     torch.tensor([-0.7 * size, -0.7 * size, 0.1], device=self.device),
+        #     torch.tensor([-0.3 * size, -0.3 * size, 0.1], device=self.device)
+        # )
         drone_pos_dist = D.Uniform(
-            torch.tensor([-0.7 * size, -0.7 * size, 0.1], device=self.device),
-            torch.tensor([-0.3 * size, -0.3 * size, 0.1], device=self.device)
+            torch.tensor([-size, -size, 0.1], device=self.device),
+            torch.tensor([size, size, 0.1], device=self.device)
         )
         drone_pos = (drone_pos_dist.sample((1, self.num_agents))).squeeze(0)
         # target pos
@@ -485,27 +490,11 @@ class HideAndSeek_circle_static(IsaacEnv):
 
         # CL : training distribution
         if self.set_train:
-            sample_p = max(0.0, self.prob_curriculum * (1 - self.prob_decay * self.update_iter / self.max_iters))
-            # sample_p = self.prob_curriculum
-            self.stats['p'] = sample_p * torch.ones(size=(self.num_envs,1)).to(self.device)
-            use_curriculum = (np.random.uniform(size=self.num_envs) < sample_p)
-            set_idx = np.arange(self.num_envs)[use_curriculum]
-            initial_states = self.curriculum_buffer.sample(len(set_idx))
-            initial_states += [None] * (self.num_envs - len(set_idx))
-            self.eval_num_envs = self.num_envs // self.task_space_len if self.task_space_len > 0 else self.num_envs
+            initial_states = [None] * self.num_envs
+            self.eval_num_envs = self.num_envs
         else:
-            if self.use_dynamic:
-                self.eval_num_envs = self.num_envs // self.task_space_len if self.task_space_len > 0 else self.num_envs
-                initial_states = [np.array([self.v_low, self.size_min])] * self.num_envs
-            else:
-                if self.fixed_config:
-                    self.eval_num_envs = self.num_envs // self.task_space_len if self.task_space_len > 0 else self.num_envs
-                    initial_states = [np.array([self.v_high, self.size_max])] * self.num_envs
-                else:
-                    self.eval_num_envs = self.num_envs // self.task_space_len if self.task_space_len > 0 else self.num_envs
-                    self.initial_states = self.curriculum_buffer.get_eval_task(eval_num_envs=self.eval_num_envs)
-                    initial_states = self.initial_states.tolist()
-                    initial_states += [None] * (self.num_envs - len(initial_states))
+            self.eval_num_envs = self.num_envs
+            initial_states = [np.array([self.v_high, self.size_max])] * self.num_envs
 
         n_envs = len(env_ids)
         drone_pos = []
@@ -520,20 +509,20 @@ class HideAndSeek_circle_static(IsaacEnv):
                 prey_speed = initial_states[idx][0]
                 size = initial_states[idx][1]
             else:
-                if self.fixed_config:
-                    prey_speed = self.v_high
-                    size = self.size_max
-                else:
-                    prey_speed = np.random.uniform(self.v_low, self.v_high)
-                    size = self.size_dist.sample().item()
+                prey_speed = self.v_high
+                size = self.size_max
             
             self.v_prey.append(prey_speed)
             self.size_list.append(size)
                         
             # drone pos
+            # drone_pos_dist = D.Uniform(
+            #     torch.tensor([-0.7 * size, -0.7 * size, 0.1], device=self.device),
+            #     torch.tensor([-0.3 * size, -0.3 * size, 0.1], device=self.device)
+            # )
             drone_pos_dist = D.Uniform(
-                torch.tensor([-0.7 * size, -0.7 * size, 0.1], device=self.device),
-                torch.tensor([-0.3 * size, -0.3 * size, 0.1], device=self.device)
+                torch.tensor([-size, -size, 0.1], device=self.device),
+                torch.tensor([size, size, 0.1], device=self.device)
             )
             drone_pos.append((drone_pos_dist.sample((1,n))).squeeze(0))
             
@@ -604,27 +593,7 @@ class HideAndSeek_circle_static(IsaacEnv):
         # reset stats
         self.stats[env_ids] = 0.   
 
-    def _update_curriculum(self, capture):
-        capture = capture.reshape(self.task_space_len,-1) # [eval_num_envs, task_space_len]
-        capture = np.mean(capture, axis=1) # [task_space_len]
-        eval_tasks = self.initial_states.reshape(self.task_space_len, self.eval_num_envs, -1)
-        for capture_idx in range(len(capture)):
-            print('task', eval_tasks[capture_idx][0], 'capture', capture[capture_idx])
-            if capture[capture_idx] >= self.sigma_min and capture[capture_idx] <= self.sigma_max:
-                self.curriculum_buffer.insert(np.array(eval_tasks[capture_idx][0])[np.newaxis,:])
-        # eval and save tasks into CL buffer
-        self.curriculum_buffer.update_states()
-        weights = np.ones(len(self.curriculum_buffer._state_buffer), dtype=np.float32)
-        self.curriculum_buffer.update_weights(np.array(weights))
-
     def _pre_sim_step(self, tensordict: TensorDictBase):
-        if self.use_dynamic:
-            if self.step_spec == self.max_episode_length // 2:
-                self.v_prey = [self.v_high] * self.num_envs
-                self.size_list = [self.size_max] * self.num_envs
-                self.v_prey = torch.Tensor(np.array(self.v_prey)).to(self.device)
-                self.size_list = torch.Tensor(np.array(self.size_list)).to(self.device)
-        
         self.step_spec += 1
         actions = tensordict[("agents", "action")]
         self.effort = self.drone.apply_action(actions)
@@ -785,9 +754,9 @@ class HideAndSeek_circle_static(IsaacEnv):
         capture_flag = (target_dist < self.catch_radius)
         self.stats['capture_episode'].add_(torch.sum(capture_flag, dim=1).unsqueeze(-1))
         self.stats['capture'].set_(torch.from_numpy(self.stats['capture_episode'].to('cpu').numpy() > 0.0).type(torch.float32).to(self.device))
-        capture_eval = self.stats['capture'].reshape(self.task_space_len, self.eval_num_envs, -1)
-        capture_eval = capture_eval.mean(dim=1)
-        self.stats['cover_rate'].set_((torch.sum(capture_eval >= 0.95) / self.task_space_len).unsqueeze(-1).expand_as(self.stats['capture']))
+        # capture_eval = self.stats['capture'].reshape(self.task_space_len, self.eval_num_envs, -1)
+        # capture_eval = capture_eval.mean(dim=1)
+        # self.stats['cover_rate'].set_((torch.sum(capture_eval >= 0.95) / self.task_space_len).unsqueeze(-1).expand_as(self.stats['capture']))
         self.stats['capture_per_step'].set_(self.stats['capture_episode'] / self.step_spec)
         # catch_reward = 10 * capture_flag.sum(-1).unsqueeze(-1).expand_as(capture_flag)
         catch_reward = 10 * capture_flag.type(torch.float32)
