@@ -56,13 +56,19 @@ class InnerCurriculum(object):
         step_speed = (self.end_speed - self.start_speed) / 5
         # self.end_num_agents = kwargs['num_agents']
         self.training_order = []
-        self.training_phase = 0
-        training_catch_radius = np.arange(self.start_catch_radius, \
-                                        self.end_catch_radius + step_catch, \
-                                        step_catch)
-        training_speed = np.arange(self.start_speed, \
-                                        self.end_speed + step_speed, \
-                                        step_speed)
+        # self.training_phase = 0
+        if self.start_catch_radius == self.end_catch_radius:
+            training_catch_radius = np.array([self.start_catch_radius])
+        else:
+            training_catch_radius = np.arange(self.start_catch_radius, \
+                                            self.end_catch_radius + step_catch, \
+                                            step_catch)
+        if self.start_speed == self.end_speed:
+            training_speed = np.array([self.start_speed])
+        else:
+            training_speed = np.arange(self.start_speed, \
+                                            self.end_speed + step_speed, \
+                                            step_speed)
         # training_num_agents = np.linspace(self.start_num_agents, 
         #                                   self.end_num_agents, 
         #                                   self.end_num_agents - self.start_num_agents, dtype=int)
@@ -84,10 +90,14 @@ class InnerCurriculum(object):
             speed_idx += 1
         speed_idx = training_speed.shape[0] - 1
  
-    def get_training_task(self):
-        current_phase = self.training_order[min(len(self.training_order), self.training_phase)]
-        self.training_phase += 1
-        return current_phase
+    def get_training_task(self, num_tasks):
+        current_phase = self.training_order[0]
+        tasks = [current_phase] * num_tasks
+        return tasks
+    
+    def update_curriculum_queue(self):
+        if len(self.training_order) > 1:
+            self.training_order.pop(0)
 
 class CurriculumBuffer(object):
     def __init__(self,):
@@ -284,18 +294,12 @@ class HideAndSeek_circle_static(IsaacEnv):
 
         self.target_init_vel = self.target.get_velocities(clone=True)
         self.env_ids = torch.from_numpy(np.arange(0, cfg.env.num_envs))
-        self.size_min = self.cfg.task.size_min
-        self.size_max = self.cfg.task.size_max
-        self.size_dist = D.Uniform(
-            torch.tensor([self.size_min], device=self.device),
-            torch.tensor([self.size_max], device=self.device)
-        )
+        self.arena_size = self.cfg.task.arena_size
         self.returns = self.progress_buf * 0
         self.catch_radius = self.cfg.task.catch_radius
         self.collision_radius = self.cfg.task.collision_radius
         self.init_poses = self.drone.get_world_poses(clone=True)
-        self.v_low = self.cfg.task.v_drone * self.cfg.task.v_low
-        self.v_high = self.cfg.task.v_drone * self.cfg.task.v_high
+        self.v_prey = self.cfg.task.v_drone * self.cfg.task.v_prey
         
         self.central_env_pos = Float3(
             *self.envs_positions[self.central_env_idx].tolist()
@@ -304,13 +308,15 @@ class HideAndSeek_circle_static(IsaacEnv):
         self.mask_value = -1.0
 
         # CL
+        self.use_cl = self.cfg.use_cl
         self.set_train = True
-        self.curriculum_module = InnerCurriculum()
-        # self.curriculum_module.set_target_task(
-        #     catch_radius=self.catch_radius,
-        #     speed=self.v_high,
-        #     num_agents=self.num_agents
-        #     )
+        if self.use_cl:
+            self.curriculum_module = InnerCurriculum()
+            self.curriculum_module.set_target_task(
+                catch_radius=self.catch_radius,
+                speed=self.v_prey,
+                num_agents=self.num_agents
+                )
         
         self.draw = _debug_draw.acquire_debug_draw_interface()
 
@@ -388,14 +394,9 @@ class HideAndSeek_circle_static(IsaacEnv):
         self.num_active_cylinders = self.cfg.task.cylinder.num_active
         self.cylinder_size = self.cfg.task.cylinder.size
         self.detect_range = self.cfg.task.detect_range
-        self.size_min = self.cfg.task.size_min
-        self.size_max = self.cfg.task.size_max
+        self.arena_size = self.cfg.task.arena_size
 
-        size_dist = D.Uniform(
-            torch.tensor([self.size_min], device=self.device),
-            torch.tensor([self.size_max], device=self.device)
-        )
-        size = size_dist.sample().item()
+        size = self.arena_size
 
         # drone pos
         # drone_pos_dist = D.Uniform(
@@ -490,36 +491,27 @@ class HideAndSeek_circle_static(IsaacEnv):
 
         # CL : training distribution
         if self.set_train:
-            initial_states = [None] * self.num_envs
-            self.eval_num_envs = self.num_envs
+            current_tasks = self.curriculum_module.get_training_task(1)
+            self.catch_radius = current_tasks[0]
+            self.v_prey = current_tasks[1]
         else:
-            self.eval_num_envs = self.num_envs
-            initial_states = [np.array([self.v_high, self.size_max])] * self.num_envs
+            self.catch_radius = self.cfg.task.catch_radius
+            self.v_prey = self.v_prey = self.cfg.task.v_drone * self.cfg.task.v_prey
 
         n_envs = len(env_ids)
         drone_pos = []
         cylinder_pos = []
         target_pos = []
         self.v_prey = []
-        self.size_list = []
         self.cylinders_mask = []
         # reset size
-        for idx in range(n_envs):            
-            if initial_states[idx] is not None:
-                prey_speed = initial_states[idx][0]
-                size = initial_states[idx][1]
-            else:
-                prey_speed = self.v_high
-                size = self.size_max
-            
-            self.v_prey.append(prey_speed)
-            self.size_list.append(size)
-                        
+        for idx in range(n_envs):
             # drone pos
             # drone_pos_dist = D.Uniform(
             #     torch.tensor([-0.7 * size, -0.7 * size, 0.1], device=self.device),
             #     torch.tensor([-0.3 * size, -0.3 * size, 0.1], device=self.device)
             # )
+            size = self.arena_size
             drone_pos_dist = D.Uniform(
                 torch.tensor([-size, -size, 0.1], device=self.device),
                 torch.tensor([size, size, 0.1], device=self.device)
@@ -547,12 +539,10 @@ class HideAndSeek_circle_static(IsaacEnv):
                                              cylinder_size=self.cylinder_size,
                                              num_cylinders=self.num_cylinders,
                                              device=self.device)
-            # TODO: adapt to CL
             num_inactive = self.num_cylinders - self.num_active_cylinders
             for inactive_idx in range(num_inactive):
                 cylinders_pos[inactive_idx + self.num_active_cylinders, 2] = -1.0
             cylinder_pos.append(cylinders_pos)
-            # TODO: adapt to CL
             cylinder_mask_one = torch.ones(self.num_cylinders, device=self.device)
             cylinder_mask_one[self.num_active_cylinders:] = 0.0
             self.cylinders_mask.append(cylinder_mask_one)

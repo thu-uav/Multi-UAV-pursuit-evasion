@@ -330,11 +330,6 @@ def main(cfg):
 
         if max_iters > 0 and i >= max_iters - 1:
             break 
-
-        # if len(fps) > 50:
-        #     fps = np.array(fps)[10:]
-        #     print(fps.mean(), fps.std())
-        #     exit()
     
     # final evaluation after training
     logging.info(f"Final Eval at {collector._frames} steps.")
