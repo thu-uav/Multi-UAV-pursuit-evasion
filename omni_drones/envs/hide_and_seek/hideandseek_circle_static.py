@@ -90,90 +90,12 @@ class InnerCurriculum(object):
             speed_idx += 1
         speed_idx = training_speed.shape[0] - 1
  
-    def get_training_task(self, num_tasks):
-        current_phase = self.training_order[0]
-        tasks = [current_phase] * num_tasks
-        return tasks
+    def get_training_task(self):
+        return self.training_order[0]
     
     def update_curriculum_queue(self):
         if len(self.training_order) > 1:
             self.training_order.pop(0)
-
-class CurriculumBuffer(object):
-    def __init__(self,):
-        self.eps = 1e-10
-        self.random_task_space = True
-
-        self._state_buffer = np.zeros((0, 1), dtype=np.float32)
-        self._weight_buffer = np.zeros((0, 1), dtype=np.float32)
-        self._task_space = dict(size=0, speed=0)
-        self._naive_task_space = []
-        self._temp_state_buffer = []
-        self._moving_max = 0.0
-        self._moving_min = 0.0
-
-    def get_eval_task(self, eval_num_envs):
-        task_space = []
-        speed_len = len(self._task_space['speed'])
-        size_len = len(self._task_space['size'])
-        if speed_len == 1 or size_len == 1:
-            return np.stack([np.array([self._task_space['speed'][0], self._task_space['size'][0]])] * eval_num_envs, axis=0)
-        for speed_idx in range(speed_len - 1):
-            for size_idx in range(size_len - 1):
-                speed = np.random.uniform(self._task_space['speed'][speed_idx], self._task_space['speed'][speed_idx + 1])
-                size = np.random.uniform(self._task_space['size'][size_idx], self._task_space['size'][size_idx + 1])
-                task_space.append(np.repeat(np.expand_dims(np.array([speed, size]), axis=0), eval_num_envs, axis=0))
-        task_space = np.concatenate(task_space, axis=0)
-        return task_space
-
-    def insert(self, states):
-        """
-        input:
-            states: list of np.array(size=(state_dim, ))
-            weight: list of np.array(size=(1, ))
-        """
-        self._temp_state_buffer.append(copy.deepcopy(states))
-
-    def update_states(self):
-        # concatenate to get all states
-        all_states = []
-        if len(self._temp_state_buffer) > 0:
-            all_states = np.concatenate(self._temp_state_buffer, axis=0)
-
-        # update
-        if len(all_states) > 0:
-            self._state_buffer = copy.deepcopy(all_states)
-        # reset temp state and weight buffer
-        self._temp_state_buffer = []
-
-        return self._state_buffer.copy()
-
-    def update_weights(self, weights):
-        self._weight_buffer = weights.copy()
-
-    def sample(self, num_samples):
-        """
-        return list of np.array
-        """
-        if self._state_buffer.shape[0] == 0:  # state buffer is empty
-            initial_states = [None for _ in range(num_samples)]
-        else:
-            weights = self._weight_buffer / np.mean(self._weight_buffer)
-            probs = weights / np.sum(weights)
-            sample_idx = np.random.choice(self._state_buffer.shape[0], num_samples, replace=True, p=probs)
-            initial_states = [self._state_buffer[idx] for idx in sample_idx]
-        return initial_states
-    
-    def save_task(self, model_dir, episode):
-        np.save('{}/tasks_{}.npy'.format(model_dir,episode), self._state_buffer)
-        np.save('{}/scores_{}.npy'.format(model_dir,episode), self._weight_buffer)
-
-    # for update_metric = greedy
-    def _buffer_sort(self, list1, *args): # sort by list1, ascending order
-        zipped = zip(list1,*args)
-        sort_zipped = sorted(zipped,key=lambda x:(x[0],np.mean(x[1])))
-        result = zip(*sort_zipped)
-        return [list(x) for x in result]
 
 def rejection_sampling(arena_size, cylinder_size, num_cylinders, device):
     # set cylinders by rejection sampling
@@ -309,7 +231,7 @@ class HideAndSeek_circle_static(IsaacEnv):
 
         # CL
         self.use_cl = self.cfg.use_cl
-        self.set_train = True
+        self.capture_threshold = self.cfg.capture_threshold
         if self.use_cl:
             self.curriculum_module = InnerCurriculum()
             self.curriculum_module.set_target_task(
@@ -370,7 +292,8 @@ class HideAndSeek_circle_static(IsaacEnv):
             "capture_episode": UnboundedContinuousTensorSpec(1),
             "capture_per_step": UnboundedContinuousTensorSpec(1),
             # "cover_rate": UnboundedContinuousTensorSpec(1),
-            "p": UnboundedContinuousTensorSpec(1),
+            "catch_radius": UnboundedContinuousTensorSpec(1),
+            "v_prey": UnboundedContinuousTensorSpec(1),
             "return": UnboundedContinuousTensorSpec(1),
             "drone1_speed_per_step": UnboundedContinuousTensorSpec(1),
             "drone2_speed_per_step": UnboundedContinuousTensorSpec(1),
@@ -489,20 +412,23 @@ class HideAndSeek_circle_static(IsaacEnv):
         init_pos, rot = self.init_poses
         self.drone._reset_idx(env_ids)
 
-        # CL : training distribution
-        if self.set_train:
-            current_tasks = self.curriculum_module.get_training_task(1)
+        if self.use_cl:
+            # CL, update curriculum
+            if torch.mean(self.stats['capture']) > self.capture_threshold:
+                self.curriculum_module.update_curriculum_queue()
+            
+            # CL, set training tasks
+            current_tasks = self.curriculum_module.get_training_task()
             self.catch_radius = current_tasks[0]
             self.v_prey = current_tasks[1]
-        else:
-            self.catch_radius = self.cfg.task.catch_radius
-            self.v_prey = self.v_prey = self.cfg.task.v_drone * self.cfg.task.v_prey
-
+        
+        self.stats['catch_radius'].set_(torch.ones_like(self.stats['catch_radius'], device=self.device) * self.catch_radius)
+        self.stats['v_prey'].set_(torch.ones_like(self.stats['v_prey'], device=self.device) * self.v_prey)
+        
         n_envs = len(env_ids)
         drone_pos = []
         cylinder_pos = []
         target_pos = []
-        self.v_prey = []
         self.cylinders_mask = []
         # reset size
         for idx in range(n_envs):
@@ -553,8 +479,6 @@ class HideAndSeek_circle_static(IsaacEnv):
         drone_pos = torch.stack(drone_pos, dim=0).type(torch.float32)
         target_pos = torch.stack(target_pos, dim=0).type(torch.float32)
         cylinder_pos = torch.stack(cylinder_pos, dim=0).type(torch.float32)
-        self.v_prey = torch.Tensor(np.array(self.v_prey)).to(self.device)
-        self.size_list = torch.Tensor(np.array(self.size_list)).to(self.device)
         self.cylinders_mask = torch.stack(self.cylinders_mask, dim=0).type(torch.float32) # 1 means active, 0 means inactive
         # set position and velocity
         self.drone.set_world_poses(
@@ -565,8 +489,6 @@ class HideAndSeek_circle_static(IsaacEnv):
         
         self.drone_sum_speed = drone_init_velocities[...,0].squeeze(-1)
         self.drone_max_speed = drone_init_velocities[...,0].squeeze(-1)
-        self.eval_drone_sum_speed = drone_init_velocities[...,0].squeeze(-1)
-        self.eval_drone_max_speed = drone_init_velocities[...,0].squeeze(-1)
 
         # set target
         self.target.set_world_poses((self.envs_positions + target_pos)[env_ids], env_indices=env_ids)
@@ -592,7 +514,7 @@ class HideAndSeek_circle_static(IsaacEnv):
         forces_target = self._get_dummy_policy_prey()
         
         # fixed velocity
-        target_vel[:,:3] = self.v_prey.unsqueeze(1) * forces_target / (torch.norm(forces_target, dim=1).unsqueeze(1) + 1e-5)
+        target_vel[:,:3] = self.v_prey * forces_target / (torch.norm(forces_target, dim=1).unsqueeze(1) + 1e-5)
         
         self.target.set_velocities(target_vel.type(torch.float32), self.env_ids)
 
@@ -611,13 +533,9 @@ class HideAndSeek_circle_static(IsaacEnv):
                 self._draw_detection()       
 
         drone_speed_norm = torch.norm(drone_vel[..., :3], dim=-1)
-        if self.set_train:
-            self.drone_sum_speed += drone_speed_norm
-            self.drone_max_speed = torch.max(torch.stack([self.drone_max_speed, drone_speed_norm], dim=-1), dim=-1).values
-        else:
-            self.eval_drone_sum_speed += drone_speed_norm
-            self.eval_drone_max_speed = torch.max(torch.stack([self.eval_drone_max_speed, drone_speed_norm], dim=-1), dim=-1).values
-        
+        self.drone_sum_speed += drone_speed_norm
+        self.drone_max_speed = torch.max(torch.stack([self.drone_max_speed, drone_speed_norm], dim=-1), dim=-1).values
+
         # record stats
         self.stats['drone1_speed_per_step'].set_(self.drone_sum_speed[:,0].unsqueeze(-1) / self.step_spec)
         self.stats['drone2_speed_per_step'].set_(self.drone_sum_speed[:,1].unsqueeze(-1) / self.step_spec)
@@ -819,9 +737,9 @@ class HideAndSeek_circle_static(IsaacEnv):
         prey_env_pos, _ = self.get_env_poses(self.target.get_world_poses())
         force_r = torch.zeros_like(force)
         prey_origin_dist = torch.norm(prey_env_pos[:, :2],dim=-1)
-        force_r[..., 0] = - prey_env_pos[:,0] / ((self.size_list - prey_origin_dist)**2 + 1e-5)
-        force_r[..., 1] = - prey_env_pos[:,1] / ((self.size_list - prey_origin_dist)**2 + 1e-5)
-        force_r[...,2] += 1 / (prey_env_pos[:,2] - 0 + 1e-5) - 1 / (2 * self.size_list - prey_env_pos[:,2] + 1e-5)
+        force_r[..., 0] = - prey_env_pos[:,0] / ((self.arena_size - prey_origin_dist)**2 + 1e-5)
+        force_r[..., 1] = - prey_env_pos[:,1] / ((self.arena_size - prey_origin_dist)**2 + 1e-5)
+        force_r[...,2] += 1 / (prey_env_pos[:,2] - 0 + 1e-5) - 1 / (2 * self.arena_size - prey_env_pos[:,2] + 1e-5)
         force += force_r
         
         # cylinders
