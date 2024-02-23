@@ -7,7 +7,7 @@ defaults:
   - /base/randomization_base@_here_
 
 env:
-  num_envs: 10
+  num_envs: 2048
   max_episode_length: 800
 
 drone_model: Crazyflie
@@ -19,22 +19,22 @@ action_transform: rate
 
 # exp
 num_agents: 4
-detect_range: 0.8 # -1.0 means fully-observable
+detect_range: -1.0 # -1.0 means fully-observable
 
 size_min: 1.0
 size_max: 1.0
 v_drone: 1.0
-v_low: 3.0
-v_high: 3.0
+v_low: 1.3
+v_high: 1.3
 
 fixed_config: False # if True, only eval max_config
 use_collision: 1
 use_speed_penalty: 1
-catch_radius: 0.15
+catch_radius: 0.5
 collision_radius: 0.01
 use_dynamic: False
 
 cylinder:
   size: 0.2
   num: 8
-  num_active: 8
+  num_active: 0
