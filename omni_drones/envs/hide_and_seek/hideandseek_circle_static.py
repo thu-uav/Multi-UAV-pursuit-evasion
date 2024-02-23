@@ -417,10 +417,7 @@ class HideAndSeek_circle_static(IsaacEnv):
             current_tasks = self.curriculum_module.get_training_task()
             self.catch_radius = current_tasks[0]
             self.v_prey = current_tasks[1]
-        
-        self.stats['catch_radius'].set_(torch.ones_like(self.stats['catch_radius'], device=self.device) * self.catch_radius)
-        self.stats['v_prey'].set_(torch.ones_like(self.stats['v_prey'], device=self.device) * self.v_prey)
-        
+                
         n_envs = len(env_ids)
         drone_pos = []
         cylinder_pos = []
@@ -503,7 +500,9 @@ class HideAndSeek_circle_static(IsaacEnv):
         self.step_spec = 0
 
         # reset stats
-        self.stats[env_ids] = 0.   
+        self.stats[env_ids] = 0.
+        self.stats['catch_radius'].set_(torch.ones_like(self.stats['catch_radius'], device=self.device) * self.catch_radius)
+        self.stats['v_prey'].set_(torch.ones_like(self.stats['v_prey'], device=self.device) * self.v_prey)
 
     def _pre_sim_step(self, tensordict: TensorDictBase):
         self.step_spec += 1
