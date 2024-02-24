@@ -96,7 +96,7 @@ class OuterCurriculum(object):
     '''
     def __init__(self, cfg, device) -> None:
         self.OOD_num_cylinders = cfg.task.cylinder.num
-        self.max_num_cylinders = 5 # < self.OOD_num_cylinders
+        self.max_num_cylinders = 0 # training dist: 0 ~ max_num_cylinders
         self.num_drones = cfg.task.num_agents
         self.max_num_obj = self.num_drones + self.OOD_num_cylinders + 1 # drone + target + cylinders
         self.cylinder_size = cfg.task.cylinder.size

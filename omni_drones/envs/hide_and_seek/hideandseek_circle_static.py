@@ -460,7 +460,10 @@ class HideAndSeek_circle_static(IsaacEnv):
                 cylinders_pos[inactive_idx + self.num_active_cylinders, 2] = -1.0
             cylinder_pos.append(cylinders_pos)
             cylinder_mask_one = torch.ones(self.num_cylinders, device=self.device)
-            cylinder_mask_one[self.num_active_cylinders:] = 0.0
+            # cylinder_mask_one[self.num_active_cylinders:] = 0.0
+            # random set 0.0
+            inactive_indices = torch.randperm(self.num_cylinders)[:num_inactive]
+            cylinder_mask_one[inactive_indices] = 0.0
             self.cylinders_mask.append(cylinder_mask_one)
 
             if idx == self.central_env_idx and self._should_render(0):
