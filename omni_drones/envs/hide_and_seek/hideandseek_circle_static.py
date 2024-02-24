@@ -52,7 +52,7 @@ class InnerCurriculum(object):
     def set_target_task(self, **kwargs):
         self.end_catch_radius = kwargs['catch_radius']
         self.end_speed = kwargs['speed']
-        num_axis = 5
+        num_axis = 10
         self.training_order = []
         if self.start_catch_radius == self.end_catch_radius:
             training_catch_radius = np.array([self.start_catch_radius])
