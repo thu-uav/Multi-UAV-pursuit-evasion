@@ -1,5 +1,5 @@
 # cl
-use_cl: 0
+use_cl: 1
 capture_threshold: 0.95
 
 # model_dir: /home/chenjy/OmniDrones/scripts/outputs/3agent_debug/02-21_15-45/wandb/run-20240221_154520-9si24h0h/files/checkpoint_640.pt
@@ -29,7 +29,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: size1_0_vel1_3_catch0_5_cylinder0_all8_fully_observable_originposdist
+  run_name: size1_0_vel1_3_catch0_5_cylinder0_all8_fully_observable_originposdist_valuenorm1
   # run_name: 4agent_debug
   job_type: train
   entity: chenjy

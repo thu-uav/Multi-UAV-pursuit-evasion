@@ -52,43 +52,36 @@ class InnerCurriculum(object):
     def set_target_task(self, **kwargs):
         self.end_catch_radius = kwargs['catch_radius']
         self.end_speed = kwargs['speed']
-        step_catch = (self.end_catch_radius - self.start_catch_radius) / 5
-        step_speed = (self.end_speed - self.start_speed) / 5
-        # self.end_num_agents = kwargs['num_agents']
+        num_axis = 5
         self.training_order = []
-        # self.training_phase = 0
         if self.start_catch_radius == self.end_catch_radius:
             training_catch_radius = np.array([self.start_catch_radius])
         else:
-            training_catch_radius = np.arange(self.start_catch_radius, \
-                                            self.end_catch_radius + step_catch, \
-                                            step_catch)
+            training_catch_radius = np.linspace(self.start_catch_radius, \
+                                            self.end_catch_radius, \
+                                            num_axis)
         if self.start_speed == self.end_speed:
             training_speed = np.array([self.start_speed])
         else:
-            training_speed = np.arange(self.start_speed, \
-                                            self.end_speed + step_speed, \
-                                            step_speed)
-        # training_num_agents = np.linspace(self.start_num_agents, 
-        #                                   self.end_num_agents, 
-        #                                   self.end_num_agents - self.start_num_agents, dtype=int)
-
+            training_speed = np.linspace(self.start_speed, \
+                                        self.end_speed, \
+                                        num_axis)
         catch_idx = 0
         speed_idx = 0
-        num_agents_idx = 0
-        # while (num_agents_idx < training_num_agents.shape[0]):
-        while (speed_idx < training_speed.shape[0]):
-            while (catch_idx < training_catch_radius.shape[0]):
+        if training_speed.shape[0] == 1 and training_catch_radius.shape[0] == 1:
+            self.training_order.append([self.start_catch_radius, self.start_speed])
+        else:
+            while (speed_idx < training_speed.shape[0]):
+                while (catch_idx < training_catch_radius.shape[0]):
+                    self.training_order.append([training_catch_radius[catch_idx], \
+                                                training_speed[speed_idx]
+                                                ])
+                    catch_idx += 1
+                catch_idx = training_catch_radius.shape[0] - 1
                 self.training_order.append([training_catch_radius[catch_idx], \
-                                            training_speed[speed_idx]
-                                            ])
-                catch_idx += 1
-            catch_idx = training_catch_radius.shape[0] - 1
-            self.training_order.append([training_catch_radius[catch_idx], \
-                            training_speed[speed_idx]
-                            ])
-            speed_idx += 1
-        speed_idx = training_speed.shape[0] - 1
+                                training_speed[speed_idx]
+                                ])
+                speed_idx += 1
  
     def get_training_task(self):
         return self.training_order[0]
