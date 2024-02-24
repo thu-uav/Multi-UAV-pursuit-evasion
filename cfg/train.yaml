@@ -1,7 +1,3 @@
-# cl
-use_cl: 1
-capture_threshold: 0.95
-
 # model_dir: /home/chenjy/OmniDrones/scripts/outputs/3agent_debug/02-21_15-45/wandb/run-20240221_154520-9si24h0h/files/checkpoint_640.pt
 model_dir: null
 
@@ -29,13 +25,13 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: size1_0_vel1_3_catch0_5_cylinder0_all8_fully_observable_originposdist_valuenorm1
-  # run_name: 4agent_debug
+  # run_name: size1_0_vel1_3_catch0_5_cylinder0_all8_fully_observable_originposdist_valuenorm1
+  run_name: 4agent_debug
   job_type: train
   entity: chenjy
   project: PredatorPrey
-  mode: online
-  # mode: disabled # set to 'disabled' when debugging locally
+  # mode: online
+  mode: disabled # set to 'disabled' when debugging locally
   run_id: 
   monitor_gym: True
   tags: 
@@ -43,7 +39,6 @@ wandb:
 defaults:
   # - task: HideAndSeek
   - task: HideAndSeek_circle_static
-  # - task: HideAndSeek_circle
-  # - task: HideAndSeek_multiprey
+  # - task: HideAndSeek_circle_static_UED
   - algo: mappo
   - _self_

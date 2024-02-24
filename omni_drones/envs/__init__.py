@@ -32,7 +32,7 @@ from .transport import TransportHover, TransportFlyThrough, TransportTrack
 from .payload import PayloadTrack, PayloadFlyThrough
 # from .dragon import DragonHover
 from .predatorprey import PredatorPrey
-from .hide_and_seek import HideAndSeek, HideAndSeek_circle_static, HideAndSeek_box_static, HideAndSeek_circle, HideAndSeek_multiprey
+from .hide_and_seek import HideAndSeek, HideAndSeek_circle_static, HideAndSeek_circle_static_UED, HideAndSeek_circle, HideAndSeek_multiprey
 # from .hideandseek import HideAndSeek
 # from .multi_gate import MultiGate
 # from .rearrange import Rearrange

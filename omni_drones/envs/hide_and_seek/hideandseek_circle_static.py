@@ -94,7 +94,7 @@ def rejection_sampling(arena_size, cylinder_size, num_cylinders, device):
     # set cylinders by rejection sampling
     grid_size = 2 * cylinder_size
     matrix_size = int(2 * arena_size / grid_size)
-    origin_grid = [matrix_size // 2 - 1, matrix_size // 2 - 1]
+    origin_pos = [-arena_size, +arena_size] # left corner
     occupancy_matrix = np.zeros((matrix_size, matrix_size))
     # pos dist
     angle_dist = D.Uniform(
@@ -117,8 +117,8 @@ def rejection_sampling(arena_size, cylinder_size, num_cylinders, device):
             y = r * torch.sin(angle)
 
             # Convert coordinates to grid units
-            x_grid = int(x / grid_size) + origin_grid[0]
-            y_grid = int(y / grid_size) + origin_grid[1]
+            x_grid = int((x - origin_pos[0]) / grid_size)
+            y_grid = int((origin_pos[1] - y) / grid_size)
 
             # Check if the new object overlaps with existing objects
             if x_grid >= 0 and x_grid < matrix_size and y_grid >= 0 and y_grid < matrix_size:
@@ -223,8 +223,8 @@ class HideAndSeek_circle_static(IsaacEnv):
         self.mask_value = -1.0
 
         # CL
-        self.use_cl = self.cfg.use_cl
-        self.capture_threshold = self.cfg.capture_threshold
+        self.use_cl = self.cfg.task.use_cl
+        self.capture_threshold = self.cfg.task.capture_threshold
         if self.use_cl:
             self.curriculum_module = InnerCurriculum()
             self.curriculum_module.set_target_task(
@@ -673,11 +673,12 @@ class HideAndSeek_circle_static(IsaacEnv):
         coll_reward = torch.zeros(self.num_envs, self.num_agents, device=self.device)
         
         cylinder_pos, _ = self.cylinders.get_world_poses()
-        for i in range(self.num_active_cylinders):
+        for i in range(self.num_cylinders):
             relative_pos = drone_pos[..., :2] - cylinder_pos[:, i, :2].unsqueeze(-2)
             norm_r = torch.norm(relative_pos, dim=-1)
             if_coll = (norm_r < (self.collision_radius + self.cylinders_size[i])).type(torch.float32)
-            coll_reward -= if_coll # sparse
+            tmp_cylinder_mask = self.cylinders_mask[:, i].unsqueeze(-1).expand(-1, self.num_agents)
+            coll_reward -= if_coll * tmp_cylinder_mask # sparse
 
         # distance reward
         min_dist = target_dist

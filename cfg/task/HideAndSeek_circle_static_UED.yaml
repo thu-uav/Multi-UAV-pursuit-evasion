@@ -1,4 +1,4 @@
-name: HideAndSeek_circle_static
+name: HideAndSeek_circle_static_UED
 
 defaults:
   # see https://hydra.cc/docs/advanced/overriding_packages/
@@ -7,7 +7,7 @@ defaults:
   - /base/randomization_base@_here_
 
 env:
-  num_envs: 10
+  num_envs: 20
   max_episode_length: 800
 
 drone_model: Crazyflie
@@ -17,9 +17,12 @@ time_encoding: true
 # action_transform: multidiscrete:4
 action_transform: rate
 
-# cl
-use_cl: 1 # inner cl
+# inner cl
+use_inner_cl: 0
 capture_threshold: 0.95
+
+# outer cl
+use_outer_cl: 1
 
 # exp
 num_agents: 4
