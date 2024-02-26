@@ -76,6 +76,9 @@ def create_obstacle(
     kit_utils.set_collision_properties(
         prim_path, contact_offset=0.02, rest_offset=0
     )
+    kit_utils.set_rigid_body_properties(
+        prim_path, rigid_body_enabled=True
+    )
 
     return prim
 

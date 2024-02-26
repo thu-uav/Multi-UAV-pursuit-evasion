@@ -214,7 +214,7 @@ def rejection_sampling(arena_size, cylinder_size, num_cylinders, device):
 
     objects_pos = torch.stack(objects_pos)
     return objects_pos
-
+        
 class HideAndSeek_circle_static_UED(IsaacEnv): 
     """
     HideAndSeek environment designed for curriculum learning.
@@ -285,8 +285,8 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
         self.cylinders = RigidPrimView(
             "/World/envs/env_*/cylinder_*",
             reset_xform_properties=False,
+            track_contact_forces=True,
             shape=[self.num_envs, -1],
-            # track_contact_forces=True
         )
         self.cylinders.initialize()
         
@@ -390,8 +390,8 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
         self.cylinder_size = self.cfg.task.cylinder.size
         self.detect_range = self.cfg.task.detect_range
         self.arena_size = self.cfg.task.arena_size
-
         size = self.arena_size
+        self.cylinder_height = 2 * size
 
         # drone pos
         drone_pos_dist = D.Uniform(
@@ -438,11 +438,24 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
             mass=1.0
         )
 
+        # self.cylinders_size = []
+        # for idx in range(self.num_cylinders):
+        #     # orientation = None
+        #     self.cylinders_size.append(self.cylinder_size)
+        #     objects.DynamicCylinder(
+        #         prim_path="/World/envs/env_0/cylinder_{}".format(idx),
+        #         name="cylinder_{}".format(idx),
+        #         translation=cylinder_pos[idx],
+        #         radius=self.cylinder_size,
+        #         height=self.cylinder_height,
+        #         mass=1000.0
+        #     )
+
         self.cylinders_prims = [None] * self.num_cylinders
         self.cylinders_size = []
         for idx in range(self.num_cylinders):
             orientation = None
-            attributes = {'axis': 'z', 'radius': self.cylinder_size, 'height': 2 * size}
+            attributes = {'axis': 'z', 'radius': self.cylinder_size, 'height': self.cylinder_height}
             self.cylinders_size.append(self.cylinder_size)
             self.cylinders_prims[idx] = create_obstacle(
                 "/World/envs/env_0/cylinder_{}".format(idx), 
@@ -516,7 +529,9 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
                     cylinders_pos[inactive_idx + num_active, 2] = -1.0
                 cylinder_pos.append(cylinders_pos)
                 cylinder_mask_one = torch.ones(self.num_cylinders, device=self.device)
-                cylinder_mask_one[num_active:] = 0.0
+                # cylinder_mask_one[num_active:] = 0.0
+                inactive_indices = torch.randperm(self.num_cylinders)[:num_inactive]
+                cylinder_mask_one[inactive_indices] = 0.0
                 self.cylinders_mask.append(cylinder_mask_one)
             else:
                 drone_pos_dist = D.Uniform(
@@ -556,16 +571,19 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
                     cylinders_pos[inactive_idx + self.num_active_cylinders, 2] = -1.0
                 cylinder_pos.append(cylinders_pos)
                 cylinder_mask_one = torch.ones(self.num_cylinders, device=self.device)
-                cylinder_mask_one[self.num_active_cylinders:] = 0.0
+                # cylinder_mask_one[self.num_active_cylinders:] = 0.0
+                inactive_indices = torch.randperm(self.num_cylinders)[:num_inactive]
+                cylinder_mask_one[inactive_indices] = 0.0
                 self.cylinders_mask.append(cylinder_mask_one)
 
             if idx == self.central_env_idx and self._should_render(0):
                 self._draw_court_circle(size)
-
+        
         drone_pos = torch.stack(drone_pos, dim=0).type(torch.float32)
         target_pos = torch.stack(target_pos, dim=0).type(torch.float32)
         cylinder_pos = torch.stack(cylinder_pos, dim=0).type(torch.float32)
         self.cylinders_mask = torch.stack(self.cylinders_mask, dim=0).type(torch.float32) # 1 means active, 0 means inactive
+                
         # set position and velocity
         self.drone.set_world_poses(
             drone_pos + self.envs_positions[env_ids].unsqueeze(1), rot[env_ids], env_ids
@@ -688,10 +706,10 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
         # get masked cylinder relative position
         cylinders_pos, _ = self.get_env_poses(self.cylinders.get_world_poses())
         cylinders_rpos = vmap(cpos)(drone_pos, cylinders_pos) # [N, n, num_cylinders, 3]
-        cylinders_height = torch.tensor([prim.GetAttribute('height').Get() for prim in self.cylinders_prims], 
+        cylinders_height = torch.tensor([self.cylinder_height for _ in range(self.num_cylinders)], 
                                         device=self.device).unsqueeze(0).unsqueeze(0).unsqueeze(-1).expand(
                                             self.num_envs, self.drone.n, -1, -1)
-        cylinders_radius = torch.tensor([prim.GetAttribute('radius').Get() for prim in self.cylinders_prims],
+        cylinders_radius = torch.tensor([self.cylinder_size for _ in range(self.num_cylinders)],
                                         device=self.device).unsqueeze(0).unsqueeze(0).unsqueeze(-1).expand(
                                             self.num_envs, self.drone.n, -1, -1)
         cylinders_state = torch.concat([
