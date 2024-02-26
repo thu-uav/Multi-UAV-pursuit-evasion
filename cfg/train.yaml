@@ -10,7 +10,7 @@ env: ${task.env}
 
 total_frames: 100_000_000_000
 max_iters: -1
-eval_interval: 200
+eval_interval: -1
 save_interval: 200
 seed: 0
 
@@ -29,7 +29,8 @@ viewer:
 wandb:
   group: ${oc.select:..task.name}
   # run_name: size1_0_vel1_3_catch0_5_cylinder0_all8_fully_observable_originposdist_valuenorm1
-  run_name: debug
+  run_name: empty_transfer_cylinder0to5_random
+  # run_name: debug
   job_type: train
   entity: chenjy
   project: PredatorPrey
