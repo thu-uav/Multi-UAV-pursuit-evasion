@@ -106,7 +106,7 @@ class OuterCurriculum(object):
         self.omega_min = 0.5
         self.omega_max = 0.9
         self.moderate_archive = [] # save tasks in [omega_min, omega_max]
-        np.random.seed(0)
+        np.random.seed(cfg.seed)
     
     def generate_envs(self, num_envs):
         '''
@@ -154,10 +154,6 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
             
         _reset_idx(self, env_ids: torch.Tensor): 
             Reset poses of all objects, statistics and infos
-
-        _update_curriculum(self, capture):
-            Determine whether the capture result matches requirements and 
-            insert corresponding states and weights into curriculum buffer
 
         _pre_sim_step(self, tensordict: TensorDictBase):
             Process need to be completed before each step of simulation, 
@@ -341,7 +337,7 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
         target_pos = torch.concat([target_x_y, target_z], dim=-1)
         
         if self.random_active:
-            num_active_cylinder = np.random.randint(1, self.max_active_cylinders + 1, 1, dtype=int)[0]
+            num_active_cylinder = np.random.randint(0, self.max_active_cylinders + 1, 1, dtype=int)[0]
         else:
             num_active_cylinder = self.max_active_cylinders
         num_inactive = self.num_cylinders - num_active_cylinder

@@ -92,6 +92,12 @@ class EpisodeStats:
 # import config file
 @hydra.main(version_base=None, config_path=CONFIG_PATH, config_name="train")
 def main(cfg):
+    # seed
+    torch.manual_seed(cfg.seed)
+    torch.cuda.manual_seed_all(cfg.seed)
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
+    
     # read config and init modules
     OmegaConf.register_new_resolver("eval", eval)
     OmegaConf.resolve(cfg)
