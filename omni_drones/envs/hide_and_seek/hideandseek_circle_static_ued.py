@@ -287,6 +287,7 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
             "capture": UnboundedContinuousTensorSpec(1),
             "capture_episode": UnboundedContinuousTensorSpec(1),
             "capture_per_step": UnboundedContinuousTensorSpec(1),
+            "first_capture_step": UnboundedContinuousTensorSpec(1),
             # "cover_rate": UnboundedContinuousTensorSpec(1),
             "catch_radius": UnboundedContinuousTensorSpec(1),
             "v_prey": UnboundedContinuousTensorSpec(1),
@@ -503,7 +504,7 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
         target_pos = torch.stack(target_pos, dim=0).type(torch.float32)
         cylinders_pos = torch.stack(cylinders_pos, dim=0).type(torch.float32)
         self.cylinders_mask = torch.stack(self.cylinders_mask, dim=0).type(torch.float32) # 1 means active, 0 means inactive
-                
+           
         # set position and velocity
         self.drone.set_world_poses(
             drone_pos + self.envs_positions[env_ids].unsqueeze(1), rot[env_ids], env_ids
@@ -530,6 +531,7 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
         self.stats[env_ids] = 0.
         self.stats['catch_radius'].set_(torch.ones_like(self.stats['catch_radius'], device=self.device) * self.catch_radius)
         self.stats['v_prey'].set_(torch.ones_like(self.stats['v_prey'], device=self.device) * self.v_prey)
+        self.stats['first_capture_step'].set_(torch.ones_like(self.stats['first_capture_step']) * self.max_episode_length)
 
     def _pre_sim_step(self, tensordict: TensorDictBase):
         self.step_spec += 1
@@ -694,6 +696,8 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
         self.stats['capture_per_step'].set_(self.stats['capture_episode'] / self.step_spec)
         # catch_reward = 10 * capture_flag.sum(-1).unsqueeze(-1).expand_as(capture_flag)
         catch_reward = 10 * capture_flag.type(torch.float32)
+        catch_flag = torch.any(catch_reward, dim=1).unsqueeze(-1)
+        self.stats['first_capture_step'][catch_flag * (self.stats['first_capture_step'] >= self.step_spec)] = self.step_spec
 
         # speed penalty
         if self.cfg.task.use_speed_penalty:

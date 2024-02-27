@@ -45,5 +45,5 @@ use_dynamic: False
 cylinder:
   size: 0.2
   num: 8
-  max_active: 5
-  random_active: True
+  max_active: 1
+  random_active: False
