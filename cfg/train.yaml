@@ -1,4 +1,5 @@
 model_dir: /home/chenjy/OmniDrones/scripts/outputs/maskvalue1_cylinder0.pt
+# model_dir: /home/chenjy/OmniDrones/scripts/outputs/empty_transfer_cylinder5_manual_realcylinder/02-27_15-47/wandb/run-20240227_154706-2579zldg/files/checkpoint_5373952.pt
 # model_dir: null
 
 # hydra.job.chdir: false
@@ -29,13 +30,13 @@ viewer:
 wandb:
   group: ${oc.select:..task.name}
   # run_name: size1_0_vel1_3_catch0_5_cylinder0_all8_fully_observable_originposdist_valuenorm1
-  run_name: empty_transfer_cylinder0to5_random
-  # run_name: debug
+  # run_name: empty_transfer_cylinder5_manual_realcylinder
+  run_name: train
   job_type: train
   entity: chenjy
   project: PredatorPrey
-  mode: online
-  # mode: disabled # set to 'disabled' when debugging locally
+  # mode: online
+  mode: disabled # set to 'disabled' when debugging locally
   run_id: 
   monitor_gym: True
   tags: 
@@ -44,5 +45,6 @@ defaults:
   # - task: HideAndSeek
   # - task: HideAndSeek_circle_static
   - task: HideAndSeek_circle_static_UED
+  # - task: HideAndSeek_circle_eval
   - algo: mappo
   - _self_

@@ -46,4 +46,4 @@ cylinder:
   size: 0.2
   num: 8
   max_active: 5
-  random_active: True
+  random_active: False
