@@ -33,6 +33,7 @@ import copy
 
 from omni.isaac.debug_draw import _debug_draw
 
+from .placement import rejection_sampling
 from .draw import draw_traj, draw_detection
 from .draw_circle import Float3, _COLOR_ACCENT, _carb_float3_add, draw_court_circle
 
@@ -87,46 +88,6 @@ class InnerCurriculum(object):
     def update_curriculum_queue(self):
         if len(self.training_order) > 1:
             self.training_order.pop(0)
-
-def rejection_sampling(arena_size, cylinder_size, num_cylinders, device):
-    # set cylinders by rejection sampling
-    grid_size = 2 * cylinder_size
-    matrix_size = int(2 * arena_size / grid_size)
-    origin_pos = [-arena_size, +arena_size] # left corner
-    occupancy_matrix = np.zeros((matrix_size, matrix_size))
-    # pos dist
-    angle_dist = D.Uniform(
-        torch.tensor([0.0], device=device),
-        torch.tensor([2 * torch.pi], device=device)
-    )
-    r_dist = D.Uniform(
-        torch.tensor([0.0], device=device),
-        torch.tensor([arena_size - 0.2], device=device)
-    )
-    objects_pos = []
-    for obj_idx in range(num_cylinders):
-        while True:
-            # Generate random angle and radius within the circular area
-            angle = angle_dist.sample()
-            r = r_dist.sample()
-
-            # Convert polar coordinates to Cartesian coordinates
-            x = r * torch.cos(angle)
-            y = r * torch.sin(angle)
-
-            # Convert coordinates to grid units
-            x_grid = int((x - origin_pos[0]) / grid_size)
-            y_grid = int((origin_pos[1] - y) / grid_size)
-
-            # Check if the new object overlaps with existing objects
-            if x_grid >= 0 and x_grid < matrix_size and y_grid >= 0 and y_grid < matrix_size:
-                if occupancy_matrix[x_grid, y_grid] == 0:
-                    objects_pos.append(torch.tensor([x, y, 1.0], device=device))
-                    occupancy_matrix[x_grid, y_grid] = 1
-                    break
-
-    objects_pos = torch.stack(objects_pos)
-    return objects_pos
 
 class HideAndSeek_circle_static(IsaacEnv): 
     """

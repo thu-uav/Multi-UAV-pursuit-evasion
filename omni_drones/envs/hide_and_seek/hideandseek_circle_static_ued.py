@@ -340,7 +340,7 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
         target_pos = torch.concat([target_x_y, target_z], dim=-1)
         
         if self.random_active:
-            num_active_cylinder = np.random.randint(0, self.max_active_cylinders + 1, 1, dtype=int)[0]
+            num_active_cylinder = np.random.randint(1, self.max_active_cylinders + 1, 1, dtype=int)[0]
         else:
             num_active_cylinder = self.max_active_cylinders
         num_inactive = self.num_cylinders - num_active_cylinder
