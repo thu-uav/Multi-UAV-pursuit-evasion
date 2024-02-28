@@ -1,5 +1,5 @@
-model_dir: /home/chenjy/OmniDrones/scripts/outputs/DR_cylinder1to5.pt
-# model_dir: /home/chenjy/OmniDrones/scripts/outputs/warmup_cylinder0.pt
+# model_dir: /home/chenjy/OmniDrones/scripts/outputs/DR_cylinder1to5.pt
+model_dir: /home/chenjy/OmniDrones/scripts/outputs/warmup_cylinder0.pt
 # model_dir: null
 
 # hydra.job.chdir: false
@@ -30,7 +30,7 @@ viewer:
 wandb:
   group: ${oc.select:..task.name}
   # run_name: size1_0_vel1_3_catch0_5_cylinder0_all8_fully_observable_originposdist_valuenorm1
-  run_name: render_debug
+  run_name: final_cylinder0_eval
   job_type: train
   entity: chenjy
   project: PredatorPrey
