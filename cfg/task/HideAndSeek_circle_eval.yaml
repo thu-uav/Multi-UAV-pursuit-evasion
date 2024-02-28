@@ -7,7 +7,7 @@ defaults:
   - /base/randomization_base@_here_
 
 env:
-  num_envs: 2048
+  num_envs: 20
   max_episode_length: 800
 
 drone_model: Crazyflie
@@ -18,7 +18,7 @@ time_encoding: true
 action_transform: rate
 
 # evalution scenario
-evaluation_flag: 'empty' # '3_cylineder_line', '5_cylineder_line', '8_cylineder_ring', '7_cylineder_ring'
+evaluation_flag: '5_cross' # '5_cross', '6_cross', '7_c_1', '7_c_2'
 
 # exp
 num_agents: 4
@@ -38,4 +38,4 @@ use_dynamic: False
 cylinder:
   size: 0.2
   num: 8
-  num_active: 0
+  num_active: 8

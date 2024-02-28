@@ -153,8 +153,43 @@ def evaluation_scenario(arena_size, evaluation_flag, num_envs, device):
             target_pos = target_pos.unsqueeze(0).expand(num_envs, -1)
             cylinders_pos = cylinders_pos.unsqueeze(0).expand(num_envs, -1, -1)
             cylinders_mask = cylinders_mask.unsqueeze(0).expand(num_envs, -1)
-    elif evaluation_flag == '8_cylineder_ring':
-        pass
+    elif evaluation_flag == '5_cross':
+        num_active_cylinders = 5
+        # drone_z = torch.tensor([0.1, 0.1, 0.1, 0.1], device=device).unsqueeze(-1)
+        drone_z = D.Uniform(
+                torch.tensor([0.1], device=device),
+                torch.tensor([2 * arena_size], device=device)
+            ).sample((1, 4)).squeeze(0)
+        drone_x_y = torch.tensor([
+                                  [0.7, -0.5],
+                                  [0.6, -0.5],
+                                  [0.5, -0.7],
+                                  [0.5, -0.6]
+                                ], device=device)
+        drone_pos = torch.concat([drone_x_y, drone_z], dim=-1)
+        # target_z = torch.tensor([0.1], device=device)
+        target_z = D.Uniform(
+                torch.tensor([0.1], device=device),
+                torch.tensor([2 * arena_size], device=device)
+            ).sample((1, 1)).squeeze(0)
+        target_x_y = torch.tensor([-0.4, 0.4], device=device).unsqueeze(0)
+        target_pos = torch.concat([target_x_y, target_z], dim=-1).squeeze(0)
+        cylinders_pos = torch.tensor([
+                                      [0.0, 0.0, 1.0],
+                                      [0.4, 0.0, 1.0],
+                                      [-0.4, 0.0, 1.0],
+                                      [0.0, 0.4, 1.0],
+                                      [0.0, -0.4, 1.0], # active 
+                                      [2.0, 0.0, 1.0],
+                                      [3.0, 0.0, 1.0],
+                                      [4.0, 0.0, 1.0], # inactive
+                                    ], device=device)
+        cylinders_mask = torch.tensor([1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0], device=device)
+        if num_envs > 1:
+            drone_pos = drone_pos.unsqueeze(0).expand(num_envs, -1, -1)
+            target_pos = target_pos.unsqueeze(0).expand(num_envs, -1)
+            cylinders_pos = cylinders_pos.unsqueeze(0).expand(num_envs, -1, -1)
+            cylinders_mask = cylinders_mask.unsqueeze(0).expand(num_envs, -1)
     elif evaluation_flag == '7_cylineder_ring':
         pass
     return drone_pos, target_pos, cylinders_pos, cylinders_mask

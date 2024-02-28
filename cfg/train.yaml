@@ -1,5 +1,5 @@
-model_dir: /home/chenjy/OmniDrones/scripts/outputs/maskvalue1_cylinder0.pt
-# model_dir: /home/chenjy/OmniDrones/scripts/outputs/empty_transfer_cylinder5_manual_realcylinder/02-27_15-47/wandb/run-20240227_154706-2579zldg/files/checkpoint_5373952.pt
+model_dir: /home/chenjy/OmniDrones/scripts/outputs/DR_cylinder1to5.pt
+# model_dir: /home/chenjy/OmniDrones/scripts/outputs/warmup_cylinder0.pt
 # model_dir: null
 
 # hydra.job.chdir: false
@@ -17,12 +17,12 @@ seed: 0
 
 viewer:
   resolution: [960, 720]
-  # # up
-  # eye: [0.1, 0., 6.]
-  # lookat: [0., 0., 2.]
-  # debug
-  eye: [0., -4., 4.]
-  lookat: [0., 0., 1.]
+  # up
+  eye: [0.1, 0., 6.]
+  lookat: [0., 0., 2.]
+  # # debug
+  # eye: [0., -4., 4.]
+  # lookat: [0., 0., 1.]
   # # front
   # eye: [4., 0., 4.]
   # lookat: [0., 0., 1.]
@@ -30,7 +30,7 @@ viewer:
 wandb:
   group: ${oc.select:..task.name}
   # run_name: size1_0_vel1_3_catch0_5_cylinder0_all8_fully_observable_originposdist_valuenorm1
-  run_name: empty_transfer_realcylinder0to5_fixedseed
+  run_name: render_debug
   job_type: train
   entity: chenjy
   project: PredatorPrey
