@@ -57,6 +57,7 @@ class Every:
 
 from typing import Sequence
 from tensordict import TensorDictBase
+import copy
 
 # Class for storing statistics for every iteration
 class EpisodeStats:
@@ -97,6 +98,7 @@ def main(cfg):
     torch.cuda.manual_seed_all(cfg.seed)
     torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.deterministic = True
+    np.random.seed(cfg.seed)
     
     # read config and init modules
     OmegaConf.register_new_resolver("eval", eval)
@@ -187,11 +189,17 @@ def main(cfg):
     # get parameters
     agent_spec: AgentSpec = env.agent_spec["drone"]
     policy = algos[cfg.algo.name.lower()](cfg.algo, agent_spec=agent_spec, device="cuda")
+    
+    # make a copy for current policy
+    last_policy = algos[cfg.algo.name.lower()](cfg.algo, agent_spec=agent_spec, device="cuda")
 
     if cfg.model_dir is not None:
-        # torch.save(policy.state_dict(), ckpt_path)
         policy.load_state_dict(torch.load(cfg.model_dir))
+        last_policy.load_state_dict(torch.load(cfg.model_dir))
         print("Successfully load model!")
+    
+    last_ckpt_path = os.path.join(run.dir, "last_policy.pt")
+    torch.save(last_policy.state_dict(), last_ckpt_path)
 
     frames_per_batch = env.num_envs * int(cfg.algo.train_every)
     total_frames = cfg.get("total_frames", -1) // frames_per_batch * frames_per_batch
@@ -219,7 +227,8 @@ def main(cfg):
 
     @torch.no_grad()
     def evaluate(
-        seed: int=0
+        eval_policy: None,
+        seed: int=0,
     ):
         """
         Evaluate function called every certain steps. 
@@ -245,17 +254,16 @@ def main(cfg):
         # get one episode rollout using current policy and form a trajectory
         trajs = env.rollout(
             max_steps=base_env.max_episode_length,
-            policy=lambda x: policy(x, deterministic=True),
+            policy=lambda x: eval_policy(x, deterministic=True),
             callback=Every(record_frame, 2),
             auto_reset=True,
             break_when_any_done=False,
             return_contiguous=False
         ).clone() # [num_envs, episode_length, 1]
-        breakpoint()
         
         # get capture and return for CL
-        task_capture = trajs['info']['capture'][:, -1].cpu().numpy()
-        task_return = trajs['info']['return'][:, -1].cpu().numpy()
+        task_capture = trajs['info']['task_capture'][:, -1].cpu().numpy()
+        task_return = trajs['info']['task_return'][:, -1].cpu().numpy()
 
         # after rollout, set rendering mode to not headless and reset env
         base_env.enable_render(not cfg.headless)
@@ -298,6 +306,11 @@ def main(cfg):
     base_env.set_train = True
     fps = []
     
+    # mkdir for cl
+    cl_model_dir = os.path.join(run.dir, 'tasks')
+    if not os.path.exists(cl_model_dir):
+        os.makedirs(cl_model_dir)
+    
     # for each iteration, the collector perform one step in the env
     # and get the result rollout as data
     for i, data in enumerate(pbar):
@@ -316,15 +329,49 @@ def main(cfg):
             }
             info.update(stats)
         
+        # # evaluate every certain step
+        # if eval_interval > 0 and i % eval_interval == 0:
+        #     logging.info(f"Last Eval at {collector._frames} steps.")
+        #     # evaluate last policy
+        #     ckpt_path = os.path.join(run.dir, "last_policy.pt")
+        #     last_policy.load_state_dict(torch.load(ckpt_path))
+        #     info.update(evaluate(eval_policy=last_policy))
+        #     last_task_return = copy.deepcopy(info['task_return'])
+            
+        #     logging.info(f"Current Eval at {collector._frames} steps.")
+        #     # evaluate current policy
+        #     info.update(evaluate(eval_policy=policy))
+        #     current_task_return = copy.deepcopy(info['task_return'])
+        #     # save current policy
+        #     torch.save(policy.state_dict(), ckpt_path)
+            
+        #     env.train() # set env back to training mode after evaluation
+        #     breakpoint()
+        #     base_env._update_curriculum(last_task_return, current_task_return, model_dir=cl_model_dir, episode=i)
+        #     base_env.set_train = True
+
         # update the policy using rollout data and store the training statistics
         info.update(policy.train_op(data.to_tensordict()))
 
         # evaluate every certain step
         if eval_interval > 0 and i % eval_interval == 0:
-            logging.info(f"Eval at {collector._frames} steps.")
-            info.update(evaluate())
+            logging.info(f"Last Eval at {collector._frames} steps.")
+            # evaluate last policy
+            ckpt_path = os.path.join(run.dir, "last_policy.pt")
+            last_policy.load_state_dict(torch.load(ckpt_path))
+            info.update(evaluate(eval_policy=last_policy))
+            last_task_return = copy.deepcopy(info['task_return'])
+            
+            logging.info(f"Current Eval at {collector._frames} steps.")
+            # evaluate current policy
+            info.update(evaluate(eval_policy=policy))
+            current_task_return = copy.deepcopy(info['task_return'])
+            # save current policy
+            torch.save(policy.state_dict(), ckpt_path)
+            
             env.train() # set env back to training mode after evaluation
-            base_env._update_curriculum(info['capture'], info['return'])
+            breakpoint()
+            base_env._update_curriculum(last_task_return, current_task_return, model_dir=cl_model_dir, episode=i)
             base_env.set_train = True
 
         # save policy model every certain step

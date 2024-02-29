@@ -16,10 +16,6 @@ time_encoding: true
 # action_transform: multidiscrete:4
 action_transform: rate
 
-# inner cl
-use_inner_cl: 0
-capture_threshold: 0.95
-
 # outer cl
 use_outer_cl: 1
 

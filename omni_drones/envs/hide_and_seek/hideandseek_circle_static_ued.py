@@ -43,56 +43,6 @@ from .draw_circle import Float3, _COLOR_ACCENT, _carb_float3_add, draw_court_cir
 
 from dgl.geometry import farthest_point_sampler
 
-class InnerCurriculum(object):
-    """
-    Naive CL, use [catch_radius, speed_ratio, num_agents]
-    """
-    def __init__(self) -> None:
-        self.start_catch_radius = 0.5
-        self.start_speed = 1.3
-        # self.start_num_agents = 4
-        
-    def set_target_task(self, **kwargs):
-        self.end_catch_radius = kwargs['catch_radius']
-        self.end_speed = kwargs['speed']
-        num_axis = 10
-        self.training_order = []
-        if self.start_catch_radius == self.end_catch_radius:
-            training_catch_radius = np.array([self.start_catch_radius])
-        else:
-            training_catch_radius = np.linspace(self.start_catch_radius, \
-                                            self.end_catch_radius, \
-                                            num_axis)
-        if self.start_speed == self.end_speed:
-            training_speed = np.array([self.start_speed])
-        else:
-            training_speed = np.linspace(self.start_speed, \
-                                        self.end_speed, \
-                                        num_axis)
-        catch_idx = 0
-        speed_idx = 0
-        if training_speed.shape[0] == 1 and training_catch_radius.shape[0] == 1:
-            self.training_order.append([self.start_catch_radius, self.start_speed])
-        else:
-            while (speed_idx < training_speed.shape[0]):
-                while (catch_idx < training_catch_radius.shape[0]):
-                    self.training_order.append([training_catch_radius[catch_idx], \
-                                                training_speed[speed_idx]
-                                                ])
-                    catch_idx += 1
-                catch_idx = training_catch_radius.shape[0] - 1
-                self.training_order.append([training_catch_radius[catch_idx], \
-                                training_speed[speed_idx]
-                                ])
-                speed_idx += 1
- 
-    def get_training_task(self):
-        return self.training_order[0]
-    
-    def update_curriculum_queue(self):
-        if len(self.training_order) > 1:
-            self.training_order.pop(0)
-
 class OuterCurriculum(object):
     '''
     propose new environments
@@ -111,11 +61,9 @@ class OuterCurriculum(object):
         self.eps = 1e-10
         self._state_buffer = np.zeros((0, 1), dtype=np.float32)
         self._weight_buffer = np.zeros((0, 1), dtype=np.float32)
-        self._capture_buffer = np.zeros((0, 1), dtype=np.float32)
         self._temp_state_buffer = []
         self.buffer_size = cfg.env.num_envs
-        self.metric = 'capture'
-        np.random.seed(cfg.seed)
+        self.metric = 'return_diff'
     
     def insert(self, states):
         """
@@ -154,16 +102,10 @@ class OuterCurriculum(object):
         end_time = time.time()
         print(f"curriculum buffer update states time: {end_time - start_time}s")
 
-    def update_weights(self, task_capture, task_return):
-        self._capture_buffer = task_capture.copy()
-        if self.metric == 'capture':
-            weights = ((task_capture <= self.omega_max) and (task_capture >= self.omega_min))
-            if np.sum(weights) < 1.0: # all tasks are out of the metric
-                weights = np.ones_like(task_capture)
-        elif self.metric == 'return_diff':
-            pass
-        else:
-            raise NotImplementedError
+    def update_weights(self, last_return, current_return):
+        weights = np.maximum(current_return - last_return, 0.0)
+        if np.sum(weights) < 1.0:
+            weights = np.ones(len(self._state_buffer))
         self._weight_buffer = weights.copy()
 
     def sample(self, num_samples):
@@ -176,7 +118,7 @@ class OuterCurriculum(object):
             num_random = int(num_samples * self.prob_random)
             num_cl = num_samples - num_random
             weights = self._weight_buffer / np.mean(self._weight_buffer)
-            probs = weights / np.sum(weights)
+            probs = (weights / np.sum(weights)).squeeze()
             sample_idx = np.random.choice(self._state_buffer.shape[0], num_cl, replace=True, p=probs)
             initial_states = [self._state_buffer[idx] for idx in sample_idx]
             initial_states += [None] * num_random
@@ -185,7 +127,6 @@ class OuterCurriculum(object):
     def save_task(self, model_dir, episode):
         np.save('{}/tasks_{}.npy'.format(model_dir,episode), self._state_buffer)
         np.save('{}/weights_{}.npy'.format(model_dir,episode), self._weight_buffer)
-        np.save('{}/capture_{}.npy'.format(model_dir,episode), self._capture_buffer)
 
 class HideAndSeek_circle_static_UED(IsaacEnv): 
     """
@@ -343,10 +284,13 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
             "drone1_max_speed": UnboundedContinuousTensorSpec(1),
             "drone2_max_speed": UnboundedContinuousTensorSpec(1),
             "drone3_max_speed": UnboundedContinuousTensorSpec(1),
-            "prey_speed": UnboundedContinuousTensorSpec(1)
+            "prey_speed": UnboundedContinuousTensorSpec(1),
+            "cl_mean_weights": UnboundedContinuousTensorSpec(1),
         }).expand(self.num_envs).to(self.device)
         info_spec = CompositeSpec({
             "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13)),
+            'task_capture': UnboundedContinuousTensorSpec(1),
+            'task_return': UnboundedContinuousTensorSpec(1),
         }).expand(self.num_envs).to(self.device)
         self.observation_spec["stats"] = stats_spec
         self.observation_spec["info"] = info_spec
@@ -386,7 +330,7 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
         target_pos = torch.concat([target_x_y, target_z], dim=-1)
         
         if self.random_active:
-            num_active_cylinder = np.random.randint(1, self.max_active_cylinders + 1, 1, dtype=int)[0]
+            num_active_cylinder = torch.randint(0, self.max_active_cylinders + 1, (1,)).item()
         else:
             num_active_cylinder = self.max_active_cylinders
         num_inactive = self.num_cylinders - num_active_cylinder
@@ -476,7 +420,7 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
         target_pos = torch.concat([target_x_y, target_z], dim=-1)
         
         if self.random_active:
-            num_active_cylinder = np.random.randint(1, self.max_active_cylinders + 1, 1, dtype=int)[0]
+            num_active_cylinder = torch.randint(0, self.max_active_cylinders + 1, (1,)).item()
         else:
             num_active_cylinder = self.max_active_cylinders
         num_inactive = self.num_cylinders - num_active_cylinder
@@ -546,7 +490,7 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
             if idx == self.central_env_idx and self._should_render(0):
                 self._draw_court_circle(self.arena_size)
         
-        if self.use_outer_cl:
+        if self.use_outer_cl and self.set_train:
             self.outer_curriculum_module.update_states()
         # end_time = time.time()
         # print('reset time', end_time - start_time)
@@ -584,9 +528,11 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
         self.stats['v_prey'].set_(torch.ones_like(self.stats['v_prey'], device=self.device) * self.v_prey)
         self.stats['first_capture_step'].set_(torch.ones_like(self.stats['first_capture_step']) * self.max_episode_length)
 
-    def _update_curriculum(self, task_capture, task_return):
-        self.outer_curriculum_module.update_weights(task_capture, task_return)
-        breakpoint()
+    def _update_curriculum(self, last_return, current_return, model_dir, episode):
+        self.outer_curriculum_module.update_weights(last_return, current_return)
+        self.stats["cl_mean_weights"].set_(torch.ones((self.num_envs, 1), device=self.device) * np.mean(self.outer_curriculum_module._weight_buffer))
+        self.outer_curriculum_module.save_task(model_dir=model_dir, 
+                                               episode=episode)
 
     def _pre_sim_step(self, tensordict: TensorDictBase):
         self.step_spec += 1
@@ -745,6 +691,7 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
         capture_flag = (target_dist < self.catch_radius)
         self.stats['capture_episode'].add_(torch.sum(capture_flag, dim=1).unsqueeze(-1))
         self.stats['capture'].set_(torch.from_numpy(self.stats['capture_episode'].to('cpu').numpy() > 0.0).type(torch.float32).to(self.device))
+        self.info['task_capture'] = self.stats['capture'].clone()
         # capture_eval = self.stats['capture'].reshape(self.task_space_len, self.eval_num_envs, -1)
         # capture_eval = capture_eval.mean(dim=1)
         # self.stats['cover_rate'].set_((torch.sum(capture_eval >= 0.95) / self.task_space_len).unsqueeze(-1).expand_as(self.stats['capture']))
@@ -785,6 +732,7 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
         self._tensordict["return"] += reward.unsqueeze(-1)
         self.returns = self._tensordict["return"].sum(1)
         self.stats["return"].set_(self.returns)
+        self.info['task_return'] = self.stats["return"].clone()
 
         done  = (
             (self.progress_buf >= self.max_episode_length).unsqueeze(-1)

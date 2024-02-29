@@ -97,6 +97,7 @@ def main(cfg):
     torch.cuda.manual_seed_all(cfg.seed)
     torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.deterministic = True
+    np.random.seed(cfg.seed)
     
     # read config and init modules
     OmegaConf.register_new_resolver("eval", eval)
