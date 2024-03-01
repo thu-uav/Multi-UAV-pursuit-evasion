@@ -329,9 +329,6 @@ def main(cfg):
             }
             info.update(stats)
         
-        # update the policy using rollout data and store the training statistics
-        info.update(policy.train_op(data.to_tensordict()))
-
         # evaluate every certain step
         if eval_interval > 0 and i % eval_interval == 0:
             # logging.info(f"Last Eval at {collector._frames} steps.")
@@ -351,6 +348,9 @@ def main(cfg):
             env.train() # set env back to training mode after evaluation
             # base_env._update_curriculum(last_task_return, current_task_return, model_dir=cl_model_dir, episode=i)
             base_env.set_train = True
+
+        # update the policy using rollout data and store the training statistics
+        info.update(policy.train_op(data.to_tensordict()))
 
         # save policy model every certain step
         if save_interval > 0 and i % save_interval == 0:

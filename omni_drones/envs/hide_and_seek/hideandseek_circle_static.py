@@ -286,7 +286,7 @@ class HideAndSeek_circle_static(IsaacEnv):
         )
         r_dist = D.Uniform(
             torch.tensor([0.0], device=self.device),
-            torch.tensor([size - 0.2], device=self.device)
+            torch.tensor([size - 0.05], device=self.device)
         )
         target_angle = angle_dist.sample()
         target_r = r_dist.sample()
@@ -391,7 +391,7 @@ class HideAndSeek_circle_static(IsaacEnv):
             )
             r_dist = D.Uniform(
                 torch.tensor([0.0], device=self.device),
-                torch.tensor([size - 0.2], device=self.device)
+                torch.tensor([size - 0.05], device=self.device)
             )
             z_dist = D.Uniform(
                 torch.tensor([0.1], device=self.device),

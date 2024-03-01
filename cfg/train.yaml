@@ -1,5 +1,5 @@
-# model_dir: /home/chenjy/OmniDrones/scripts/outputs/DR_cylinder1to5.pt
-model_dir: /home/chenjy/OmniDrones/scripts/outputs/warmup_cylinder0.pt
+model_dir: /home/chenjy/OmniDrones/scripts/outputs/DR_random0to5_final.pt
+# model_dir: /home/chenjy/OmniDrones/scripts/outputs/warmup_cylinder0.pt
 # model_dir: null
 
 # hydra.job.chdir: false
@@ -11,14 +11,14 @@ env: ${task.env}
 
 total_frames: 100_000_000_000
 max_iters: -1
-eval_interval: -1
+eval_interval: 200
 save_interval: 200
 seed: 0
 
 viewer:
   resolution: [960, 720]
   # up
-  eye: [0.1, 0., 6.]
+  eye: [0.01, 0.01, 6.]
   lookat: [0., 0., 2.]
   # # debug
   # eye: [0., -4., 4.]
@@ -30,13 +30,13 @@ viewer:
 wandb:
   group: ${oc.select:..task.name}
   # run_name: size1_0_vel1_3_catch0_5_cylinder0_all8_fully_observable_originposdist_valuenorm1
-  # run_name: Ours_random0to5
-  run_name: debug
+  # run_name: debug
+  run_name: DR0to5_eval_1cylinder
   job_type: train
   entity: chenjy
   project: PredatorPrey
-  # mode: online
-  mode: disabled # set to 'disabled' when debugging locally
+  mode: online
+  # mode: disabled # set to 'disabled' when debugging locally
   run_id: 
   monitor_gym: True
   tags: 
