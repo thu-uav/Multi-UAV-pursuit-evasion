@@ -11,7 +11,7 @@ env: ${task.env}
 
 total_frames: 100_000_000_000
 max_iters: -1
-eval_interval: 10
+eval_interval: -1
 save_interval: 200
 seed: 0
 
@@ -35,8 +35,8 @@ wandb:
   job_type: train
   entity: chenjy
   project: PredatorPrey
-  mode: online
-  # mode: disabled # set to 'disabled' when debugging locally
+  # mode: online
+  mode: disabled # set to 'disabled' when debugging locally
   run_id: 
   monitor_gym: True
   tags: 
