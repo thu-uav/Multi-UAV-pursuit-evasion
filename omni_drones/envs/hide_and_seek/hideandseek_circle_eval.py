@@ -618,7 +618,7 @@ class HideAndSeek_circle_eval(IsaacEnv):
         )
         drone_init_velocities = torch.zeros_like(self.drone.get_velocities())
         self.drone.set_velocities(torch.zeros_like(drone_init_velocities), env_ids)
-        
+
         self.drone_sum_speed = drone_init_velocities[...,0].squeeze(-1)
         self.drone_max_speed = drone_init_velocities[...,0].squeeze(-1)
 

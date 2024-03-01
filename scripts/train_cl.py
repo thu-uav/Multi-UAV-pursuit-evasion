@@ -259,7 +259,7 @@ def main(cfg):
             auto_reset=True,
             break_when_any_done=False,
             return_contiguous=False
-        ).clone() # [num_envs, episode_length, 1]
+        ) # [num_envs, episode_length, 1]
         
         # get capture and return for CL
         task_capture = trajs['info']['task_capture'][:, -1].cpu().numpy()
@@ -331,22 +331,22 @@ def main(cfg):
         
         # evaluate every certain step
         if eval_interval > 0 and i % eval_interval == 0:
-            # logging.info(f"Last Eval at {collector._frames} steps.")
-            # # evaluate last policy
+            logging.info(f"Last Eval at {collector._frames} steps.")
+            # evaluate last policy
             ckpt_path = os.path.join(run.dir, "last_policy.pt")
-            # last_policy.load_state_dict(torch.load(ckpt_path))
-            # info.update(evaluate(eval_policy=last_policy))
-            # last_task_return = copy.deepcopy(info['task_return'])
+            last_policy.load_state_dict(torch.load(ckpt_path))
+            info.update(evaluate(eval_policy=last_policy, seed=cfg.seed))
+            last_task_return = copy.deepcopy(info['task_return'])
             
             logging.info(f"Current Eval at {collector._frames} steps.")
             # evaluate current policy
-            info.update(evaluate(eval_policy=policy))
+            info.update(evaluate(eval_policy=policy, seed=cfg.seed))
             current_task_return = copy.deepcopy(info['task_return'])
             # save current policy
             torch.save(policy.state_dict(), ckpt_path)
             
             env.train() # set env back to training mode after evaluation
-            # base_env._update_curriculum(last_task_return, current_task_return, model_dir=cl_model_dir, episode=i)
+            base_env._update_curriculum(last_task_return, current_task_return, model_dir=cl_model_dir, episode=i)
             base_env.set_train = True
 
         # update the policy using rollout data and store the training statistics

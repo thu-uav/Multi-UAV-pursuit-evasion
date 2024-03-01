@@ -129,7 +129,10 @@ def rejection_sampling_all_obj_xy(arena_size, cylinder_size, num_drones, num_cyl
                     cylinders_pos.append(torch.tensor([x, y], device=device))
                     occupancy_matrix[x_grid, y_grid] = 1
                     break
-    cylinders_pos = torch.stack(cylinders_pos)
+    if num_cylinders == 0:
+        cylinders_pos = torch.tensor([], device=device)
+    else:
+        cylinders_pos = torch.stack(cylinders_pos)
     cylinder_occupancy_matrix = copy.deepcopy(occupancy_matrix)
     
     # pos dist

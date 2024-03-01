@@ -261,6 +261,7 @@ class MultirotorBase(RobotBase):
         )
 
         rotor_pos, rotor_rot = self.rotors_view.get_world_poses()
+        # TODO, why rotor_rot is diff????
         torque_axis = quat_axis(rotor_rot.flatten(end_dim=-2), axis=2).unflatten(0, (*self.shape, self.num_rotors))
 
         self.thrusts[..., 2] = thrusts

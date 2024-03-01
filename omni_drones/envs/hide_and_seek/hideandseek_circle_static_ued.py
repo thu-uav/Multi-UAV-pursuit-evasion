@@ -506,10 +506,10 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
         )
         drone_init_velocities = torch.zeros_like(self.drone.get_velocities())
         self.drone.set_velocities(torch.zeros_like(drone_init_velocities), env_ids)
-        
+                
         self.drone_sum_speed = drone_init_velocities[...,0].squeeze(-1)
         self.drone_max_speed = drone_init_velocities[...,0].squeeze(-1)
-
+        
         # set target
         self.target.set_world_poses((self.envs_positions + target_pos)[env_ids], env_indices=env_ids)
         target_vel = self.target.get_velocities()
@@ -537,6 +537,10 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
     def _pre_sim_step(self, tensordict: TensorDictBase):
         self.step_spec += 1
         actions = tensordict[("agents", "action")]
+        
+        # TODO: debug
+        if torch.all(self.progress_buf == 0):
+            breakpoint()
         self.effort = self.drone.apply_action(actions)
         
         target_vel = self.target.get_velocities()
@@ -550,6 +554,10 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
     def _compute_state_and_obs(self):
         self.drone_states = self.drone.get_state()
         self.info["drone_state"][:] = self.drone_states[..., :13]
+        # if torch.all(self.progress_buf == 0):
+        #     breakpoint()
+        # if torch.all(self.progress_buf == 1):
+        #     breakpoint()
         drone_pos = self.drone_states[..., :3]
         drone_vel = self.drone.get_velocities()
         self.drone_rpos = vmap(cpos)(drone_pos, drone_pos)
@@ -732,7 +740,7 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
         self._tensordict["return"] += reward.unsqueeze(-1)
         self.returns = self._tensordict["return"].sum(1)
         self.stats["return"].set_(self.returns)
-        self.info['task_return'] = self.stats["return"].clone()
+        self.info['task_return'].set_(self.returns)
 
         done  = (
             (self.progress_buf >= self.max_episode_length).unsqueeze(-1)
