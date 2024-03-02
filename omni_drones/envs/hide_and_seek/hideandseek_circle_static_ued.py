@@ -62,7 +62,7 @@ class OuterCurriculum(object):
         self._state_buffer = np.zeros((0, 1), dtype=np.float32)
         self._weight_buffer = np.zeros((0, 1), dtype=np.float32)
         self._temp_state_buffer = []
-        self.buffer_size = 50000
+        self.buffer_size = 5 * cfg.env.num_envs
     
     def insert(self, states):
         """
@@ -74,7 +74,7 @@ class OuterCurriculum(object):
     def update_states(self):
         start_time = time.time()
 
-        # concatenate to get all states
+        # concatenate to get all states and all weights
         all_states = np.array(self._temp_state_buffer)
         if self._state_buffer.shape[0] != 0:  # state buffer is not empty
             all_states = np.concatenate([self._state_buffer, all_states], axis=0)
@@ -95,7 +95,6 @@ class OuterCurriculum(object):
         
         # reset temp state and weight buffer
         self._temp_state_buffer = []
-        self._temp_share_obs_buffer = []
 
         # print update time
         end_time = time.time()
@@ -215,6 +214,7 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
         # outer CL
         self.use_outer_cl = self.cfg.task.use_outer_cl
         self.set_train = True
+        self.eval_iter = 0 # eval 5 times for cl buffer
         if self.use_outer_cl:
             self.outer_curriculum_module = OuterCurriculum(cfg=self.cfg, device=self.device)
         
@@ -283,6 +283,7 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
             "prey_speed": UnboundedContinuousTensorSpec(1),
             "cl_mean_weights": UnboundedContinuousTensorSpec(1),
             "cl_mean_num_cylinders": UnboundedContinuousTensorSpec(1),
+            "train_mean_num_cylinders": UnboundedContinuousTensorSpec(1),
         }).expand(self.num_envs).to(self.device)
         info_spec = CompositeSpec({
             "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13)),
@@ -442,9 +443,10 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
         if self.use_outer_cl:
             # current_tasks contains x, y, z of drones, target, cylinders and cylinder masks
             if self.set_train:
+                breakpoint()
                 current_tasks = self.outer_curriculum_module.sample(num_samples=len(env_ids))
             else:
-                current_tasks = self.outer_curriculum_module._state_buffer
+                current_tasks = self.outer_curriculum_module._state_buffer[self.eval_iter * self.num_envs: (self.eval_iter + 1) * self.num_envs]
         else:
             current_tasks = [None] * len(self.env_ids)
         
@@ -486,19 +488,24 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
 
             if idx == self.central_env_idx and self._should_render(0):
                 self._draw_court_circle(self.arena_size)
-        
-        if self.use_outer_cl and self.set_train:
-            self.outer_curriculum_module.update_states()
-        cl_mean_num_cylinders = self.outer_curriculum_module._state_buffer[:, -self.num_cylinders].sum(axis=-1).mean()
-        self.stats['cl_mean_num_cylinders'].set_(torch.ones((self.num_envs, 1), device=self.device) * cl_mean_num_cylinders)
+
         # end_time = time.time()
         # print('reset time', end_time - start_time)
-        
+                
         drone_pos = torch.stack(drone_pos, dim=0).type(torch.float32)
         target_pos = torch.stack(target_pos, dim=0).type(torch.float32)
         cylinders_pos = torch.stack(cylinders_pos, dim=0).type(torch.float32)
         self.cylinders_mask = torch.stack(self.cylinders_mask, dim=0).type(torch.float32) # 1 means active, 0 means inactive
-           
+
+        # update states
+        if self.use_outer_cl and self.set_train:
+            breakpoint()
+            self.outer_curriculum_module.update_states()
+            cl_mean_num_cylinders = self.outer_curriculum_module._state_buffer[:, -self.num_cylinders].sum(axis=-1).mean()
+            train_mean_num_cylinders = self.cylinders_mask.sum(axis=-1).mean()
+            self.stats['cl_mean_num_cylinders'].set_(torch.ones((self.num_envs, 1), device=self.device) * cl_mean_num_cylinders)
+            self.stats['train_mean_num_cylinders'].set_(torch.ones((self.num_envs, 1), device=self.device) * train_mean_num_cylinders)
+
         # set position and velocity
         self.drone.set_world_poses(
             drone_pos + self.envs_positions[env_ids].unsqueeze(1), rot[env_ids], env_ids

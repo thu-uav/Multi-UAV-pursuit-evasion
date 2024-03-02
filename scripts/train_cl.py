@@ -229,6 +229,7 @@ def main(cfg):
     def evaluate(
         eval_policy: None,
         seed: int=0,
+        rollout_step: int = base_env.max_episode_length,
     ):
         """
         Evaluate function called every certain steps. 
@@ -253,7 +254,7 @@ def main(cfg):
 
         # get one episode rollout using current policy and form a trajectory
         trajs = env.rollout(
-            max_steps=base_env.max_episode_length,
+            max_steps=rollout_step,
             policy=lambda x: eval_policy(x, deterministic=True),
             callback=Every(record_frame, 2),
             auto_reset=True,
@@ -264,6 +265,7 @@ def main(cfg):
         # get capture and return for CL
         task_capture = trajs['info']['task_capture'][:, -1].cpu().numpy()
         task_return = trajs['info']['task_return'][:, -1].cpu().numpy()
+        task_disagreement = torch.std(trajs['state_value'][:, 0], dim=1).cpu().numpy()
 
         # after rollout, set rendering mode to not headless and reset env
         base_env.enable_render(not cfg.headless)
@@ -298,6 +300,7 @@ def main(cfg):
         
         info['task_capture'] = task_capture
         info['task_return'] = task_return
+        info['task_disagreement'] = task_disagreement
         
         return info
 
@@ -341,10 +344,21 @@ def main(cfg):
 
         # update the policy using rollout data and store the training statistics
         info.update(policy.train_op(data.to_tensordict()))
+        breakpoint()
         
-        # update cl
-        disagreement = torch.std(data['state_value'][:, 0], dim=1).to('cpu').numpy()
-        base_env._update_curriculum(disagreement, model_dir=cl_model_dir, episode=i)
+        # # update cl before sampling
+        # if (i % (base_env.max_episode_length // cfg.algo.train_every - 1) == 0):
+        #     # evaluate current policy
+        #     disagreement_list = []
+        #     for _ in range(len(base_env.outer_curriculum_module._state_buffer) // base_env.num_envs):
+        #         info.update(evaluate(eval_policy=policy, seed=cfg.seed, rollout_step=1))
+        #         base_env.eval_iter += 1
+        #         disagreement_list.append(info['task_disagreement'])
+        #     env.train() # set env back to training mode after evaluation
+        #     base_env.set_train = True
+        #     base_env.eval_iter = 0
+        #     disagreement_list = np.concatenate(disagreement_list)
+        #     base_env._update_curriculum(disagreement_list, model_dir=cl_model_dir, episode=i)
 
         # save policy model every certain step
         if save_interval > 0 and i % save_interval == 0:
