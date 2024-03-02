@@ -102,10 +102,7 @@ class OuterCurriculum(object):
         end_time = time.time()
         print(f"curriculum buffer update states time: {end_time - start_time}s")
 
-    def update_weights(self, last_return, current_return):
-        weights = np.maximum(current_return - last_return, 0.0)
-        if np.sum(weights) < 1.0:
-            weights = np.ones(len(self._state_buffer))
+    def update_weights(self, weights):
         self._weight_buffer = weights.copy()
 
     def sample(self, num_samples):
@@ -286,6 +283,7 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
             "drone3_max_speed": UnboundedContinuousTensorSpec(1),
             "prey_speed": UnboundedContinuousTensorSpec(1),
             "cl_mean_weights": UnboundedContinuousTensorSpec(1),
+            "cl_mean_num_cylinders": UnboundedContinuousTensorSpec(1),
         }).expand(self.num_envs).to(self.device)
         info_spec = CompositeSpec({
             "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13)),
@@ -492,6 +490,8 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
         
         if self.use_outer_cl and self.set_train:
             self.outer_curriculum_module.update_states()
+        cl_mean_num_cylinders = self.outer_curriculum_module._state_buffer[:, -self.num_cylinders].sum(axis=-1).mean()
+        self.stats['cl_mean_num_cylinders'].set_(torch.ones((self.num_envs, 1), device=self.device) * cl_mean_num_cylinders)
         # end_time = time.time()
         # print('reset time', end_time - start_time)
         
@@ -532,8 +532,8 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
         for substep in range(1):
             self.sim.step(self._should_render(substep))
 
-    def _update_curriculum(self, last_return, current_return, model_dir, episode):
-        self.outer_curriculum_module.update_weights(last_return, current_return)
+    def _update_curriculum(self, eval_metrics, model_dir, episode):
+        self.outer_curriculum_module.update_weights(eval_metrics)
         self.stats["cl_mean_weights"].set_(torch.ones((self.num_envs, 1), device=self.device) * np.mean(self.outer_curriculum_module._weight_buffer))
         self.outer_curriculum_module.save_task(model_dir=model_dir, 
                                                episode=episode)
