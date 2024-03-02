@@ -62,8 +62,7 @@ class OuterCurriculum(object):
         self._state_buffer = np.zeros((0, 1), dtype=np.float32)
         self._weight_buffer = np.zeros((0, 1), dtype=np.float32)
         self._temp_state_buffer = []
-        self.buffer_size = cfg.env.num_envs
-        self.metric = 'return_diff'
+        self.buffer_size = 50000
     
     def insert(self, states):
         """
