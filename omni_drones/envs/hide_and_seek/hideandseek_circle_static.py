@@ -455,6 +455,10 @@ class HideAndSeek_circle_static(IsaacEnv):
         self.stats['catch_radius'].set_(torch.ones_like(self.stats['catch_radius'], device=self.device) * self.catch_radius)
         self.stats['v_prey'].set_(torch.ones_like(self.stats['v_prey'], device=self.device) * self.v_prey)
 
+        # TODO: sim.step for global env, only for tasks with fixed episode
+        for substep in range(1):
+            self.sim.step(self._should_render(substep))
+
     def _pre_sim_step(self, tensordict: TensorDictBase):
         self.step_spec += 1
         actions = tensordict[("agents", "action")]

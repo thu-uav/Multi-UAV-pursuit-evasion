@@ -527,6 +527,10 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
         self.stats['catch_radius'].set_(torch.ones_like(self.stats['catch_radius'], device=self.device) * self.catch_radius)
         self.stats['v_prey'].set_(torch.ones_like(self.stats['v_prey'], device=self.device) * self.v_prey)
         self.stats['first_capture_step'].set_(torch.ones_like(self.stats['first_capture_step']) * self.max_episode_length)
+        
+        # TODO: sim.step for global env, only for tasks with fixed episode
+        for substep in range(1):
+            self.sim.step(self._should_render(substep))
 
     def _update_curriculum(self, last_return, current_return, model_dir, episode):
         self.outer_curriculum_module.update_weights(last_return, current_return)
@@ -538,9 +542,6 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
         self.step_spec += 1
         actions = tensordict[("agents", "action")]
         
-        # TODO: debug
-        if torch.all(self.progress_buf == 0):
-            breakpoint()
         self.effort = self.drone.apply_action(actions)
         
         target_vel = self.target.get_velocities()
@@ -554,10 +555,6 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
     def _compute_state_and_obs(self):
         self.drone_states = self.drone.get_state()
         self.info["drone_state"][:] = self.drone_states[..., :13]
-        # if torch.all(self.progress_buf == 0):
-        #     breakpoint()
-        # if torch.all(self.progress_buf == 1):
-        #     breakpoint()
         drone_pos = self.drone_states[..., :3]
         drone_vel = self.drone.get_velocities()
         self.drone_rpos = vmap(cpos)(drone_pos, drone_pos)
