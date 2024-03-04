@@ -133,17 +133,17 @@ def rejection_sampling_all_obj_xy(arena_size, cylinder_size, num_drones, num_cyl
         cylinders_pos = torch.tensor([], device=device)
     else:
         cylinders_pos = torch.stack(cylinders_pos)
-    cylinder_occupancy_matrix = copy.deepcopy(occupancy_matrix)
+    # cylinder_occupancy_matrix = copy.deepcopy(occupancy_matrix)
     
-    # pos dist
-    angle_dist = D.Uniform(
-        torch.tensor([0.0], device=device),
-        torch.tensor([2 * torch.pi], device=device)
-    )
-    r_dist = D.Uniform(
-        torch.tensor([0.0], device=device),
-        torch.tensor([arena_size], device=device)
-    )
+    # # pos dist
+    # angle_dist = D.Uniform(
+    #     torch.tensor([0.0], device=device),
+    #     torch.tensor([2 * torch.pi], device=device)
+    # )
+    # r_dist = D.Uniform(
+    #     torch.tensor([0.0], device=device),
+    #     torch.tensor([arena_size], device=device)
+    # )
     drone_target_pos = []
     extra_size = 0.15
     for _ in range(num_drones + 1):

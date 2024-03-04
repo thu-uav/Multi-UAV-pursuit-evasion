@@ -291,6 +291,12 @@ def main(cfg):
     base_env.set_train = True
     fps = []
     
+    # # eval for 1 times
+    # info = {}
+    # info.update(evaluate())
+    # run.log(info)
+    # breakpoint()
+    
     # for each iteration, the collector perform one step in the env
     # and get the result rollout as data
     for i, data in enumerate(pbar):
@@ -308,6 +314,9 @@ def main(cfg):
                 for k, v in episode_stats.pop().items(True, True)
             }
             info.update(stats)
+        
+        # update the policy using rollout data and store the training statistics
+        info.update(policy.train_op(data.to_tensordict()))
 
         # evaluate every certain step
         if eval_interval > 0 and i % eval_interval == 0:
@@ -315,9 +324,6 @@ def main(cfg):
             info.update(evaluate())
             env.train() # set env back to training mode after evaluation
             base_env.set_train = True
-        
-        # update the policy using rollout data and store the training statistics
-        info.update(policy.train_op(data.to_tensordict()))
 
         # save policy model every certain step
         if save_interval > 0 and i % save_interval == 0:

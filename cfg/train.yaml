@@ -17,21 +17,20 @@ seed: 0
 
 viewer:
   resolution: [960, 720]
-  # up
-  eye: [0.01, 0.01, 6.]
-  lookat: [0., 0., 2.]
+  # # up
+  # eye: [0.01, 0.01, 6.]
+  # lookat: [0., 0., 2.]
   # # debug
   # eye: [0., -4., 4.]
   # lookat: [0., 0., 1.]
-  # # front
-  # eye: [4., 0., 4.]
-  # lookat: [0., 0., 1.]
+  # front
+  eye: [20., 0., 20.]
+  lookat: [0., 0., 1.]
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: size1_0_vel1_3_catch0_5_cylinder0_all8_fully_observable_originposdist_valuenorm1
   run_name: debug
-  # run_name: CL_0to5_random0_2
+  # run_name: DR_emptytransfer_0and3_wo_reset_simstep
   job_type: train
   entity: chenjy
   project: PredatorPrey

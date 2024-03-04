@@ -269,7 +269,6 @@ def main(cfg):
 
         # after rollout, set rendering mode to not headless and reset env
         base_env.enable_render(not cfg.headless)
-        env.reset()
 
         # get first done index of each trajectory
         done = trajs.get(("next", "done"))
@@ -338,27 +337,25 @@ def main(cfg):
             # evaluate current policy
             info.update(evaluate(eval_policy=policy, seed=cfg.seed))
             # current_task_return = copy.deepcopy(info['task_return'])
-            
-            env.train() # set env back to training mode after evaluation
-            base_env.set_train = True
 
         # update the policy using rollout data and store the training statistics
         info.update(policy.train_op(data.to_tensordict()))
-        breakpoint()
         
-        # # update cl before sampling
-        # if (i % (base_env.max_episode_length // cfg.algo.train_every - 1) == 0):
-        #     # evaluate current policy
-        #     disagreement_list = []
-        #     for _ in range(len(base_env.outer_curriculum_module._state_buffer) // base_env.num_envs):
-        #         info.update(evaluate(eval_policy=policy, seed=cfg.seed, rollout_step=1))
-        #         base_env.eval_iter += 1
-        #         disagreement_list.append(info['task_disagreement'])
-        #     env.train() # set env back to training mode after evaluation
-        #     base_env.set_train = True
-        #     base_env.eval_iter = 0
-        #     disagreement_list = np.concatenate(disagreement_list)
-        #     base_env._update_curriculum(disagreement_list, model_dir=cl_model_dir, episode=i)
+        # update cl before sampling
+        if i > 0 and (i % (base_env.max_episode_length // cfg.algo.train_every - 1) == 0):
+            # evaluate current policy
+            disagreement_list = []
+            for _ in range(len(base_env.outer_curriculum_module._state_buffer) // base_env.num_envs):
+                info.update(evaluate(eval_policy=policy, seed=cfg.seed, rollout_step=1))
+                base_env.eval_iter += 1
+                disagreement_list.append(info['task_disagreement'])
+            base_env.eval_iter = 0
+            disagreement_list = np.concatenate(disagreement_list)
+            base_env._update_curriculum(disagreement_list, model_dir=cl_model_dir, episode=i)
+            
+            env.train() # set env back to training mode after evaluation
+            base_env.set_train = True
+            env.reset()
 
         # save policy model every certain step
         if save_interval > 0 and i % save_interval == 0:

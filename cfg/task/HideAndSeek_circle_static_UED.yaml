@@ -6,7 +6,7 @@ defaults:
   - /base/sim_base@_here_
 
 env:
-  num_envs: 20
+  num_envs: 2048
   max_episode_length: 800
 
 drone_model: Crazyflie
@@ -17,7 +17,7 @@ time_encoding: true
 action_transform: rate
 
 # outer cl
-use_outer_cl: 1
+use_outer_cl: 0
 
 # evalution scenario
 evaluation_flag: null # '3_cylineder_line', '5_cylineder_line', '8_cylineder_ring', '7_cylineder_ring'
@@ -39,5 +39,5 @@ use_dynamic: False
 cylinder:
   size: 0.2
   num: 8
-  max_active: 5
+  max_active: 1
   random_active: True
