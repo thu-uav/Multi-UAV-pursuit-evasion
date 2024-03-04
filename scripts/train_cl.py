@@ -343,7 +343,7 @@ def main(cfg):
         
         # update cl before sampling
         # if training_data contains done, update CL
-        if (i > 0) and (i % (base_env.max_episode_length // cfg.algo.train_every) == 0):
+        if (i > 0) and (data['next']['done'].sum() > 0):
             # evaluate current policy
             base_env._update_cl_states()
             disagreement_list = []

@@ -30,7 +30,6 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: debug
   run_name: Disagreement_emptytransfer_0and1
   job_type: train
   entity: chenjy
