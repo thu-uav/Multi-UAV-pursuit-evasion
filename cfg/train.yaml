@@ -1,5 +1,6 @@
 # model_dir: /home/chenjy/OmniDrones/scripts/outputs/DR_random0to5_final.pt
 model_dir: /home/chenjy/OmniDrones/scripts/outputs/warmup_cylinder0.pt
+# model_dir: /home/chenjy/OmniDrones/scripts/outputs/newreward_vel1_3.pt
 # model_dir: null
 
 # hydra.job.chdir: false
@@ -29,13 +30,13 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: debug
-  # run_name: DR_emptytransfer_0and3_wo_reset_simstep
+  # run_name: debug
+  run_name: DR_emptytransfer_0and1
   job_type: train
   entity: chenjy
   project: PredatorPrey
-  # mode: online
-  mode: disabled # set to 'disabled' when debugging locally
+  mode: online
+  # mode: disabled # set to 'disabled' when debugging locally
   run_id: 
   monitor_gym: True
   tags: 
