@@ -107,7 +107,7 @@ class OuterCurriculum(object):
         """
         return list of np.array
         """
-        if self._weight_buffer.shape[0] == 0:  # state buffer is empty
+        if self._state_buffer.shape[0] == 0:  # state buffer is empty
             initial_states = [None for _ in range(num_samples)]
         else:
             num_random = int(num_samples * self.prob_random)
@@ -501,9 +501,9 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
         cylinders_pos = torch.stack(cylinders_pos, dim=0).type(torch.float32)
         self.cylinders_mask = torch.stack(self.cylinders_mask, dim=0).type(torch.float32) # 1 means active, 0 means inactive
 
-        # update states
-        if self.use_outer_cl and self.set_train:
-            self.outer_curriculum_module.update_states()
+        # # update states
+        # if self.use_outer_cl and self.set_train:
+        #     self.outer_curriculum_module.update_states()
 
         # set position and velocity
         self.drone.set_world_poses(
@@ -533,14 +533,16 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
         self.stats['v_prey'].set_(torch.ones_like(self.stats['v_prey'], device=self.device) * self.v_prey)
         self.stats['first_capture_step'].set_(torch.ones_like(self.stats['first_capture_step']) * self.max_episode_length)
         
-        if self.use_outer_cl and self.set_train:
-            cl_mean_num_cylinders = self.outer_curriculum_module._state_buffer[:, -self.num_cylinders].sum(axis=-1).mean()
-            self.stats['cl_mean_num_cylinders'].set_(torch.ones((self.num_envs, 1), device=self.device) * cl_mean_num_cylinders)
         train_mean_num_cylinders = self.cylinders_mask.sum(axis=-1).mean()
         self.stats['train_mean_num_cylinders'].set_(torch.ones((self.num_envs, 1), device=self.device) * train_mean_num_cylinders)
         
         for substep in range(1):
             self.sim.step(self._should_render(substep))
+
+    def _update_cl_states(self):
+        self.outer_curriculum_module.update_states()
+        cl_mean_num_cylinders = self.outer_curriculum_module._state_buffer[:, -self.num_cylinders].sum(axis=-1).mean()
+        self.stats['cl_mean_num_cylinders'].set_(torch.ones((self.num_envs, 1), device=self.device) * cl_mean_num_cylinders)
 
     def _update_curriculum(self, eval_metrics, model_dir, episode):
         self.outer_curriculum_module.update_weights(eval_metrics)
