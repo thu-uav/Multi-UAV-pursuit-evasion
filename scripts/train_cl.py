@@ -330,16 +330,17 @@ def main(cfg):
                 for k, v in episode_stats.pop().items(True, True)
             }
             info.update(stats)
-        
+
+        # update the policy using rollout data and store the training statistics
+        info.update(policy.train_op(data.to_tensordict()))
+        breakpoint()
+
         # evaluate every certain step
         if eval_interval > 0 and i % eval_interval == 0:           
             logging.info(f"Eval at {collector._frames} steps.")
             # evaluate current policy
             info.update(evaluate(eval_policy=policy, seed=cfg.seed))
             # current_task_return = copy.deepcopy(info['task_return'])
-
-        # update the policy using rollout data and store the training statistics
-        info.update(policy.train_op(data.to_tensordict()))
         
         # update cl before sampling
         if i > 0 and (i % (base_env.max_episode_length // cfg.algo.train_every - 1) == 0):
