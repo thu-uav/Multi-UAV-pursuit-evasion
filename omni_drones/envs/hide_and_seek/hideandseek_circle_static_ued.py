@@ -107,7 +107,7 @@ class OuterCurriculum(object):
         """
         return list of np.array
         """
-        if self._state_buffer.shape[0] == 0:  # state buffer is empty
+        if self._weight_buffer.shape[0] == 0:  # state buffer is empty
             initial_states = [None for _ in range(num_samples)]
         else:
             num_random = int(num_samples * self.prob_random)

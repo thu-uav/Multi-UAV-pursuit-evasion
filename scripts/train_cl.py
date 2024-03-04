@@ -333,7 +333,6 @@ def main(cfg):
 
         # update the policy using rollout data and store the training statistics
         info.update(policy.train_op(data.to_tensordict()))
-        breakpoint()
 
         # evaluate every certain step
         if eval_interval > 0 and i % eval_interval == 0:           
@@ -343,7 +342,7 @@ def main(cfg):
             # current_task_return = copy.deepcopy(info['task_return'])
         
         # update cl before sampling
-        if i > 0 and (i % (base_env.max_episode_length // cfg.algo.train_every - 1) == 0):
+        if (i + 1) % (base_env.max_episode_length // cfg.algo.train_every) == 0:
             # evaluate current policy
             disagreement_list = []
             for _ in range(len(base_env.outer_curriculum_module._state_buffer) // base_env.num_envs):
