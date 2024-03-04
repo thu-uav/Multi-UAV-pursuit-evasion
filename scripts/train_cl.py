@@ -342,8 +342,8 @@ def main(cfg):
             # current_task_return = copy.deepcopy(info['task_return'])
         
         # update cl before sampling
-        # TODO: only update after done = True
-        if (i + 1) % (base_env.max_episode_length // cfg.algo.train_every) == 0:
+        # if training_data contains done, update CL
+        if (i > 0) and (i % (base_env.max_episode_length // cfg.algo.train_every) == 0):
             # evaluate current policy
             base_env._update_cl_states()
             disagreement_list = []
