@@ -30,12 +30,13 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: Disagreement_emptytransfer_0and1
+  # run_name: Disagreement_emptytransfer_0and1
+  run_name: debug
   job_type: train
   entity: chenjy
   project: PredatorPrey
-  mode: online
-  # mode: disabled # set to 'disabled' when debugging locally
+  # mode: online
+  mode: disabled # set to 'disabled' when debugging locally
   run_id: 
   monitor_gym: True
   tags: 

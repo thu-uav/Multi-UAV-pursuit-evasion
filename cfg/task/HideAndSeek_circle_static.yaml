@@ -19,7 +19,7 @@ action_transform: rate
 
 # cl
 use_cl: 1 # inner cl
-capture_threshold: 0.95
+capture_threshold: 0.98
 
 # exp
 num_agents: 4

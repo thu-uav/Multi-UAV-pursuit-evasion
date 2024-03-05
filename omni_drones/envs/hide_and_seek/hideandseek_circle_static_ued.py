@@ -43,6 +43,57 @@ from .draw_circle import Float3, _COLOR_ACCENT, _carb_float3_add, draw_court_cir
 
 from dgl.geometry import farthest_point_sampler
 
+# drones on land by default
+# only cubes are available as walls
+class InnerCurriculum(object):
+    """
+    Naive CL, use [catch_radius, speed_ratio, num_agents]
+    """
+    def __init__(self) -> None:
+        self.start_catch_radius = 0.5
+        self.start_speed = 1.3
+        # self.start_num_agents = 4
+        
+    def set_target_task(self, **kwargs):
+        self.end_catch_radius = kwargs['catch_radius']
+        self.end_speed = kwargs['speed']
+        num_axis = 10
+        self.training_order = []
+        if self.start_catch_radius == self.end_catch_radius:
+            training_catch_radius = np.array([self.start_catch_radius])
+        else:
+            training_catch_radius = np.linspace(self.start_catch_radius, \
+                                            self.end_catch_radius, \
+                                            num_axis)
+        if self.start_speed == self.end_speed:
+            training_speed = np.array([self.start_speed])
+        else:
+            training_speed = np.linspace(self.start_speed, \
+                                        self.end_speed, \
+                                        num_axis)
+        catch_idx = 0
+        speed_idx = 0
+        if training_speed.shape[0] == 1 and training_catch_radius.shape[0] == 1:
+            self.training_order.append([self.start_catch_radius, self.start_speed])
+        else:
+            while (speed_idx < training_speed.shape[0]):
+                while (catch_idx < training_catch_radius.shape[0]):
+                    self.training_order.append([training_catch_radius[catch_idx], \
+                                                training_speed[speed_idx]
+                                                ])
+                    catch_idx += 1
+                self.training_order.append([training_catch_radius[-1], \
+                                training_speed[speed_idx]
+                                ])
+                speed_idx += 1
+ 
+    def get_training_task(self):
+        return self.training_order[0]
+    
+    def update_curriculum_queue(self):
+        if len(self.training_order) > 1:
+            self.training_order.pop(0)
+
 class OuterCurriculum(object):
     '''
     propose new environments
@@ -210,6 +261,17 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
         )
 
         self.mask_value = -1.0
+        
+        # inner CL
+        self.use_inner_cl = self.cfg.task.use_inner_cl
+        self.capture_threshold = self.cfg.task.capture_threshold
+        if self.use_inner_cl:
+            self.inner_curriculum_module = InnerCurriculum()
+            self.inner_curriculum_module.set_target_task(
+                catch_radius=self.catch_radius,
+                speed=self.v_prey,
+                num_agents=self.num_agents
+                )
         
         # outer CL
         self.use_outer_cl = self.cfg.task.use_outer_cl
@@ -435,15 +497,25 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
         cylinders_z = torch.ones(self.num_cylinders, device=self.device).unsqueeze(-1)
         cylinders_pos = torch.concat([cylinder_x_y, cylinders_z], dim=-1)
         cylinder_mask = torch.ones(self.num_cylinders, device=self.device)
-        cylinder_mask[num_active_cylinder:] = 0.0
-        # inactive_indices = torch.randperm(self.num_cylinders)[:num_inactive]
-        # cylinder_mask_one[inactive_indices] = 0.0
+        # cylinder_mask[num_active_cylinder:] = 0.0
+        inactive_indices = torch.randperm(self.num_cylinders)[:num_inactive]
+        cylinder_mask[inactive_indices] = 0.0
         return drone_pos, target_pos, cylinders_pos, cylinder_mask
 
     def _reset_idx(self, env_ids: torch.Tensor):
         n = self.num_agents
         init_pos, rot = self.init_poses
         self.drone._reset_idx(env_ids)
+
+        if self.use_inner_cl:
+            # CL, update curriculum
+            if torch.mean(self.stats['capture']) > self.capture_threshold:
+                self.inner_curriculum_module.update_curriculum_queue()
+            
+            # CL, set training tasks
+            inner_tasks = self.inner_curriculum_module.get_training_task()
+            self.catch_radius = inner_tasks[0]
+            self.v_prey = inner_tasks[1]
 
         if self.use_outer_cl:
             # current_tasks contains x, y, z of drones, target, cylinders and cylinder masks
