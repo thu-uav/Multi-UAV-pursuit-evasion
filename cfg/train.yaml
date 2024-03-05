@@ -1,7 +1,7 @@
 # model_dir: /home/chenjy/OmniDrones/scripts/outputs/DR_random0to5_final.pt
-model_dir: /home/chenjy/OmniDrones/scripts/outputs/warmup_cylinder0.pt
+# model_dir: /home/chenjy/OmniDrones/scripts/outputs/warmup_cylinder0.pt
 # model_dir: /home/chenjy/OmniDrones/scripts/outputs/newreward_vel1_3.pt
-# model_dir: null
+model_dir: null
 
 # hydra.job.chdir: false
 
@@ -30,8 +30,8 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: Disagreement_emptytransfer_0and1
   run_name: debug
+  # run_name: warmup_cylinder0and1_fromscratch
   job_type: train
   entity: chenjy
   project: PredatorPrey

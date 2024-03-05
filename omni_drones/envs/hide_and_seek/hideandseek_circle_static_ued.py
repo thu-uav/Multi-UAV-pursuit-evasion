@@ -33,7 +33,7 @@ import copy
 
 from omni.isaac.debug_draw import _debug_draw
 
-from .placement import plot_heatmap, rejection_sampling_all_obj_xy, generate_outside_cylinders_x_y
+from .placement import rejection_sampling_with_validation, generate_outside_cylinders_x_y
 from .draw import draw_traj, draw_detection
 from .draw_circle import Float3, _COLOR_ACCENT, _carb_float3_add, draw_court_circle
 
@@ -373,13 +373,15 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
         self.arena_size = self.cfg.task.arena_size
         size = self.arena_size
         self.cylinder_height = 2 * size
+        self.use_validation = self.cfg.task.use_validation
 
-        obj_pos, _ = rejection_sampling_all_obj_xy(
+        obj_pos, _, _, _ = rejection_sampling_with_validation(
             arena_size=self.arena_size, 
             cylinder_size=self.cylinder_size, 
             num_drones=self.num_agents, 
             num_cylinders=self.max_active_cylinders, 
-            device=self.device)
+            device=self.device,
+            use_validation=self.use_validation)
 
         drone_z = D.Uniform(
                 torch.tensor([0.1], device=self.device),
@@ -472,12 +474,13 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
                 torch.tensor([0.1], device=self.device),
                 torch.tensor([2 * self.arena_size], device=self.device)
             ).sample()
-        obj_pos, occupancy_matrix_one = rejection_sampling_all_obj_xy(
+        obj_pos, _, _, _ = rejection_sampling_with_validation(
             arena_size=self.arena_size, 
             cylinder_size=self.cylinder_size, 
             num_drones=self.num_agents, 
             num_cylinders=self.max_active_cylinders, 
-            device=self.device)
+            device=self.device,
+            use_validation=self.use_validation)
         
         drone_x_y = obj_pos[:self.num_agents].clone()
         target_x_y = obj_pos[self.num_agents].clone()

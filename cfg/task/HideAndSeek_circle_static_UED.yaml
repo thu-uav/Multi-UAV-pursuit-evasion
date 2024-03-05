@@ -6,7 +6,7 @@ defaults:
   - /base/sim_base@_here_
 
 env:
-  num_envs: 2048
+  num_envs: 100
   max_episode_length: 800
 
 drone_model: Crazyflie
@@ -22,6 +22,9 @@ capture_threshold: 0.98
 
 # outer cl
 use_outer_cl: 0
+
+# use rejection sampling validation
+use_validation: 1
 
 # evalution scenario
 evaluation_flag: null # '3_cylineder_line', '5_cylineder_line', '8_cylineder_ring', '7_cylineder_ring'
@@ -43,5 +46,5 @@ use_dynamic: False
 cylinder:
   size: 0.2
   num: 8
-  max_active: 1
-  random_active: False
+  max_active: 5
+  random_active: True
