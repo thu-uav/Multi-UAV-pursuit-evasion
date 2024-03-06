@@ -12,7 +12,7 @@ env: ${task.env}
 
 total_frames: 100_000_000_000
 max_iters: -1
-eval_interval: 200
+eval_interval: -1
 save_interval: 200
 seed: 0
 
@@ -30,14 +30,14 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: debug
+  # run_name: debug
   # run_name: warmup_cylinder5_fromscratch_new_rs_withvalidation
-  # run_name: cylinder1to3_fromscratch_catch_01889_check
+  run_name: cylinder0to5_fromscratch_catch0_5to0_15_wo_validation
   job_type: train
   entity: chenjy
   project: PredatorPrey
-  # mode: online
-  mode: disabled # set to 'disabled' when debugging locally
+  mode: online
+  # mode: disabled # set to 'disabled' when debugging locally
   run_id: 
   monitor_gym: True
   tags: 
