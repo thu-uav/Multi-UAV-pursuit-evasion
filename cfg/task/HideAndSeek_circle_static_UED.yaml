@@ -6,7 +6,7 @@ defaults:
   - /base/sim_base@_here_
 
 env:
-  num_envs: 100
+  num_envs: 2048
   max_episode_length: 800
 
 drone_model: Crazyflie
@@ -17,7 +17,7 @@ time_encoding: true
 action_transform: rate
 
 # inner cl
-use_inner_cl: 1
+use_inner_cl: 0
 capture_threshold: 0.98
 
 # outer cl
@@ -46,5 +46,6 @@ use_dynamic: False
 cylinder:
   size: 0.2
   num: 8
-  max_active: 5
-  random_active: True
+  max_active: 3
+  min_active: 1
+  random_active: True # if False, only train max_active
