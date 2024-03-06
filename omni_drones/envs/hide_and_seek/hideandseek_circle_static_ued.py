@@ -193,7 +193,7 @@ class ManualCurriculum(object):
         return list of np.array
         """
         if np.sum(self._weight_buffer) < 1.0: # all tasks = 0.0
-            initial_states += [None] * num_samples
+            initial_states = [None] * num_samples
         else:
             weights = self._weight_buffer / np.mean(self._weight_buffer)
             probs = (weights / np.sum(weights)).squeeze()

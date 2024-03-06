@@ -251,7 +251,7 @@ def main(cfg):
             auto_reset=True,
             break_when_any_done=False,
             return_contiguous=False
-        ).clone()
+        )
         
         # manual cl evaluation
         eval_num_cylinders = np.arange(cfg.task.cylinder.min_active, cfg.task.cylinder.max_active + 1)
