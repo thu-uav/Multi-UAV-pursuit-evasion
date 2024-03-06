@@ -23,6 +23,9 @@ capture_threshold: 0.98
 # outer cl
 use_outer_cl: 0
 
+# manual cl
+use_manual_cl: 1
+
 # use rejection sampling validation
 use_validation: 0
 
