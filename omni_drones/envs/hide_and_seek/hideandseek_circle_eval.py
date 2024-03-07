@@ -288,7 +288,7 @@ class HideAndSeek_circle_eval(IsaacEnv):
                 translation=cylinders_pos[idx],
                 radius=self.cylinder_size,
                 height=self.cylinder_height,
-                mass=1000.0
+                mass=20000.0
             )
 
         objects.VisualCylinder(
@@ -320,40 +320,52 @@ class HideAndSeek_circle_eval(IsaacEnv):
         '''
         num_drones = 4
         if evaluation_flag == '3_cylineder_line':
-            drone_z = D.Uniform(
-                    torch.tensor([0.1], device=device),
-                    torch.tensor([2 * arena_size], device=device)
-                ).sample((1, 4)).squeeze(0)
-            target_z = D.Uniform(
-                    torch.tensor([0.1], device=device),
-                    torch.tensor([2 * arena_size], device=device)
-                ).sample((1, 1)).squeeze(0)
-            drone_x_y = torch.tensor([
-                                    [0.0, -0.9],
-                                    [0.0, -0.7],
-                                    [0.1, -0.8],
-                                    [-0.1, -0.8]
-                                    ], device=device)
-            target_x_y = torch.tensor([0.0, 0.9], device=device).unsqueeze(0)
-            drone_pos = torch.concat([drone_x_y, drone_z], dim=-1)
-            target_pos = torch.concat([target_x_y, target_z], dim=-1).squeeze(0)
-            num_active_cylinders = 3
-            cylinders_pos = torch.tensor([
-                                        [0.0, 0.0, 1.0],
-                                        [0.4, 0.0, 1.0],
-                                        [-0.4, 0.0, 1.0], # active 
-                                        [2.0, 0.0, 1.0],
-                                        [3.0, 0.0, 1.0],
-                                        [4.0, 0.0, 1.0],
-                                        [-2.0, 0.0, -1.0],
-                                        [-3.0, 0.0, -1.0], # inactive
-                                        ], device=device)
-            cylinders_mask = torch.tensor([1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0], device=device)
-            if num_envs > 1:
-                drone_pos = drone_pos.unsqueeze(0).expand(num_envs, -1, -1)
-                target_pos = target_pos.unsqueeze(0).expand(num_envs, -1)
-                cylinders_pos = cylinders_pos.unsqueeze(0).expand(num_envs, -1, -1)
-                cylinders_mask = cylinders_mask.unsqueeze(0).expand(num_envs, -1)
+            drone_pos = []
+            target_pos = []
+            cylinders_pos = []
+            cylinders_mask = [] 
+            for _ in range(num_envs):
+                drone_z = D.Uniform(
+                        torch.tensor([0.1], device=device),
+                        torch.tensor([2 * arena_size], device=device)
+                    ).sample((1, 4)).squeeze(0)
+                target_z = D.Uniform(
+                        torch.tensor([0.1], device=device),
+                        torch.tensor([2 * arena_size], device=device)
+                    ).sample((1, 1)).squeeze(0)
+                drone_x_y = D.Uniform(
+                        torch.tensor([-0.3, -0.9], device=device),
+                        torch.tensor([0.3, -0.7], device=device)
+                    ).sample((1, 4)).squeeze(0)
+                
+                target_x_y = torch.tensor([0.0, 0.9], device=device).unsqueeze(0)
+                drone_pos_one = torch.concat([drone_x_y, drone_z], dim=-1)
+                target_pos_one = torch.concat([target_x_y, target_z], dim=-1).squeeze(0)
+                
+                cylinder_random_pos = torch.tensor([
+                                                [0.0, 0.0, 1.1],
+                                                [0.4, 0.0, 1.1],
+                                                [-0.4, 0.0, 1.1], # active 
+                                                ], device=device)
+                cylinder_random_pos = cylinder_random_pos[torch.randperm(3)]
+                cylinder_fixed_pos = torch.tensor([
+                                            [2.0, 0.0, 1.1],
+                                            [1.4142, 1.4142, 1.1],
+                                            [0.0, 2.0, 1.1],
+                                            [-1.4142, 1.4142, 1.1],
+                                            [-2.0, 0.0, 1.1], # inactive
+                                            ], device=device)
+                cylinder_pos_one = torch.concat([cylinder_random_pos, cylinder_fixed_pos])
+                cylinders_mask_one = torch.tensor([1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0], device=device)
+                
+                drone_pos.append(drone_pos_one)
+                target_pos.append(target_pos_one)
+                cylinders_pos.append(cylinder_pos_one)
+                cylinders_mask.append(cylinders_mask_one)
+            drone_pos = torch.stack(drone_pos, dim=0).type(torch.float32)
+            target_pos = torch.stack(target_pos, dim=0).type(torch.float32)
+            cylinders_pos = torch.stack(cylinders_pos, dim=0).type(torch.float32)
+            cylinders_mask = torch.stack(cylinders_mask, dim=0).type(torch.float32)
         elif evaluation_flag == 'empty':
             # pos dist
             angle_dist = D.Uniform(

@@ -20,6 +20,8 @@ action_transform: rate
 # evalution scenario
 evaluation_flag: '3_cylineder_line' # '5_cross', '6_cross', '7_c_1', '8_random'
 
+use_validation: 1
+
 # exp
 num_agents: 4
 detect_range: -1.0 # -1.0 means fully-observable
@@ -38,4 +40,6 @@ use_dynamic: False
 cylinder:
   size: 0.2
   num: 8
-  num_active: 3
+  max_active: 5
+  min_active: 0
+  random_active: True # if False, only train max_active
