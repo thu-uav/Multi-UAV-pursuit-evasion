@@ -12,7 +12,7 @@ env: ${task.env}
 
 total_frames: 100_000_000_000
 max_iters: -1
-eval_interval: 50
+eval_interval: 100
 save_interval: 200
 seed: 0
 
@@ -31,7 +31,7 @@ viewer:
 wandb:
   group: ${oc.select:..task.name}
   run_name: cylinder0to5_fromscratch_catch0_5to0_15_with_validation_cl
-  # run_name: warmup_cylinder5_fromscratch_new_rs_withvalidation
+  # run_name: debug
   # run_name: cylinder0to5_fromscratch_catch0_5to0_15_wo_validation
   job_type: train
   entity: chenjy
