@@ -57,7 +57,7 @@ class InnerCurriculum(object):
     def set_target_task(self, **kwargs):
         self.end_catch_radius = kwargs['catch_radius']
         self.end_speed = kwargs['speed']
-        num_axis = 10
+        num_axis = 5
         self.training_order = []
         if self.start_catch_radius == self.end_catch_radius:
             training_catch_radius = np.array([self.start_catch_radius])
@@ -179,8 +179,8 @@ class ManualCurriculum(object):
         self.min_active_cylinders = cfg.task.cylinder.min_active
         self._state_buffer = np.arange(self.min_active_cylinders, self.max_active_cylinders + 1)
         self._weight_buffer = np.ones_like(self._state_buffer)
-        self.omega_min = 0.3
-        self.omega_max = 0.7
+        self.omega_min = 0.5
+        self.omega_max = 0.9
         
     def update_weights(self, capture_dict):
         for idx in range(len(self._state_buffer)):
@@ -304,13 +304,14 @@ class HideAndSeek_circle_static_UED_cl(IsaacEnv):
         self.use_manual_cl = self.cfg.task.use_manual_cl
         if self.use_manual_cl:
             self.manual_curriculum_module = ManualCurriculum(cfg)
-        
-        # outer CL
-        self.use_outer_cl = self.cfg.task.use_outer_cl
         self.set_train = True
-        self.eval_iter = 0 # eval 5 times for cl buffer
-        if self.use_outer_cl:
-            self.outer_curriculum_module = OuterCurriculum(cfg=self.cfg, device=self.device)
+        
+        # # outer CL
+        # self.use_outer_cl = self.cfg.task.use_outer_cl
+        # self.set_train = True
+        # self.eval_iter = 0 # eval 5 times for cl buffer
+        # if self.use_outer_cl:
+        #     self.outer_curriculum_module = OuterCurriculum(cfg=self.cfg, device=self.device)
         
         self.draw = _debug_draw.acquire_debug_draw_interface()
 
@@ -559,13 +560,13 @@ class HideAndSeek_circle_static_UED_cl(IsaacEnv):
             self.catch_radius = inner_tasks[0]
             self.v_prey = inner_tasks[1]
 
-        if self.use_outer_cl:
-            # current_tasks contains x, y, z of drones, target, cylinders and cylinder masks
-            if self.set_train:
-                current_tasks = self.outer_curriculum_module.sample(num_samples=len(env_ids))
-            else:
-                current_tasks = self.outer_curriculum_module._state_buffer[self.eval_iter * self.num_envs: (self.eval_iter + 1) * self.num_envs]
-        elif self.use_manual_cl:
+        # if self.use_outer_cl:
+        #     # current_tasks contains x, y, z of drones, target, cylinders and cylinder masks
+        #     if self.set_train:
+        #         current_tasks = self.outer_curriculum_module.sample(num_samples=len(env_ids))
+        #     else:
+        #         current_tasks = self.outer_curriculum_module._state_buffer[self.eval_iter * self.num_envs: (self.eval_iter + 1) * self.num_envs]
+        if self.use_manual_cl:
             if self.set_train:
                 current_tasks = self.manual_curriculum_module.sample(num_samples=len(env_ids))
             else:
@@ -587,6 +588,7 @@ class HideAndSeek_circle_static_UED_cl(IsaacEnv):
                 num_active_cylinder = torch.randint(self.min_active_cylinders, self.max_active_cylinders + 1, (1,)).item()
             else:
                 num_active_cylinder = self.max_active_cylinders
+            
             if current_tasks[idx] is None:
                 drone_pos_one, target_pos_one, \
                     cylinder_pos_one, cylinder_mask_one = self.uniform_generate_envs(num_active_cylinder=num_active_cylinder)
@@ -607,16 +609,16 @@ class HideAndSeek_circle_static_UED_cl(IsaacEnv):
             cylinders_pos.append(cylinder_pos_one)
             self.cylinders_mask.append(cylinder_mask_one)
                 
-            # get cl_task
-            cl_task_one = []
-            cl_task_one += drone_pos_one.reshape(-1).to('cpu').numpy().tolist()
-            cl_task_one += target_pos_one.to('cpu').numpy().tolist()
-            cl_task_one += cylinder_pos_one.reshape(-1).to('cpu').numpy().tolist()
-            cl_task_one += cylinder_mask_one.tolist()
+            # # get cl_task
+            # cl_task_one = []
+            # cl_task_one += drone_pos_one.reshape(-1).to('cpu').numpy().tolist()
+            # cl_task_one += target_pos_one.to('cpu').numpy().tolist()
+            # cl_task_one += cylinder_pos_one.reshape(-1).to('cpu').numpy().tolist()
+            # cl_task_one += cylinder_mask_one.tolist()
             
-            if self.use_outer_cl and self.set_train:
-                # cl_task: [drone_pos, target_pos, cylinder_pos, cylinder_mask]
-                self.outer_curriculum_module.insert(np.array(cl_task_one))
+            # if self.use_outer_cl and self.set_train:
+            #     # cl_task: [drone_pos, target_pos, cylinder_pos, cylinder_mask]
+            #     self.outer_curriculum_module.insert(np.array(cl_task_one))
 
             if idx == self.central_env_idx and self._should_render(0):
                 self._draw_court_circle(self.arena_size)
@@ -664,17 +666,17 @@ class HideAndSeek_circle_static_UED_cl(IsaacEnv):
         for substep in range(1):
             self.sim.step(self._should_render(substep))
 
-    # for outer curriculum
-    def _update_cl_states(self):
-        self.outer_curriculum_module.update_states()
-        cl_mean_num_cylinders = self.outer_curriculum_module._state_buffer[:, -self.num_cylinders].sum(axis=-1).mean()
-        self.stats['cl_mean_num_cylinders'].set_(torch.ones((self.num_envs, 1), device=self.device) * cl_mean_num_cylinders)
+    # # for outer curriculum
+    # def _update_cl_states(self):
+    #     self.outer_curriculum_module.update_states()
+    #     cl_mean_num_cylinders = self.outer_curriculum_module._state_buffer[:, -self.num_cylinders].sum(axis=-1).mean()
+    #     self.stats['cl_mean_num_cylinders'].set_(torch.ones((self.num_envs, 1), device=self.device) * cl_mean_num_cylinders)
 
-    def _update_curriculum(self, eval_metrics, model_dir, episode):
-        self.outer_curriculum_module.update_weights(eval_metrics)
-        self.stats["cl_mean_weights"].set_(torch.ones((self.num_envs, 1), device=self.device) * np.mean(self.outer_curriculum_module._weight_buffer))
-        self.outer_curriculum_module.save_task(model_dir=model_dir, 
-                                               episode=episode)
+    # def _update_curriculum(self, eval_metrics, model_dir, episode):
+    #     self.outer_curriculum_module.update_weights(eval_metrics)
+    #     self.stats["cl_mean_weights"].set_(torch.ones((self.num_envs, 1), device=self.device) * np.mean(self.outer_curriculum_module._weight_buffer))
+    #     self.outer_curriculum_module.save_task(model_dir=model_dir, 
+    #                                            episode=episode)
     #################
     
     # for manual CL

@@ -1,7 +1,7 @@
 model_dir: /home/chenjy/OmniDrones/scripts/outputs/inner_cylinder0to5_validation.pt
 # model_dir: /home/chenjy/OmniDrones/scripts/outputs/warmup_cylinder0.pt
 # model_dir: /home/chenjy/OmniDrones/scripts/outputs/warmup_cylinder1to3.pt
-# model_dir: null
+model_dir: null
 
 # hydra.job.chdir: false
 
@@ -12,7 +12,7 @@ env: ${task.env}
 
 total_frames: 100_000_000_000
 max_iters: -1
-eval_interval: -1
+eval_interval: 100
 save_interval: 200
 seed: 0
 
@@ -32,7 +32,7 @@ wandb:
   group: ${oc.select:..task.name}
   # run_name: cylinder5_validation_check_catch015
   # run_name: debug
-  run_name: cylinder0to5_catch0_15_validation_load
+  run_name: cylinder0to5_catch0_15_validation_cl_load
   job_type: train
   entity: chenjy
   project: PredatorPrey
@@ -45,8 +45,8 @@ wandb:
 defaults:
   # - task: HideAndSeek
   # - task: HideAndSeek_circle_static
-  - task: HideAndSeek_circle_static_UED
-  # - task: HideAndSeek_circle_static_UED_cl
+  # - task: HideAndSeek_circle_static_UED
+  - task: HideAndSeek_circle_static_UED_cl
   # - task: HideAndSeek_circle_eval
   - algo: mappo
   - _self_

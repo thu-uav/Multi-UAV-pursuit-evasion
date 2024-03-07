@@ -6,7 +6,7 @@ defaults:
   - /base/sim_base@_here_
 
 env:
-  num_envs: 100
+  num_envs: 2048
   max_episode_length: 800
 
 drone_model: Crazyflie
@@ -24,7 +24,7 @@ capture_threshold: 0.98
 use_outer_cl: 0
 
 # manual cl
-use_manual_cl: 0
+use_manual_cl: 1
 
 # use rejection sampling validation
 use_validation: 1
