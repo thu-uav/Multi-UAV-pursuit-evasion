@@ -30,9 +30,9 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: cylinder5_validation_check_catch015
+  # run_name: cylinder5_validation_check_catch015
   # run_name: debug
-  # run_name: cylinder0to5_fromscratch_catch0_5to0_15_wo_validation
+  run_name: cylinder0to5_catch0_2_validation_load
   job_type: train
   entity: chenjy
   project: PredatorPrey
@@ -46,6 +46,7 @@ defaults:
   # - task: HideAndSeek
   # - task: HideAndSeek_circle_static
   - task: HideAndSeek_circle_static_UED
+  # - task: HideAndSeek_circle_static_UED_cl
   # - task: HideAndSeek_circle_eval
   - algo: mappo
   - _self_
