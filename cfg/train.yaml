@@ -32,7 +32,7 @@ wandb:
   group: ${oc.select:..task.name}
   # run_name: cylinder5_validation_check_catch015
   # run_name: debug
-  run_name: cylinder0to5_catch0_2_validation_load
+  run_name: cylinder0to5_catch0_15_validation_load
   job_type: train
   entity: chenjy
   project: PredatorPrey
