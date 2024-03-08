@@ -263,6 +263,8 @@ def main(cfg):
         # after rollout, set rendering mode to not headless and reset env
         base_env.enable_render(not cfg.headless)
 
+
+        base_env._update_manual_curriculum(capture_dict=capture_dict)
         env.train() # set env back to training mode after evaluation
         base_env.set_train = True
         env.reset()
@@ -294,7 +296,7 @@ def main(cfg):
                 video_array, fps=0.5 / cfg.sim.dt, format="mp4"
             )
         
-        info.update(capture_dict)
+        # info.update(capture_dict)
         
         return info
 
@@ -334,7 +336,6 @@ def main(cfg):
         if eval_interval > 0 and i % eval_interval == 0:
             logging.info(f"Eval at {collector._frames} steps.")
             info.update(evaluate())
-            base_env._update_manual_curriculum(capture_dict=info)
 
         # save policy model every certain step
         if save_interval > 0 and i % save_interval == 0:

@@ -179,14 +179,21 @@ class ManualCurriculum(object):
         self.min_active_cylinders = cfg.task.cylinder.min_active
         self._state_buffer = np.arange(self.min_active_cylinders, self.max_active_cylinders + 1)
         self._weight_buffer = np.ones_like(self._state_buffer)
+        self._easy_buffer = []
         self.omega_min = 0.5
         self.omega_max = 0.9
+        self.easy_prob = 0.1
         
     def update_weights(self, capture_dict):
+        # empty the easy buffer
+        self._easy_buffer = []
         for idx in range(len(self._state_buffer)):
             num_cylinder = self._state_buffer[idx]
-            self._weight_buffer[idx] = (capture_dict['capture_{}'.format(num_cylinder)] >= self.omega_min) and \
-                                        (capture_dict['capture_{}'.format(num_cylinder)] <= self.omega_max)
+            self._weight_buffer[idx] = (capture_dict['capture_{}'.format(num_cylinder)] > self.omega_min) and \
+                                        (capture_dict['capture_{}'.format(num_cylinder)] < self.omega_max)
+            if capture_dict['capture_{}'.format(num_cylinder)] >= self.omega_max:
+                self._easy_buffer.append(num_cylinder)
+        self._easy_buffer = np.array(self._easy_buffer)
 
     def sample(self, num_samples):
         """
@@ -195,10 +202,20 @@ class ManualCurriculum(object):
         if np.sum(self._weight_buffer) < 1.0: # all tasks = 0.0
             initial_states = [None] * num_samples
         else:
+            # num_samples = num_cl + num_easy
+            initial_states = []
+            if len(self._easy_buffer) > 0:
+                num_easy = int(num_samples * self.easy_prob)
+            else:
+                num_easy = 0
+            num_cl = num_samples - num_easy
             weights = self._weight_buffer / np.mean(self._weight_buffer)
             probs = (weights / np.sum(weights)).squeeze()
-            sample_idx = np.random.choice(self._state_buffer.shape[0], num_samples, replace=True, p=probs)
-            initial_states = [self._state_buffer[idx] for idx in sample_idx]
+            sample_idx = np.random.choice(self._state_buffer.shape[0], num_cl, replace=True, p=probs)
+            initial_states += [self._state_buffer[idx] for idx in sample_idx]
+            if len(self._easy_buffer) > 0:
+                sample_easy_idx = np.random.randint(0, len(self._easy_buffer), size=num_easy)
+                initial_states += [self._easy_buffer[idx] for idx in sample_easy_idx]
         return initial_states
 
 class HideAndSeek_circle_static_UED_cl(IsaacEnv): 
@@ -683,6 +700,7 @@ class HideAndSeek_circle_static_UED_cl(IsaacEnv):
     def _update_manual_curriculum(self, capture_dict):
         self.manual_curriculum_module.update_weights(capture_dict=capture_dict)
         self.stats["manual_cl_sum_weights"].set_(torch.ones((self.num_envs, 1), device=self.device) * np.sum(self.manual_curriculum_module._weight_buffer))
+        print('num_easy_list', self.manual_curriculum_module._easy_buffer)
 
     def _pre_sim_step(self, tensordict: TensorDictBase):   
         self.step_spec += 1
