@@ -33,7 +33,7 @@ import copy
 
 from omni.isaac.debug_draw import _debug_draw
 
-from .placement import rejection_sampling_with_validation, generate_outside_cylinders_x_y
+from .placement import rejection_sampling_drone_target_xy, rejection_sampling_with_validation, generate_outside_cylinders_x_y
 from .draw import draw_traj, draw_detection
 from .draw_circle import Float3, _COLOR_ACCENT, _carb_float3_add, draw_court_circle
 
@@ -342,12 +342,27 @@ class HideAndSeek_circle_eval(IsaacEnv):
                         torch.tensor([0.1], device=device),
                         torch.tensor([2 * arena_size], device=device)
                     ).sample((1, 1)).squeeze(0)
-                drone_x_y = D.Uniform(
-                        torch.tensor([-0.3, -0.9], device=device),
-                        torch.tensor([0.3, -0.7], device=device)
-                    ).sample((1, 4)).squeeze(0)
+                # drone_x_y = D.Uniform(
+                #         torch.tensor([-0.3, -0.9], device=device),
+                #         torch.tensor([0.3, -0.7], device=device)
+                #     ).sample((1, 4)).squeeze(0)
                 
-                target_x_y = torch.tensor([0.0, 0.9], device=device).unsqueeze(0)
+                # target_x_y = torch.tensor([0.0, 0.9], device=device).unsqueeze(0)
+                
+                occupancy_matrix = np.zeros((5, 5))
+                occupancy_matrix[1, 2] = 1.0
+                occupancy_matrix[2, 2] = 1.0
+                occupancy_matrix[3, 2] = 1.0
+                drone_target_xy, _, _, _ = rejection_sampling_drone_target_xy(arena_size=1.0, 
+                                                   cylinder_size=0.2, 
+                                                   num_drones=4, 
+                                                   device=self.device,
+                                                   occupancy_matrix=occupancy_matrix)
+                drone_x_y = drone_target_xy[:4].clone()
+                target_x_y = drone_target_xy[4:].clone()
+                drone_pos_one = torch.concat([drone_x_y, drone_z], dim=-1)
+                target_pos_one = torch.concat([target_x_y, target_z], dim=-1).squeeze(0)
+                
                 drone_pos_one = torch.concat([drone_x_y, drone_z], dim=-1)
                 target_pos_one = torch.concat([target_x_y, target_z], dim=-1).squeeze(0)
                 
@@ -389,12 +404,21 @@ class HideAndSeek_circle_eval(IsaacEnv):
                         torch.tensor([0.1], device=device),
                         torch.tensor([2 * arena_size], device=device)
                     ).sample((1, 1)).squeeze(0)
-                drone_x_y = D.Uniform(
-                        torch.tensor([-0.3, -0.9], device=device),
-                        torch.tensor([0.3, -0.7], device=device)
-                    ).sample((1, 4)).squeeze(0)
+                # drone_x_y = D.Uniform(
+                #         torch.tensor([-0.3, -0.9], device=device),
+                #         torch.tensor([0.3, -0.7], device=device)
+                #     ).sample((1, 4)).squeeze(0)
                 
-                target_x_y = torch.tensor([0.0, 0.9], device=device).unsqueeze(0)
+                # target_x_y = torch.tensor([0.0, 0.9], device=device).unsqueeze(0)
+                occupancy_matrix = np.zeros((5, 5))
+                occupancy_matrix[2, 2] = 1.0
+                drone_target_xy, _, _, _ = rejection_sampling_drone_target_xy(arena_size=1.0, 
+                                                   cylinder_size=0.2, 
+                                                   num_drones=4, 
+                                                   device=self.device,
+                                                   occupancy_matrix=occupancy_matrix)
+                drone_x_y = drone_target_xy[:4].clone()
+                target_x_y = drone_target_xy[4:].clone()
                 drone_pos_one = torch.concat([drone_x_y, drone_z], dim=-1)
                 target_pos_one = torch.concat([target_x_y, target_z], dim=-1).squeeze(0)
                 

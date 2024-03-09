@@ -87,75 +87,60 @@ def has_feasible_path(matrix, start_points, target):
 
 ###################################################
 
-# old version
-def rejection_sampling_all_obj_xy(arena_size, cylinder_size, num_drones, num_cylinders, device):
-    # set cylinders by rejection sampling
+def rejection_sampling_drone_target_xy(arena_size, cylinder_size, num_drones, device, occupancy_matrix):
+    # occupancy_matrix : (matrix_size, matrix_size) 
     grid_size = 2 * cylinder_size
     matrix_size = int(2 * arena_size / grid_size)
     origin_grid = [int(matrix_size / 2), int(matrix_size / 2)]
-    origin_pos = [0.0, 0.0] # left corner
-    occupancy_matrix = np.zeros((matrix_size, matrix_size))
-    cylinder_occupancy_matrix = np.zeros((matrix_size, matrix_size))
-    
-    # first randomize the grid pos of cylinders
-    # occupy the matrix
-    x_y_grid_list = [[0,2], [1,1], [1,2], [1,3], [2,0], [2,1], [2,2], [2,3], [2,4], \
-                        [3,1], [3,2], [3,3], [4,2]]
-    cylinders_pos = []
-    for cylinder_idx in range(num_cylinders):
-        while True:
-            grid_idx = torch.randint(0, len(x_y_grid_list), (1,)).item()
-            x_grid = int(x_y_grid_list[grid_idx][0])
-            y_grid = int(x_y_grid_list[grid_idx][1])
-            # x_grid = torch.randint(0, matrix_size, (1,))
-            # y_grid = torch.randint(0, matrix_size, (1,))
-            
-            x = (x_grid - origin_grid[0]) * grid_size
-            y = (y_grid - origin_grid[1]) * grid_size
-
-            # Check if the new object overlaps with existing objects
-            if x_grid >= 0 and x_grid < matrix_size and y_grid >= 0 and y_grid < matrix_size:
-                if occupancy_matrix[x_grid, y_grid] == 0:
-                    cylinders_pos.append(torch.tensor([x, y], device=device))
-                    occupancy_matrix[x_grid, y_grid] = 1
-                    break
-    if num_cylinders == 0:
-        cylinders_pos = torch.tensor([], device=device)
-    else:
-        cylinders_pos = torch.stack(cylinders_pos)
-    cylinder_occupancy_matrix = occupancy_matrix.copy()
+    origin_pos = [0.0, 0.0] # left corner   
+    # expand to 10 * 10, and set corner to 1.0
+    occupancy_matrix = np.kron(occupancy_matrix, np.ones((2, 2), dtype=occupancy_matrix.dtype))
+    # set disabled idx to 1.0
+    # up
+    occupancy_matrix[0,0] = 1.0; occupancy_matrix[0,1] = 1.0; occupancy_matrix[0,2] = 1.0
+    occupancy_matrix[0, -1] = 1.0; occupancy_matrix[0, -2] = 1.0; occupancy_matrix[0, -3] = 1.0
+    occupancy_matrix[1,0] = 1.0; occupancy_matrix[1,1] = 1.0
+    occupancy_matrix[1,-1] = 1.0; occupancy_matrix[1,-2] = 1.0
+    occupancy_matrix[2,0] = 1.0; occupancy_matrix[2,-1] = 1.0
+    # down
+    occupancy_matrix[-1,0] = 1.0; occupancy_matrix[-1,1] = 1.0; occupancy_matrix[-1,2] = 1.0
+    occupancy_matrix[-1, -1] = 1.0; occupancy_matrix[-1, -2] = 1.0; occupancy_matrix[-1, -3] = 1.0
+    occupancy_matrix[-2,0] = 1.0; occupancy_matrix[-2,1] = 1.0
+    occupancy_matrix[-2,-1] = 1.0; occupancy_matrix[-2,-2] = 1.0
+    occupancy_matrix[-3,0] = 1.0; occupancy_matrix[-3,-1] = 1.0
 
     drone_target_pos = []
-    extra_size = 0.15
+    start_grid = ()
+    target_grid = ()
+    small_reference_grid = [0, 0]
+    small_reference_pos = [-0.9, -0.9]
+    small_grid_size = grid_size / 2.0
+    small_matrix_size = len(occupancy_matrix)
+    
     for idx in range(num_drones + 1):
         while True:
-            # Generate random angle and radius within the circular area
-            grid_idx = torch.randint(0, len(x_y_grid_list), (1,)).item()
-            x_grid = int(x_y_grid_list[grid_idx][0])
-            y_grid = int(x_y_grid_list[grid_idx][1])
+            grid_idx = torch.randint(0, len(occupancy_matrix), (2,))
+            x_grid = int(grid_idx[0])
+            y_grid = int(grid_idx[1])
             
-            x = (x_grid - origin_grid[0]) * grid_size
-            y = (y_grid - origin_grid[1]) * grid_size
+            x = (x_grid - small_reference_grid[0]) * small_grid_size + small_reference_pos[0]
+            y = (y_grid - small_reference_grid[1]) * small_grid_size + small_reference_pos[1]
 
             # Check if the new object overlaps with existing objects
-            if x_grid >= 0 and x_grid < matrix_size and y_grid >= 0 and y_grid < matrix_size:
+            if x_grid >= 0 and x_grid < small_matrix_size and y_grid >= 0 and y_grid < small_matrix_size:
                 if occupancy_matrix[x_grid, y_grid] == 0:
-                    extra_x = (2.0 * torch.rand(1)[0] - 1.0) * extra_size
-                    extra_y = (2.0 * torch.rand(1)[0] - 1.0) * extra_size
-                    real_x = x + extra_x
-                    real_y = y + extra_y
-                    drone_target_pos.append(torch.tensor([real_x, real_y], device=device))
+                    drone_target_pos.append(torch.tensor([x, y], device=device))
                     occupancy_matrix[x_grid, y_grid] = 1
-                    if idx == 0:
-                        drone_target_occupancy_matrix = occupancy_matrix - cylinder_occupancy_matrix
+                    if idx >= num_drones: # target
+                        target_grid += (x_grid, y_grid)
+                    else: # drones
+                        start_grid += ((x_grid, y_grid), )
                     break
     drone_target_pos = torch.stack(drone_target_pos)
-    objects_pos = torch.concat([drone_target_pos, cylinders_pos])
-    # drone_target_occupancy_matrix = occupancy_matrix - cylinder_occupancy_matrix
     
-    return objects_pos, occupancy_matrix
+    return drone_target_pos, occupancy_matrix, start_grid, target_grid
 
-def rejection_sampling_all_obj_xy_new(arena_size, cylinder_size, num_drones, num_cylinders, device):
+def rejection_sampling_all_obj_xy(arena_size, cylinder_size, num_drones, num_cylinders, device):
     # set cylinders by rejection sampling
     grid_size = 2 * cylinder_size
     matrix_size = int(2 * arena_size / grid_size)
@@ -333,7 +318,7 @@ def rejection_sampling_with_validation(arena_size, cylinder_size, num_drones, nu
     if not use_validation:
         task_one, occupancy_matrix, drone_target_occupancy_matrix, \
             cylinder_occupancy_matrix, start_grid, target_grid = \
-            rejection_sampling_all_obj_xy_new(arena_size=arena_size, 
+            rejection_sampling_all_obj_xy(arena_size=arena_size, 
                                                 cylinder_size=cylinder_size, 
                                                 num_drones=num_drones, 
                                                 num_cylinders=num_cylinders, 
@@ -344,7 +329,7 @@ def rejection_sampling_with_validation(arena_size, cylinder_size, num_drones, nu
         while(num_loop <= 100):
             task_one, occupancy_matrix, drone_target_occupancy_matrix, \
                 cylinder_occupancy_matrix, start_grid, target_grid = \
-                rejection_sampling_all_obj_xy_new(arena_size=arena_size, 
+                rejection_sampling_all_obj_xy(arena_size=arena_size, 
                                                     cylinder_size=cylinder_size, 
                                                     num_drones=num_drones, 
                                                     num_cylinders=num_cylinders, 
@@ -353,47 +338,6 @@ def rejection_sampling_with_validation(arena_size, cylinder_size, num_drones, nu
                 return task_one, occupancy_matrix, drone_target_occupancy_matrix, cylinder_occupancy_matrix
             num_loop += 1
         raise NotImplementedError
-
-# only for empty scenario
-def rejection_sampling(arena_size, cylinder_size, num_cylinders, device):
-    # set cylinders by rejection sampling
-    grid_size = 2 * cylinder_size
-    matrix_size = int(2 * arena_size / grid_size)
-    origin_pos = [-arena_size, +arena_size] # left corner
-    occupancy_matrix = np.zeros((matrix_size, matrix_size))
-    # pos dist
-    angle_dist = D.Uniform(
-        torch.tensor([0.0], device=device),
-        torch.tensor([2 * torch.pi], device=device)
-    )
-    r_dist = D.Uniform(
-        torch.tensor([0.0], device=device),
-        torch.tensor([arena_size], device=device)
-    )
-    objects_pos = []
-    for obj_idx in range(num_cylinders):
-        while True:
-            # Generate random angle and radius within the circular area
-            angle = angle_dist.sample()
-            r = r_dist.sample()
-
-            # Convert polar coordinates to Cartesian coordinates
-            x = r * torch.cos(angle)
-            y = r * torch.sin(angle)
-
-            # Convert coordinates to grid units
-            x_grid = int((x - origin_pos[0]) / grid_size)
-            y_grid = int((origin_pos[1] - y) / grid_size)
-
-            # Check if the new object overlaps with existing objects
-            if x_grid >= 0 and x_grid < matrix_size and y_grid >= 0 and y_grid < matrix_size:
-                if occupancy_matrix[x_grid, y_grid] == 0:
-                    objects_pos.append(torch.tensor([x, y, 1.0], device=device))
-                    occupancy_matrix[x_grid, y_grid] = 1
-                    break
-
-    objects_pos = torch.stack(objects_pos)
-    return objects_pos
 
 # plot
 def plot_fessible_scenario():

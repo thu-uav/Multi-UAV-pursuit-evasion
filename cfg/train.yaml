@@ -19,7 +19,7 @@ seed: 0
 viewer:
   resolution: [960, 720]
   # up
-  eye: [0.01, 0.01, 6.]
+  eye: [0.001, 0.0, 6.]
   lookat: [0., 0., 2.]
   # # debug
   # eye: [0., -4., 4.]
@@ -30,7 +30,8 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: 1_cylinder_random
+  run_name: 3_cylinder_line_load
+  # run_name: debug
   # run_name: only_cylinder0_catch0_15_validation_load_catch02
   job_type: train
   entity: chenjy
