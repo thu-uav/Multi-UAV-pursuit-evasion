@@ -1,1 +1,1 @@
-CUDA_VISIABLE_DEVICES=1 python train_cl.py 
+CUDA_VISIABLE_DEVICES=1 python train_cl_v2.py 

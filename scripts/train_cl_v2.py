@@ -57,7 +57,6 @@ class Every:
 
 from typing import Sequence
 from tensordict import TensorDictBase
-import copy
 
 # Class for storing statistics for every iteration
 class EpisodeStats:
@@ -189,17 +188,11 @@ def main(cfg):
     # get parameters
     agent_spec: AgentSpec = env.agent_spec["drone"]
     policy = algos[cfg.algo.name.lower()](cfg.algo, agent_spec=agent_spec, device="cuda")
-    
-    # # make a copy for current policy
-    # last_policy = algos[cfg.algo.name.lower()](cfg.algo, agent_spec=agent_spec, device="cuda")
 
     if cfg.model_dir is not None:
+        # torch.save(policy.state_dict(), ckpt_path)
         policy.load_state_dict(torch.load(cfg.model_dir))
-        # last_policy.load_state_dict(torch.load(cfg.model_dir))
         print("Successfully load model!")
-    
-    # last_ckpt_path = os.path.join(run.dir, "last_policy.pt")
-    # torch.save(last_policy.state_dict(), last_ckpt_path)
 
     frames_per_batch = env.num_envs * int(cfg.algo.train_every)
     total_frames = cfg.get("total_frames", -1) // frames_per_batch * frames_per_batch
@@ -227,9 +220,7 @@ def main(cfg):
 
     @torch.no_grad()
     def evaluate(
-        eval_policy: None,
-        seed: int=0,
-        rollout_step: int = base_env.max_episode_length,
+        seed: int=0
     ):
         """
         Evaluate function called every certain steps. 
@@ -254,21 +245,19 @@ def main(cfg):
 
         # get one episode rollout using current policy and form a trajectory
         trajs = env.rollout(
-            max_steps=rollout_step,
-            policy=lambda x: eval_policy(x, deterministic=True),
+            max_steps=base_env.max_episode_length,
+            policy=lambda x: policy(x, deterministic=True),
             callback=Every(record_frame, 2),
             auto_reset=True,
             break_when_any_done=False,
             return_contiguous=False
-        ) # [num_envs, episode_length, 1]
+        )
         
-        # get capture and return for CL
-        task_capture = trajs['info']['task_capture'][:, -1].cpu().numpy()
-        task_return = trajs['info']['task_return'][:, -1].cpu().numpy()
-        task_disagreement = torch.std(trajs['state_value'][:, 0], dim=1).cpu().numpy()
+        min_distance = trajs['info']['min_distance'][:, -1].cpu().numpy()
 
         # after rollout, set rendering mode to not headless and reset env
         base_env.enable_render(not cfg.headless)
+        env.reset()
 
         # get first done index of each trajectory
         done = trajs.get(("next", "done"))
@@ -297,9 +286,7 @@ def main(cfg):
                 video_array, fps=0.5 / cfg.sim.dt, format="mp4"
             )
         
-        info['task_capture'] = task_capture
-        info['task_return'] = task_return
-        info['task_disagreement'] = task_disagreement
+        info.update({'min_distance': min_distance})
         
         return info
 
@@ -330,30 +317,23 @@ def main(cfg):
                 for k, v in episode_stats.pop().items(True, True)
             }
             info.update(stats)
-
+        
         # update the policy using rollout data and store the training statistics
         info.update(policy.train_op(data.to_tensordict()))
 
-        # evaluate every certain step
-        if eval_interval > 0 and i % eval_interval == 0:           
-            logging.info(f"Eval at {collector._frames} steps.")
-            # evaluate current policy
-            info.update(evaluate(eval_policy=policy, seed=cfg.seed))
-            # current_task_return = copy.deepcopy(info['task_return'])
-        
         # update cl before sampling
         # if training_data contains done, update CL
         if (i > 0) and (data['next']['done'].sum() > 0):
             # evaluate current policy
             base_env._update_cl_states()
-            disagreement_list = []
+            distance_list = []
             for _ in range(len(base_env.outer_curriculum_module._state_buffer) // base_env.num_envs):
-                info.update(evaluate(eval_policy=policy, seed=cfg.seed, rollout_step=1))
+                info.update(evaluate(seed=cfg.seed))
                 base_env.eval_iter += 1
-                disagreement_list.append(info['task_disagreement'])
+                distance_list.append(info['min_distance'])
             base_env.eval_iter = 0
-            disagreement_list = np.concatenate(disagreement_list)
-            base_env._update_curriculum(disagreement_list, model_dir=cl_model_dir, episode=i)
+            distance_list = np.concatenate(distance_list)
+            base_env._update_curriculum(distance_list, model_dir=cl_model_dir, episode=i)
             
             env.train() # set env back to training mode after evaluation
             base_env.set_train = True
