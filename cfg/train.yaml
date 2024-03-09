@@ -1,4 +1,4 @@
-model_dir: /home/chenjy/OmniDrones/scripts/outputs/inner_cylinder0to5_validation.pt
+model_dir: /home/chenjy/OmniDrones/scripts/outputs/cylinder0to5_validation_catch0_2.pt
 # model_dir: /home/chenjy/OmniDrones/scripts/outputs/cylinder0to5_catch0_15_validation_cl_load/03-07_21-23/wandb/run-20240307_212355-z1zptkff/files/checkpoint_1127350272.pt
 # model_dir: /home/chenjy/OmniDrones/scripts/outputs/warmup_cylinder1to3.pt
 # model_dir: null
@@ -12,26 +12,26 @@ env: ${task.env}
 
 total_frames: 100_000_000_000
 max_iters: -1
-eval_interval: 50
+eval_interval: 100
 save_interval: 200
 seed: 0
 
 viewer:
   resolution: [960, 720]
-  # # up
-  # eye: [0.01, 0.01, 6.]
-  # lookat: [0., 0., 2.]
+  # up
+  eye: [0.01, 0.01, 6.]
+  lookat: [0., 0., 2.]
   # # debug
   # eye: [0., -4., 4.]
   # lookat: [0., 0., 1.]
-  # front
-  eye: [20., 0., 20.]
-  lookat: [0., 0., 1.]
+  # # front
+  # eye: [8., 0., 8.]
+  # lookat: [0., 0., 1.]
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: cl_check
-  run_name: cylinder0to5_catch0_25_validation_cl_load
+  run_name: 1_cylinder_random
+  # run_name: only_cylinder0_catch0_15_validation_load_catch02
   job_type: train
   entity: chenjy
   project: PredatorPrey
@@ -45,7 +45,7 @@ defaults:
   # - task: HideAndSeek
   # - task: HideAndSeek_circle_static
   # - task: HideAndSeek_circle_static_UED
-  - task: HideAndSeek_circle_static_UED_cl
-  # - task: HideAndSeek_circle_eval
+  # - task: HideAndSeek_circle_static_UED_cl
+  - task: HideAndSeek_circle_eval
   - algo: mappo
   - _self_
