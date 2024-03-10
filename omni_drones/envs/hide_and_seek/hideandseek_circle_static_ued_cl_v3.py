@@ -131,7 +131,10 @@ class OuterCurriculum(object):
             all_states = np.concatenate([self._state_buffer, all_states], axis=0)
         
         self._temp_state_buffer = []
-        self._state_buffer = copy.deepcopy(all_states[all_states.shape[0] - self.buffer_size:])
+        if len(all_states) < self.buffer_size:
+            self._state_buffer = copy.deepcopy(all_states)
+        else:
+            self._state_buffer = copy.deepcopy(all_states[all_states.shape[0] - self.buffer_size:])
         self._weight_buffer = np.ones((self._state_buffer.shape[0], 1), dtype=np.float32)
 
     def sample(self, num_samples):

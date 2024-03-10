@@ -18,7 +18,7 @@ time_encoding: true
 action_transform: rate
 
 # evalution scenario
-evaluation_flag: '3_cylineder_line' # '3_cylineder_line', '5_cross', '6_cross', '7_c_1', '8_random'
+evaluation_flag: 'random' # '3_cylineder_line', '5_cross', '6_cross', '7_c_1', '8_random'
 
 use_validation: 1
 
