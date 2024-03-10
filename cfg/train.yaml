@@ -1,5 +1,5 @@
-# model_dir: /home/chenjy/OmniDrones/scripts/outputs/cylinder0to5_catch0_2.pt
-model_dir: /home/chenjy/OmniDrones/scripts/outputs/cl_v2.pt
+model_dir: /home/chenjy/OmniDrones/scripts/outputs/cylinder0to5_catch0_2.pt
+# model_dir: /home/chenjy/OmniDrones/scripts/outputs/cl_v2.pt
 # model_dir: null
 
 # hydra.job.chdir: false
@@ -29,7 +29,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: cl_v2_3_cylinder_random
+  run_name: 5_random_load
   # run_name: 3_cyinder_random_cl_v3_uniform07_hard03
   job_type: train
   entity: chenjy
