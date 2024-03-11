@@ -252,6 +252,10 @@ def main(cfg):
             break_when_any_done=False,
             return_contiguous=False
         )
+
+        env.train() # set env back to training mode after evaluation
+        base_env.set_train = True
+        env.reset()
         
         min_distance = trajs['info']['min_distance'][:, -1].cpu().numpy()
 
@@ -321,23 +325,23 @@ def main(cfg):
         # update the policy using rollout data and store the training statistics
         info.update(policy.train_op(data.to_tensordict()))
 
-        # update cl before sampling
-        # if training_data contains done, update CL
-        if (i > 0) and (data['next']['done'].sum() > 0):
-            # evaluate current policy
-            base_env._update_cl_states()
-            distance_list = []
-            for _ in range(len(base_env.outer_curriculum_module._state_buffer) // base_env.num_envs):
-                info.update(evaluate(seed=cfg.seed))
-                base_env.eval_iter += 1
-                distance_list.append(info['min_distance'])
-            base_env.eval_iter = 0
-            distance_list = np.concatenate(distance_list)
-            base_env._update_curriculum(distance_list, model_dir=cl_model_dir, episode=i)
+        # # update cl before sampling
+        # # if training_data contains done, update CL
+        # if (i > 0) and (data['next']['done'].sum() > 0):
+        #     # evaluate current policy
+        #     base_env._update_cl_states()
+        #     distance_list = []
+        #     for _ in range(len(base_env.outer_curriculum_module._state_buffer) // base_env.num_envs):
+        #         info.update(evaluate(seed=cfg.seed))
+        #         base_env.eval_iter += 1
+        #         distance_list.append(info['min_distance'])
+        #     base_env.eval_iter = 0
+        #     distance_list = np.concatenate(distance_list)
+        #     base_env._update_curriculum(distance_list, model_dir=cl_model_dir, episode=i)
             
-            env.train() # set env back to training mode after evaluation
-            base_env.set_train = True
-            env.reset()
+        #     env.train() # set env back to training mode after evaluation
+        #     base_env.set_train = True
+        #     env.reset()
 
         # save policy model every certain step
         if save_interval > 0 and i % save_interval == 0:
