@@ -18,7 +18,7 @@ time_encoding: true
 action_transform: rate
 
 # evalution scenario
-evaluation_flag: 'random' # '3_cylineder_line', '5_cross', '6_cross', '7_c_1', '8_random'
+evaluation_flag: '5_cross' # '3_cylineder_line', '5_cross', '6_cross', '7_c_1', '8_random'
 
 use_validation: 1
 
@@ -40,6 +40,6 @@ use_dynamic: False
 cylinder:
   size: 0.2
   num: 8
-  max_active: 1
+  max_active: 5
   min_active: 0
   random_active: False # if False, only train max_active

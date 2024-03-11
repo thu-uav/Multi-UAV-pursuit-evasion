@@ -449,19 +449,31 @@ class HideAndSeek_circle_static_UED_cl_v2(IsaacEnv):
             mass=1.0
         )
 
-        # cylinders with physcical properties
+        # # cylinders with physcical properties
+        # self.cylinders_size = []
+        # for idx in range(self.num_cylinders):
+        #     # orientation = None
+        #     self.cylinders_size.append(self.cylinder_size)
+        #     objects.DynamicCylinder(
+        #         prim_path="/World/envs/env_0/cylinder_{}".format(idx),
+        #         name="cylinder_{}".format(idx),
+        #         translation=cylinders_pos[idx],
+        #         radius=self.cylinder_size,
+        #         height=self.cylinder_height,
+        #         mass=1000.0
+        #     )
+
+        self.cylinders_prims = [None] * self.num_cylinders
         self.cylinders_size = []
         for idx in range(self.num_cylinders):
-            # orientation = None
             self.cylinders_size.append(self.cylinder_size)
-            objects.DynamicCylinder(
-                prim_path="/World/envs/env_0/cylinder_{}".format(idx),
-                name="cylinder_{}".format(idx),
+            attributes = {'axis': 'Z', 'radius': self.cylinder_size, 'height': self.cylinder_height}
+            self.cylinders_prims[idx] = create_obstacle(
+                "/World/envs/env_0/cylinder_{}".format(idx), 
+                prim_type="Cylinder",
                 translation=cylinders_pos[idx],
-                radius=self.cylinder_size,
-                height=self.cylinder_height,
-                mass=1000.0
-            )
+                attributes=attributes
+            ) # Use 'self.cylinders_prims[0].GetAttribute('radius').Get()' to get attributes
 
         objects.VisualCylinder(
             prim_path="/World/envs/env_0/Cylinder",

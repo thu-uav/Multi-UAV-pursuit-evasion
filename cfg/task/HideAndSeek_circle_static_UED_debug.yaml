@@ -45,4 +45,4 @@ cylinder:
   num: 8
   max_active: 5
   min_active: 0
-  random_active: False # if False, only train max_active
+  random_active: True # if False, only train max_active
