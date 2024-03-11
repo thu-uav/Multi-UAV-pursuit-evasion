@@ -17,20 +17,21 @@ seed: 0
 
 viewer:
   resolution: [960, 720]
-  # # up
-  # eye: [0.001, 0.0, 6.]
-  # lookat: [0., 0., 2.]
+  # up
+  eye: [0.001, 0.0, 6.]
+  lookat: [0., 0., 2.]
   # # debug
   # eye: [0., -4., 4.]
   # lookat: [0., 0., 1.]
-  # front
-  eye: [8., 0., 8.]
-  lookat: [0., 0., 1.]
+  # # front
+  # eye: [8., 0., 8.]
+  # lookat: [0., 0., 1.]
 
 wandb:
   group: ${oc.select:..task.name}
   # run_name: virtual_cylinder_0to5_random_catch0_15_loadcatch0_2
-  run_name: 5_cross_catch0_15
+  run_name: 7_c_1_catch0_15
+  # run_name: debug
   job_type: train
   entity: chenjy
   project: PredatorPrey
