@@ -263,7 +263,6 @@ def main(cfg):
         # after rollout, set rendering mode to not headless and reset env
         base_env.enable_render(not cfg.headless)
 
-
         base_env._update_manual_curriculum(capture_dict=capture_dict)
         env.train() # set env back to training mode after evaluation
         base_env.set_train = True
@@ -304,13 +303,7 @@ def main(cfg):
     env.train() # set env into training mode
     base_env.set_train = True
     fps = []
-    
-    # # eval for 1 times
-    # info = {}
-    # info.update(evaluate())
-    # run.log(info)
-    # breakpoint()
-    
+        
     # for each iteration, the collector perform one step in the env
     # and get the result rollout as data
     for i, data in enumerate(pbar):

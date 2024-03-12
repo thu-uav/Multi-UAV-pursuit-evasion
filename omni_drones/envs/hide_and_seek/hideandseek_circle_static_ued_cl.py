@@ -182,7 +182,7 @@ class ManualCurriculum(object):
         self._easy_buffer = []
         self.omega_min = 0.5
         self.omega_max = 0.9
-        self.easy_prob = 0.1
+        self.easy_prob = 0.05
         
     def update_weights(self, capture_dict):
         # empty the easy buffer
@@ -398,6 +398,7 @@ class HideAndSeek_circle_static_UED_cl(IsaacEnv):
             "train_mean_num_cylinders": UnboundedContinuousTensorSpec(1), # right
             "manual_cl_sum_weights": UnboundedContinuousTensorSpec(1),
             "inner_cl_eval_capture": UnboundedContinuousTensorSpec(1),
+            "num_easy_list": UnboundedContinuousTensorSpec(1),
             'capture_0': UnboundedContinuousTensorSpec(1),
             'capture_1': UnboundedContinuousTensorSpec(1),
             'capture_2': UnboundedContinuousTensorSpec(1),
@@ -487,19 +488,31 @@ class HideAndSeek_circle_static_UED_cl(IsaacEnv):
             mass=1.0
         )
 
-        # cylinders with physcical properties
+        # # cylinders with physcical properties
+        # self.cylinders_size = []
+        # for idx in range(self.num_cylinders):
+        #     # orientation = None
+        #     self.cylinders_size.append(self.cylinder_size)
+        #     objects.DynamicCylinder(
+        #         prim_path="/World/envs/env_0/cylinder_{}".format(idx),
+        #         name="cylinder_{}".format(idx),
+        #         translation=cylinders_pos[idx],
+        #         radius=self.cylinder_size,
+        #         height=self.cylinder_height,
+        #         mass=1000.0
+        #     )
+
+        self.cylinders_prims = [None] * self.num_cylinders
         self.cylinders_size = []
         for idx in range(self.num_cylinders):
-            # orientation = None
             self.cylinders_size.append(self.cylinder_size)
-            objects.DynamicCylinder(
-                prim_path="/World/envs/env_0/cylinder_{}".format(idx),
-                name="cylinder_{}".format(idx),
+            attributes = {'axis': 'Z', 'radius': self.cylinder_size, 'height': self.cylinder_height}
+            self.cylinders_prims[idx] = create_obstacle(
+                "/World/envs/env_0/cylinder_{}".format(idx), 
+                prim_type="Cylinder",
                 translation=cylinders_pos[idx],
-                radius=self.cylinder_size,
-                height=self.cylinder_height,
-                mass=1000.0
-            )
+                attributes=attributes
+            ) # Use 'self.cylinders_prims[0].GetAttribute('radius').Get()' to get attributes
 
         objects.VisualCylinder(
             prim_path="/World/envs/env_0/Cylinder",
@@ -583,6 +596,7 @@ class HideAndSeek_circle_static_UED_cl(IsaacEnv):
         #         current_tasks = self.outer_curriculum_module.sample(num_samples=len(env_ids))
         #     else:
         #         current_tasks = self.outer_curriculum_module._state_buffer[self.eval_iter * self.num_envs: (self.eval_iter + 1) * self.num_envs]
+        
         if self.use_manual_cl:
             if self.set_train:
                 current_tasks = self.manual_curriculum_module.sample(num_samples=len(env_ids))
@@ -675,6 +689,7 @@ class HideAndSeek_circle_static_UED_cl(IsaacEnv):
         self.stats['catch_radius'].set_(torch.ones_like(self.stats['catch_radius'], device=self.device) * self.catch_radius)
         self.stats['v_prey'].set_(torch.ones_like(self.stats['v_prey'], device=self.device) * self.v_prey)
         self.stats['first_capture_step'].set_(torch.ones_like(self.stats['first_capture_step']) * self.max_episode_length)
+        self.stats["num_easy_list"].set_(torch.ones((self.num_envs, 1), device=self.device) * len(self.manual_curriculum_module._easy_buffers))
         
         if self.set_train:
             train_mean_num_cylinders = self.cylinders_mask.sum(axis=-1).mean()
