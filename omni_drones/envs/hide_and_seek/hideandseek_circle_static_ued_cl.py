@@ -930,7 +930,7 @@ class HideAndSeek_circle_static_UED_cl(IsaacEnv):
         )
         
         # for inner cl
-        if not self.set_train and torch.all(done):
+        if torch.all(done):
             self.mean_eval_capture = torch.mean(self.stats['capture'])
             self.stats['inner_cl_eval_capture'].set_(torch.ones((self.num_envs, 1), device=self.device) * self.mean_eval_capture)
         

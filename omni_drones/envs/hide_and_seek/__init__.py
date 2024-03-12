@@ -1,7 +1,6 @@
 from .hideandseek import HideAndSeek
 from .hideandseek_circle import HideAndSeek_circle
 from .hideandseek_circle_static_ued import HideAndSeek_circle_static_UED
-from .hideandseek_circle_static_ued_debug import HideAndSeek_circle_static_UED_debug
 from .hideandseek_circle_static_ued_cl import HideAndSeek_circle_static_UED_cl
 from .hideandseek_circle_static_ued_cl_v2 import HideAndSeek_circle_static_UED_cl_v2
 from .hideandseek_circle_eval import HideAndSeek_circle_eval
