@@ -30,7 +30,7 @@ viewer:
 wandb:
   group: ${oc.select:..task.name}
   # run_name: virtual_cylinder_0to5_random_catch0_15_loadcatch0_2
-  run_name: virtual_cylinder_0to5_catch0_15_cl_generate_env_loadcatch0_2
+  run_name: cylinder0to5_catch0_15_collision001_cl_generate_env_loadcatch0_2
   # run_name: debug
   job_type: train
   entity: chenjy

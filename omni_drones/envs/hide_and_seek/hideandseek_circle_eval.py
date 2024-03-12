@@ -280,19 +280,31 @@ class HideAndSeek_circle_eval(IsaacEnv):
             mass=1.0
         )
 
-        # cylinders with physcical properties
+        # # cylinders with physcical properties
+        # self.cylinders_size = []
+        # for idx in range(self.num_cylinders):
+        #     # orientation = None
+        #     self.cylinders_size.append(self.cylinder_size)
+        #     objects.DynamicCylinder(
+        #         prim_path="/World/envs/env_0/cylinder_{}".format(idx),
+        #         name="cylinder_{}".format(idx),
+        #         translation=cylinders_pos[idx],
+        #         radius=self.cylinder_size,
+        #         height=self.cylinder_height,
+        #         mass=20000.0
+        #     )
+
+        self.cylinders_prims = [None] * self.num_cylinders
         self.cylinders_size = []
         for idx in range(self.num_cylinders):
-            # orientation = None
             self.cylinders_size.append(self.cylinder_size)
-            objects.DynamicCylinder(
-                prim_path="/World/envs/env_0/cylinder_{}".format(idx),
-                name="cylinder_{}".format(idx),
+            attributes = {'axis': 'Z', 'radius': self.cylinder_size, 'height': self.cylinder_height}
+            self.cylinders_prims[idx] = create_obstacle(
+                "/World/envs/env_0/cylinder_{}".format(idx), 
+                prim_type="Cylinder",
                 translation=cylinders_pos[idx],
-                radius=self.cylinder_size,
-                height=self.cylinder_height,
-                mass=20000.0
-            )
+                attributes=attributes
+            ) # Use 'self.cylinders_prims[0].GetAttribute('radius').Get()' to get attributes
 
         objects.VisualCylinder(
             prim_path="/World/envs/env_0/Cylinder",
@@ -563,29 +575,29 @@ class HideAndSeek_circle_eval(IsaacEnv):
                         torch.tensor([2 * arena_size], device=device)
                     ).sample((1, 1)).squeeze(0)
                 
-                # drone_x_y = D.Uniform(
-                #         torch.tensor([0.4, -0.4], device=device),
-                #         torch.tensor([0.6, -0.6], device=device)
-                #     ).sample((1, 4)).squeeze(0)
+                drone_x_y = D.Uniform(
+                        torch.tensor([0.4, -0.4], device=device),
+                        torch.tensor([0.6, -0.6], device=device)
+                    ).sample((1, 4)).squeeze(0)
                 
-                # target_x_y = D.Uniform(
-                #         torch.tensor([-0.6, 0.4], device=device),
-                #         torch.tensor([-0.4, 0.6], device=device)
-                #     ).sample((1, 1)).squeeze(0)
+                target_x_y = D.Uniform(
+                        torch.tensor([-0.6, 0.4], device=device),
+                        torch.tensor([-0.4, 0.6], device=device)
+                    ).sample((1, 1)).squeeze(0)
                 
-                occupancy_matrix = np.zeros((5, 5))
-                occupancy_matrix[1, 2] = 1.0
-                occupancy_matrix[2, 2] = 1.0
-                occupancy_matrix[3, 2] = 1.0
-                occupancy_matrix[2, 3] = 1.0
-                occupancy_matrix[2, 1] = 1.0
-                drone_target_xy, _, _, _ = rejection_sampling_drone_target_xy(arena_size=1.0, 
-                                                   cylinder_size=0.2, 
-                                                   num_drones=4, 
-                                                   device=self.device,
-                                                   occupancy_matrix=occupancy_matrix)
-                drone_x_y = drone_target_xy[:4].clone()
-                target_x_y = drone_target_xy[4:].clone()
+                # occupancy_matrix = np.zeros((5, 5))
+                # occupancy_matrix[1, 2] = 1.0
+                # occupancy_matrix[2, 2] = 1.0
+                # occupancy_matrix[3, 2] = 1.0
+                # occupancy_matrix[2, 3] = 1.0
+                # occupancy_matrix[2, 1] = 1.0
+                # drone_target_xy, _, _, _ = rejection_sampling_drone_target_xy(arena_size=1.0, 
+                #                                    cylinder_size=0.2, 
+                #                                    num_drones=4, 
+                #                                    device=self.device,
+                #                                    occupancy_matrix=occupancy_matrix)
+                # drone_x_y = drone_target_xy[:4].clone()
+                # target_x_y = drone_target_xy[4:].clone()
                 
                 drone_pos_one = torch.concat([drone_x_y, drone_z], dim=-1)
                 target_pos_one = torch.concat([target_x_y, target_z], dim=-1).squeeze(0)
@@ -630,29 +642,29 @@ class HideAndSeek_circle_eval(IsaacEnv):
                         torch.tensor([2 * arena_size], device=device)
                     ).sample((1, 1)).squeeze(0)
                 
-                # drone_x_y = D.Uniform(
-                #         torch.tensor([0.4, 0.4], device=device),
-                #         torch.tensor([0.6, 0.6], device=device)
-                #     ).sample((1, 4)).squeeze(0)
-                # target_x_y = D.Uniform(
-                #         torch.tensor([-0.6, 0.4], device=device),
-                #         torch.tensor([-0.4, 0.6], device=device)
-                #     ).sample((1, 1)).squeeze(0)
+                drone_x_y = D.Uniform(
+                        torch.tensor([0.4, 0.4], device=device),
+                        torch.tensor([0.6, 0.6], device=device)
+                    ).sample((1, 4)).squeeze(0)
+                target_x_y = D.Uniform(
+                        torch.tensor([-0.6, 0.4], device=device),
+                        torch.tensor([-0.4, 0.6], device=device)
+                    ).sample((1, 1)).squeeze(0)
                 
-                occupancy_matrix = np.zeros((5, 5))
-                occupancy_matrix[2, 0] = 1.0
-                occupancy_matrix[2, 2] = 1.0
-                occupancy_matrix[2, 3] = 1.0
-                occupancy_matrix[2, 4] = 1.0
-                occupancy_matrix[4, 2] = 1.0
-                occupancy_matrix[0, 2] = 1.0
-                drone_target_xy, _, _, _ = rejection_sampling_drone_target_xy(arena_size=1.0, 
-                                                   cylinder_size=0.2, 
-                                                   num_drones=4, 
-                                                   device=self.device,
-                                                   occupancy_matrix=occupancy_matrix)
-                drone_x_y = drone_target_xy[:4].clone()
-                target_x_y = drone_target_xy[4:].clone()
+                # occupancy_matrix = np.zeros((5, 5))
+                # occupancy_matrix[2, 0] = 1.0
+                # occupancy_matrix[2, 2] = 1.0
+                # occupancy_matrix[2, 3] = 1.0
+                # occupancy_matrix[2, 4] = 1.0
+                # occupancy_matrix[4, 2] = 1.0
+                # occupancy_matrix[0, 2] = 1.0
+                # drone_target_xy, _, _, _ = rejection_sampling_drone_target_xy(arena_size=1.0, 
+                #                                    cylinder_size=0.2, 
+                #                                    num_drones=4, 
+                #                                    device=self.device,
+                #                                    occupancy_matrix=occupancy_matrix)
+                # drone_x_y = drone_target_xy[:4].clone()
+                # target_x_y = drone_target_xy[4:].clone()
                 
                 drone_pos_one = torch.concat([drone_x_y, drone_z], dim=-1)
                 target_pos_one = torch.concat([target_x_y, target_z], dim=-1).squeeze(0)

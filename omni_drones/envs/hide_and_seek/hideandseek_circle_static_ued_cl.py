@@ -181,7 +181,7 @@ class ManualCurriculum(object):
         self._weight_buffer = np.ones_like(self._state_buffer)
         self._easy_buffer = []
         self.omega_min = 0.5
-        self.omega_max = 0.9
+        self.omega_max = 0.95
         self.easy_prob = 0.05
         
     def update_weights(self, capture_dict):
@@ -689,7 +689,7 @@ class HideAndSeek_circle_static_UED_cl(IsaacEnv):
         self.stats['catch_radius'].set_(torch.ones_like(self.stats['catch_radius'], device=self.device) * self.catch_radius)
         self.stats['v_prey'].set_(torch.ones_like(self.stats['v_prey'], device=self.device) * self.v_prey)
         self.stats['first_capture_step'].set_(torch.ones_like(self.stats['first_capture_step']) * self.max_episode_length)
-        self.stats["num_easy_list"].set_(torch.ones((self.num_envs, 1), device=self.device) * len(self.manual_curriculum_module._easy_buffers))
+        self.stats["num_easy_list"].set_(torch.ones((self.num_envs, 1), device=self.device) * len(self.manual_curriculum_module._easy_buffer))
         
         if self.set_train:
             train_mean_num_cylinders = self.cylinders_mask.sum(axis=-1).mean()
