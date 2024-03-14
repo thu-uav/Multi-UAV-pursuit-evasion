@@ -345,6 +345,9 @@ def main(cfg):
 
         # save policy model every certain step
         if save_interval > 0 and i % save_interval == 0:
+            # save cl tasks
+            base_env.outer_curriculum_module.save_task(model_dir=cl_model_dir, episode=i)
+
             if hasattr(policy, "state_dict"):
                 ckpt_path = os.path.join(run.dir, f"checkpoint_{collector._frames}.pt")
                 logging.info(f"Save checkpoint to {str(ckpt_path)}")

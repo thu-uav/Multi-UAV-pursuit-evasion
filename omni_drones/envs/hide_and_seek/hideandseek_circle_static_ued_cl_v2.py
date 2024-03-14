@@ -33,7 +33,7 @@ import copy
 
 from omni.isaac.debug_draw import _debug_draw
 
-from .placement import rejection_sampling_with_validation_cl, generate_outside_cylinders_x_y
+from .placement import rejection_sampling_with_validation, generate_outside_cylinders_x_y
 from .draw import draw_traj, draw_detection
 from .draw_circle import Float3, _COLOR_ACCENT, _carb_float3_add, draw_court_circle
 
@@ -95,103 +95,91 @@ class InnerCurriculum(object):
             self.training_order.pop(0)
 
 class OuterCurriculum(object):
-    """
-    Naive CL, use [cl_bound]
-    """
-    def __init__(self) -> None:
-        self.start_cl_bound = 2
-        self.end_cl_bound = 5
-        self.training_order = np.arange(self.start_cl_bound, self.end_cl_bound + 1).tolist() # 2~5
-        self.threshold = 0.9
- 
-    def get_training_task(self):
-        return self.training_order[0]
+    '''
+    propose new environments
+    '''
+    def __init__(self, cfg, device) -> None:
+        self.OOD_num_cylinders = cfg.task.cylinder.num
+        self.max_active_cylinder = cfg.task.cylinder.max_active
+        self.min_active_cylinder = cfg.task.cylinder.min_active
+        self.num_drones = cfg.task.num_agents
+        self.max_num_obj = self.num_drones + self.OOD_num_cylinders + 1 # drone + target + cylinders
+        self.cylinder_size = cfg.task.cylinder.size
+        self.arena_size = cfg.task.arena_size
+        self.device = device
+        self.omega_min = 0.0
+        self.omega_max = 0.3
+        self.prob_random = 0.1
+        self.eps = 1e-10
+        self._state_buffer = np.zeros((0, 1), dtype=np.float32)
+        self._weight_buffer = np.zeros((0, 1), dtype=np.float32)
+        self._temp_state_buffer = []
+        self.buffer_size = 10000
     
-    def update_curriculum_queue(self):
-        if len(self.training_order) > 1:
-            self.training_order.pop(0)
+    def insert(self, states):
+        """
+        input:
+            states: list of np.array(size=(state_dim, ))
+        """
+        self._temp_state_buffer.append(copy.deepcopy(states))
 
-# class OuterCurriculum(object):
-#     '''
-#     propose new environments
-#     '''
-#     def __init__(self, cfg, device) -> None:
-#         self.OOD_num_cylinders = cfg.task.cylinder.num
-#         self.num_drones = cfg.task.num_agents
-#         self.max_num_obj = self.num_drones + self.OOD_num_cylinders + 1 # drone + target + cylinders
-#         self.cylinder_size = cfg.task.cylinder.size
-#         self.arena_size = cfg.task.arena_size
-#         self.device = device
-#         self.omega_min = 0.5
-#         self.omega_max = 0.9
-#         self.prob_random = 0.1
-#         self.eps = 1e-10
-#         self._state_buffer = np.zeros((0, 1), dtype=np.float32)
-#         self._weight_buffer = np.zeros((0, 1), dtype=np.float32)
-#         self._temp_state_buffer = []
-#         self.buffer_size = 2000
-    
-#     def generate_cl_tasks(self):
-#         pass
-    
-#     def insert(self, states):
-#         """
-#         input:
-#             states: list of np.array(size=(state_dim, ))
-#         """
-#         self._temp_state_buffer.append(copy.deepcopy(states))
-
-#     def update_states(self):
-#         start_time = time.time()
-
-#         # concatenate to get all states and all weights
-#         all_states = np.array(self._temp_state_buffer)
-#         if self._state_buffer.shape[0] != 0:  # state buffer is not empty
-#             all_states = np.concatenate([self._state_buffer, all_states], axis=0)
-
-#         # update 
-#         if all_states.shape[0] <= self.buffer_size:
-#             self._state_buffer = all_states
-#         else:
-#             min_states = np.min(all_states, axis=0)
-#             max_states = np.max(all_states, axis=0)
-#             all_states_normalized = (all_states - min_states) / (max_states - min_states + self.eps)
-#             consider_dim = np.ones(all_states_normalized.shape[-1],dtype=bool)
-#             consider_dim[-self.OOD_num_cylinders:] = False # ignore cylinder_masks
-#             all_states_tensor = torch.tensor(all_states_normalized[np.newaxis, :, consider_dim])
-#             # farthest point sampling
-#             fps_idx = farthest_point_sampler(all_states_tensor, self.buffer_size)[0].numpy()
-#             self._state_buffer = all_states[fps_idx]
+    def update_curriculum(self, capture_ratio_list):
+        # pair: [_temp_state_buffer, capture_ratio_list]
+        tmp_state_buffer = []
+        for task, capture in zip(self._temp_state_buffer, capture_ratio_list):
+            if capture >= self.omega_min and capture < self.omega_max:
+                tmp_state_buffer.append(task)
         
-#         # reset temp state and weight buffer
-#         self._temp_state_buffer = []
+        # update states
+        start_time = time.time()
 
-#         # print update time
-#         end_time = time.time()
-#         print(f"curriculum buffer update states time: {end_time - start_time}s")
+        # concatenate to get all states and all weights
+        all_states = np.array(tmp_state_buffer)
+        if self._state_buffer.shape[0] != 0:  # state buffer is not empty
+            all_states = np.concatenate([self._state_buffer, all_states], axis=0)
 
-#     def update_weights(self, weights):
-#         self._weight_buffer = weights.copy()
+        # update 
+        if all_states.shape[0] <= self.buffer_size:
+            self._state_buffer = all_states
+        else:
+            min_states = np.min(all_states, axis=0)
+            max_states = np.max(all_states, axis=0)
+            all_states_normalized = (all_states - min_states) / (max_states - min_states + self.eps)
+            consider_dim = np.ones(all_states_normalized.shape[-1],dtype=bool)
+            consider_dim[-self.OOD_num_cylinders:] = False # ignore cylinder_masks
+            all_states_tensor = torch.tensor(all_states_normalized[np.newaxis, :, consider_dim])
+            # farthest point sampling
+            fps_idx = farthest_point_sampler(all_states_tensor, self.buffer_size)[0].numpy()
+            self._state_buffer = all_states[fps_idx]
+        
+        # reset temp state and weight buffer
+        self._temp_state_buffer = []
+        
+        self._weight_buffer = np.ones_like(self._state_buffer)
 
-#     def sample(self, num_samples):
-#         """
-#         return list of np.array
-#         """
-#         if self._state_buffer.shape[0] == 0:  # state buffer is empty
-#             initial_states = [None for _ in range(num_samples)]
-#         else:
-#             num_random = int(num_samples * self.prob_random)
-#             num_cl = num_samples - num_random
-#             weights = self._weight_buffer / np.mean(self._weight_buffer)
-#             probs = (weights / np.sum(weights)).squeeze()
-#             sample_idx = np.random.choice(self._state_buffer.shape[0], num_cl, replace=True, p=probs)
-#             initial_states = [self._state_buffer[idx] for idx in sample_idx]
-#             initial_states += [None] * num_random
-#         return initial_states
+        # print update time
+        end_time = time.time()
+        print(f"curriculum buffer update states time: {end_time - start_time}s")
+
+    def sample(self, num_samples):
+        """
+        return list of np.array
+        """
+        if self._state_buffer.shape[0] == 0:  # state buffer is empty
+            initial_states = [None for _ in range(num_samples)]
+        else:
+            num_random = int(num_samples * self.prob_random)
+            num_cl = num_samples - num_random
+            weights = self._weight_buffer / np.mean(self._weight_buffer)
+            probs = (weights / np.sum(weights)).squeeze()
+            sample_idx = np.random.choice(self._state_buffer.shape[0], num_cl, replace=True, p=probs)
+            initial_states = [self._state_buffer[idx] for idx in sample_idx]
+            initial_states += [None] * num_random
+        return initial_states
     
-#     def save_task(self, model_dir, episode):
-#         np.save('{}/tasks_{}.npy'.format(model_dir,episode), self._state_buffer)
-#         np.save('{}/weights_{}.npy'.format(model_dir,episode), self._weight_buffer)
+    def save_task(self, model_dir, episode):
+        np.save('{}/tasks_{}.npy'.format(model_dir,episode), self._state_buffer)
+        np.save('{}/weights_{}.npy'.format(model_dir,episode), self._weight_buffer)
 
 class HideAndSeek_circle_static_UED_cl_v2(IsaacEnv): 
     """
@@ -284,11 +272,9 @@ class HideAndSeek_circle_static_UED_cl_v2(IsaacEnv):
         # outer CL
         self.use_outer_cl = self.cfg.task.use_outer_cl
         self.set_train = True
+        self.eval_iter = 0 # eval 5 times for cl buffer
         if self.use_outer_cl:
-            self.outer_curriculum_module = OuterCurriculum()
-        # self.eval_iter = 0 # eval 5 times for cl buffer
-        # if self.use_outer_cl:
-        #     self.outer_curriculum_module = OuterCurriculum(cfg=self.cfg, device=self.device)
+            self.outer_curriculum_module = OuterCurriculum(cfg=self.cfg, device=self.device)
         
         self.draw = _debug_draw.acquire_debug_draw_interface()
 
@@ -364,6 +350,12 @@ class HideAndSeek_circle_static_UED_cl_v2(IsaacEnv):
             'capture_3': UnboundedContinuousTensorSpec(1),
             'capture_4': UnboundedContinuousTensorSpec(1),
             'capture_5': UnboundedContinuousTensorSpec(1),
+            'capture_0_episode': UnboundedContinuousTensorSpec(1),
+            'capture_1_episode': UnboundedContinuousTensorSpec(1),
+            'capture_2_episode': UnboundedContinuousTensorSpec(1),
+            'capture_3_episode': UnboundedContinuousTensorSpec(1),
+            'capture_4_episode': UnboundedContinuousTensorSpec(1),
+            'capture_5_episode': UnboundedContinuousTensorSpec(1),
             'min_distance': UnboundedContinuousTensorSpec(1),
             'cl_bound': UnboundedContinuousTensorSpec(1),
         }).expand(self.num_envs).to(self.device)
@@ -371,12 +363,6 @@ class HideAndSeek_circle_static_UED_cl_v2(IsaacEnv):
             "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13)),
             'task_capture': UnboundedContinuousTensorSpec(1),
             'task_return': UnboundedContinuousTensorSpec(1),
-            'capture_0': UnboundedContinuousTensorSpec(1),
-            'capture_1': UnboundedContinuousTensorSpec(1),
-            'capture_2': UnboundedContinuousTensorSpec(1),
-            'capture_3': UnboundedContinuousTensorSpec(1),
-            'capture_4': UnboundedContinuousTensorSpec(1),
-            'capture_5': UnboundedContinuousTensorSpec(1),
         }).expand(self.num_envs).to(self.device)
         self.observation_spec["stats"] = stats_spec
         self.observation_spec["info"] = info_spec
@@ -397,7 +383,7 @@ class HideAndSeek_circle_static_UED_cl_v2(IsaacEnv):
         self.use_validation = self.cfg.task.use_validation
         self.mean_eval_capture = 0.0 # for inner cl
 
-        obj_pos, _, _, _ = rejection_sampling_with_validation_cl(
+        obj_pos, _, _, _ = rejection_sampling_with_validation(
             arena_size=self.arena_size, 
             cylinder_size=self.cylinder_size, 
             num_drones=self.num_agents, 
@@ -498,7 +484,7 @@ class HideAndSeek_circle_static_UED_cl_v2(IsaacEnv):
 
         return ["/World/defaultGroundPlane"]
 
-    def uniform_generate_envs_cl(self, num_active_cylinder, cl_bound=5):
+    def uniform_generate_envs(self, num_active_cylinder):
         # random set z
         drone_z = D.Uniform(
                     torch.tensor([0.1], device=self.device),
@@ -508,14 +494,13 @@ class HideAndSeek_circle_static_UED_cl_v2(IsaacEnv):
                 torch.tensor([0.1], device=self.device),
                 torch.tensor([2 * self.arena_size], device=self.device)
             ).sample()
-        obj_pos, _, _, _ = rejection_sampling_with_validation_cl(
+        obj_pos, _, _, _ = rejection_sampling_with_validation(
             arena_size=self.arena_size, 
             cylinder_size=self.cylinder_size, 
             num_drones=self.num_agents, 
             num_cylinders=num_active_cylinder, 
             device=self.device,
-            use_validation=self.use_validation,
-            cl_bound=cl_bound)
+            use_validation=self.use_validation)
         
         drone_x_y = obj_pos[:self.num_agents].clone()
         target_x_y = obj_pos[self.num_agents].clone()
@@ -543,11 +528,8 @@ class HideAndSeek_circle_static_UED_cl_v2(IsaacEnv):
 
         if self.use_outer_cl:
             # current_tasks contains x, y, z of drones, target, cylinders and cylinder masks
-            if self.set_train:
-                current_cl_bound = self.outer_curriculum_module.get_training_task()
-            else:
-                current_cl_bound = self.outer_curriculum_module.end_cl_bound
-        
+            current_tasks = self.outer_curriculum_module.sample(num_samples=len(env_ids))
+
         n_envs = len(env_ids)
         drone_pos = []
         cylinders_pos = []
@@ -563,16 +545,16 @@ class HideAndSeek_circle_static_UED_cl_v2(IsaacEnv):
             else:
                 num_active_cylinder = self.max_active_cylinders
             
-            drone_pos_one, target_pos_one, \
-                cylinder_pos_one, cylinder_mask_one = self.uniform_generate_envs_cl(num_active_cylinder=num_active_cylinder,
-                                                                                    cl_bound=current_cl_bound)
-                
-            # drone_pos_one = torch.from_numpy(current_tasks[idx][:self.num_agents * 3].reshape(-1, 3)).to(self.device)
-            # target_pos_one = torch.from_numpy(current_tasks[idx][self.num_agents * 3: self.num_agents * 3 + 3]).to(self.device)
-            # cylinder_pos_one = torch.from_numpy(current_tasks[idx][self.num_agents * 3 + 3: \
-            #     self.num_agents * 3 + 3 + self.num_cylinders * 3].reshape(-1, 3)).to(self.device)
-            # cylinder_mask_one = torch.from_numpy(current_tasks[idx][-self.num_cylinders:]).to(self.device)
-            
+            if current_tasks[idx] is None:
+                drone_pos_one, target_pos_one, \
+                    cylinder_pos_one, cylinder_mask_one = self.uniform_generate_envs(num_active_cylinder=num_active_cylinder)
+            else:
+                drone_pos_one = torch.from_numpy(current_tasks[idx][:self.num_agents * 3].reshape(-1, 3)).to(self.device)
+                target_pos_one = torch.from_numpy(current_tasks[idx][self.num_agents * 3: self.num_agents * 3 + 3]).to(self.device)
+                cylinder_pos_one = torch.from_numpy(current_tasks[idx][self.num_agents * 3 + 3: \
+                    self.num_agents * 3 + 3 + self.num_cylinders * 3].reshape(-1, 3)).to(self.device)
+                cylinder_mask_one = torch.from_numpy(current_tasks[idx][-self.num_cylinders:]).to(self.device)
+           
             drone_pos.append(drone_pos_one)
             target_pos.append(target_pos_one)
             cylinders_pos.append(cylinder_pos_one)
@@ -585,9 +567,9 @@ class HideAndSeek_circle_static_UED_cl_v2(IsaacEnv):
             cl_task_one += cylinder_pos_one.reshape(-1).to('cpu').numpy().tolist()
             cl_task_one += cylinder_mask_one.tolist()
             
-            # if self.use_outer_cl and self.set_train:
-            #     # cl_task: [drone_pos, target_pos, cylinder_pos, cylinder_mask]
-            #     self.outer_curriculum_module.insert(np.array(cl_task_one))
+            if self.use_outer_cl:
+                # cl_task: [drone_pos, target_pos, cylinder_pos, cylinder_mask]
+                self.outer_curriculum_module.insert(np.array(cl_task_one))
 
             if idx == self.central_env_idx and self._should_render(0):
                 self._draw_court_circle(self.arena_size)
@@ -629,27 +611,12 @@ class HideAndSeek_circle_static_UED_cl_v2(IsaacEnv):
         self.stats['first_capture_step'].set_(torch.ones_like(self.stats['first_capture_step']) * self.max_episode_length)
         # reset info
         self.stats['min_distance'].set_(torch.Tensor(self.num_envs, 1).fill_(float('inf')).to(self.device))
-        self.stats['cl_bound'].set_(current_cl_bound * torch.ones_like(self.stats['cl_bound'], device=self.device))
         
-        if self.set_train:
-            train_mean_num_cylinders = self.cylinders_mask.sum(axis=-1).mean()
-            self.stats['train_mean_num_cylinders'].set_(torch.ones((self.num_envs, 1), device=self.device) * train_mean_num_cylinders)
+        train_mean_num_cylinders = self.cylinders_mask.sum(axis=-1).mean()
+        self.stats['train_mean_num_cylinders'].set_(torch.ones((self.num_envs, 1), device=self.device) * train_mean_num_cylinders)
         
         for substep in range(1):
             self.sim.step(self._should_render(substep))
-
-    # for outer curriculum
-    # def _update_cl_states(self):
-    #     self.outer_curriculum_module.update_states()
-    #     cl_mean_num_cylinders = self.outer_curriculum_module._state_buffer[:, -self.num_cylinders].sum(axis=-1).mean()
-    #     self.stats['cl_mean_num_cylinders'].set_(torch.ones((self.num_envs, 1), device=self.device) * cl_mean_num_cylinders)
-
-    # def _update_curriculum(self, eval_metrics, model_dir, episode):
-    #     self.outer_curriculum_module.update_weights(eval_metrics)
-    #     self.stats["cl_mean_weights"].set_(torch.ones((self.num_envs, 1), device=self.device) * np.mean(self.outer_curriculum_module._weight_buffer))
-    #     self.outer_curriculum_module.save_task(model_dir=model_dir, 
-    #                                            episode=episode)
-    #################
     
     def _pre_sim_step(self, tensordict: TensorDictBase):   
         self.step_spec += 1
@@ -812,12 +779,10 @@ class HideAndSeek_circle_static_UED_cl_v2(IsaacEnv):
         self.stats['capture'].set_(torch.from_numpy(self.stats['capture_episode'].to('cpu').numpy() > 0.0).type(torch.float32).to(self.device))
         
         self.stats['capture_0'].set_(torch.ones_like(self.stats['capture'], device=self.device) * self.stats['capture'][(self.cylinders_mask.sum(-1) == 0)].mean())
+        self.stats['capture_0_episode'].set_(torch.ones_like(self.stats['capture_episode'], device=self.device) * self.stats['capture'][(self.cylinders_mask.sum(-1) == 0)].mean())
         for idx in range(self.max_active_cylinders):
             self.stats['capture_{}'.format(idx + 1)].set_(torch.ones_like(self.stats['capture'], device=self.device) * self.stats['capture'][(self.cylinders_mask.sum(-1) == idx + 1)].mean())
-        if not self.set_train:
-            self.info['capture_0'].set_(torch.ones_like(self.stats['capture'], device=self.device) * self.stats['capture'][(self.cylinders_mask.sum(-1) == 0)].mean())
-            for idx in range(self.max_active_cylinders):
-                self.info['capture_{}'.format(idx + 1)].set_(torch.ones_like(self.stats['capture'], device=self.device) * self.stats['capture'][(self.cylinders_mask.sum(-1) == idx + 1)].mean())
+            self.stats['capture_{}_episode'.format(idx + 1)].set_(torch.ones_like(self.stats['capture_episode'], device=self.device) * self.stats['capture_episode'][(self.cylinders_mask.sum(-1) == idx + 1)].mean())
         
         self.info['task_capture'] = self.stats['capture'].clone()
         self.stats['capture_per_step'].set_(self.stats['capture_episode'] / self.step_spec)
@@ -867,11 +832,11 @@ class HideAndSeek_circle_static_UED_cl_v2(IsaacEnv):
         )
         
         if torch.all(done):
-            if torch.mean(self.stats['capture']) >= self.outer_curriculum_module.threshold:
-                self.outer_curriculum_module.update_curriculum_queue()
-        
-        # for inner cl
-        if not self.set_train and torch.all(done):
+            self.outer_curriculum_module.update_curriculum(capture_ratio_list=self.stats["capture_episode"].to('cpu').numpy() / self.max_episode_length)
+            
+            cl_mean_num_cylinders = self.outer_curriculum_module._state_buffer[:, -self.num_cylinders:].sum(axis=-1).mean()
+            self.stats['cl_mean_num_cylinders'].set_(torch.ones((self.num_envs, 1), device=self.device) * cl_mean_num_cylinders)
+
             self.mean_eval_capture = torch.mean(self.stats['capture'])
             self.stats['inner_cl_eval_capture'].set_(torch.ones((self.num_envs, 1), device=self.device) * self.mean_eval_capture)
         
