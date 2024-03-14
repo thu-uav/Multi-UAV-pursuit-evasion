@@ -155,7 +155,7 @@ class OuterCurriculum(object):
         # reset temp state and weight buffer
         self._temp_state_buffer = []
         
-        self._weight_buffer = np.ones_like(self._state_buffer)
+        self._weight_buffer = np.ones(self._state_buffer.shape[0])
 
         # print update time
         end_time = time.time()
