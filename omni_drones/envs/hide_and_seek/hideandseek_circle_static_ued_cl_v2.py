@@ -108,13 +108,13 @@ class OuterCurriculum(object):
         self.arena_size = cfg.task.arena_size
         self.device = device
         self.omega_min = 0.0
-        self.omega_max = 0.3
+        self.omega_max = cfg.task.threshold
         self.prob_random = 0.1
         self.eps = 1e-10
         self._state_buffer = np.zeros((0, 1), dtype=np.float32)
         self._weight_buffer = np.zeros((0, 1), dtype=np.float32)
         self._temp_state_buffer = []
-        self.buffer_size = 10000
+        self.buffer_size = 5000
     
     def insert(self, states):
         """
@@ -127,7 +127,7 @@ class OuterCurriculum(object):
         # pair: [_temp_state_buffer, capture_ratio_list]
         tmp_state_buffer = []
         for task, capture in zip(self._temp_state_buffer, capture_ratio_list):
-            if capture >= self.omega_min and capture < self.omega_max:
+            if capture >= self.omega_min and capture <= self.omega_max:
                 tmp_state_buffer.append(task)
         
         # update states
@@ -142,15 +142,16 @@ class OuterCurriculum(object):
         if all_states.shape[0] <= self.buffer_size:
             self._state_buffer = all_states
         else:
-            min_states = np.min(all_states, axis=0)
-            max_states = np.max(all_states, axis=0)
-            all_states_normalized = (all_states - min_states) / (max_states - min_states + self.eps)
-            consider_dim = np.ones(all_states_normalized.shape[-1],dtype=bool)
-            consider_dim[-self.OOD_num_cylinders:] = False # ignore cylinder_masks
-            all_states_tensor = torch.tensor(all_states_normalized[np.newaxis, :, consider_dim])
-            # farthest point sampling
-            fps_idx = farthest_point_sampler(all_states_tensor, self.buffer_size)[0].numpy()
-            self._state_buffer = all_states[fps_idx]
+            self._state_buffer = all_states[len(all_states) - self.buffer_size:]
+            # min_states = np.min(all_states, axis=0)
+            # max_states = np.max(all_states, axis=0)
+            # all_states_normalized = (all_states - min_states) / (max_states - min_states + self.eps)
+            # consider_dim = np.ones(all_states_normalized.shape[-1], dtype=bool)
+            # # consider_dim[-self.OOD_num_cylinders:] = False # ignore cylinder_masks
+            # all_states_tensor = torch.tensor(all_states_normalized[np.newaxis, :, consider_dim])
+            # # farthest point sampling
+            # fps_idx = farthest_point_sampler(all_states_tensor, self.buffer_size)[0].numpy()
+            # self._state_buffer = all_states[fps_idx]
         
         # reset temp state and weight buffer
         self._temp_state_buffer = []
@@ -357,7 +358,6 @@ class HideAndSeek_circle_static_UED_cl_v2(IsaacEnv):
             'capture_4_episode': UnboundedContinuousTensorSpec(1),
             'capture_5_episode': UnboundedContinuousTensorSpec(1),
             'min_distance': UnboundedContinuousTensorSpec(1),
-            'cl_bound': UnboundedContinuousTensorSpec(1),
         }).expand(self.num_envs).to(self.device)
         info_spec = CompositeSpec({
             "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13)),
@@ -528,7 +528,10 @@ class HideAndSeek_circle_static_UED_cl_v2(IsaacEnv):
 
         if self.use_outer_cl:
             # current_tasks contains x, y, z of drones, target, cylinders and cylinder masks
-            current_tasks = self.outer_curriculum_module.sample(num_samples=len(env_ids))
+            if not self.set_train:
+                current_tasks = self.outer_curriculum_module.sample(num_samples=len(env_ids))
+            else:
+                current_tasks = [None] * self.num_envs
 
         n_envs = len(env_ids)
         drone_pos = []
@@ -831,7 +834,7 @@ class HideAndSeek_circle_static_UED_cl_v2(IsaacEnv):
             (self.progress_buf >= self.max_episode_length).unsqueeze(-1)
         )
         
-        if torch.all(done):
+        if not self.set_train and torch.all(done):
             self.outer_curriculum_module.update_curriculum(capture_ratio_list=self.stats["capture_episode"].to('cpu').numpy() / self.max_episode_length)
             
             cl_mean_num_cylinders = self.outer_curriculum_module._state_buffer[:, -self.num_cylinders:].sum(axis=-1).mean()

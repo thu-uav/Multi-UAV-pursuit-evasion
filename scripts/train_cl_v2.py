@@ -219,7 +219,7 @@ def main(cfg):
     )
 
     @torch.no_grad()
-    def evaluate(
+    def render(
         seed: int=0
     ):
         """
@@ -256,8 +256,6 @@ def main(cfg):
         env.train() # set env back to training mode after evaluation
         base_env.set_train = True
         env.reset()
-        
-        min_distance = trajs['info']['min_distance'][:, -1].cpu().numpy()
 
         # after rollout, set rendering mode to not headless and reset env
         base_env.enable_render(not cfg.headless)
@@ -289,9 +287,63 @@ def main(cfg):
             info["recording"] = wandb.Video(
                 video_array, fps=0.5 / cfg.sim.dt, format="mp4"
             )
-        
-        info.update({'min_distance': min_distance})
-        
+                
+        return info
+
+    @torch.no_grad()
+    def evaluate(
+        seed: int=0
+    ):
+        """
+        Evaluate function called every certain steps. 
+        Used to record statistics and videos.
+        """
+
+        # set env to rendering and evaluation mode
+        base_env.enable_render(True)
+        base_env.eval()
+        env.eval()
+        base_env.set_train = False
+        env.set_seed(seed)
+
+        from tqdm import tqdm
+        t = tqdm(total=base_env.max_episode_length)
+
+        def record(*args, **kwargs):
+            t.update(2)
+
+        # get one episode rollout using current policy and form a trajectory
+        trajs = env.rollout(
+            max_steps=base_env.max_episode_length,
+            policy=lambda x: policy(x, deterministic=True),
+            callback=Every(record, 2),
+            auto_reset=True,
+            break_when_any_done=False,
+            return_contiguous=False
+        )
+
+        # after rollout, set rendering mode to not headless and reset env
+        base_env.enable_render(not cfg.headless)
+        env.reset()
+
+        # get first done index of each trajectory
+        done = trajs.get(("next", "done"))
+        first_done = torch.argmax(done.long(), dim=1).cpu()
+
+        def take_first_episode(tensor: torch.Tensor):
+            indices = first_done.reshape(first_done.shape+(1,)*(tensor.ndim-2))
+            return torch.take_along_dim(tensor, indices, dim=1).reshape(-1)
+
+        traj_stats = {
+            k: take_first_episode(v)
+            for k, v in trajs[("next", "stats")].cpu().items()
+        }
+
+        info = {
+            "eval/stats." + k: torch.nanmean(v.float()).item() 
+            for k, v in traj_stats.items()
+        }
+                        
         return info
 
     pbar = tqdm(collector)
@@ -325,29 +377,27 @@ def main(cfg):
         # update the policy using rollout data and store the training statistics
         info.update(policy.train_op(data.to_tensordict()))
 
-        # # update cl before sampling
-        # # if training_data contains done, update CL
-        # if (i > 0) and (data['next']['done'].sum() > 0):
-        #     # evaluate current policy
-        #     base_env._update_cl_states()
-        #     distance_list = []
-        #     for _ in range(len(base_env.outer_curriculum_module._state_buffer) // base_env.num_envs):
-        #         info.update(evaluate(seed=cfg.seed))
-        #         base_env.eval_iter += 1
-        #         distance_list.append(info['min_distance'])
-        #     base_env.eval_iter = 0
-        #     distance_list = np.concatenate(distance_list)
-        #     base_env._update_curriculum(distance_list, model_dir=cl_model_dir, episode=i)
-            
-        #     env.train() # set env back to training mode after evaluation
-        #     base_env.set_train = True
-        #     env.reset()
+        # update cl before sampling
+        # if training_data contains done, update CL
+        if i == 0 or ('train/stats.capture' in info.keys() and info['train/stats.capture'] > 0.95):
+            # empty the state_buffer
+            base_env.outer_curriculum_module._state_buffer = np.zeros((0, 1), dtype=np.float32)
+            # update the state_buffer
+            num_loop = 0
+            while base_env.outer_curriculum_module._state_buffer.shape[0] < base_env.outer_curriculum_module.buffer_size \
+                and num_loop <= 5:
+                info.update(evaluate(seed=cfg.seed))
+                num_loop += 1
+                print('cl_buffer', base_env.outer_curriculum_module._state_buffer.shape[0], 'num_loop', num_loop)
+            # save cl tasks
+            base_env.outer_curriculum_module.save_task(model_dir=cl_model_dir, episode=i)
+            env.train() # set env back to training mode after evaluation
+            base_env.set_train = True
+            env.reset()
 
         # save policy model every certain step
         if save_interval > 0 and i % save_interval == 0:
-            # save cl tasks
-            base_env.outer_curriculum_module.save_task(model_dir=cl_model_dir, episode=i)
-
+            
             if hasattr(policy, "state_dict"):
                 ckpt_path = os.path.join(run.dir, f"checkpoint_{collector._frames}.pt")
                 logging.info(f"Save checkpoint to {str(ckpt_path)}")
