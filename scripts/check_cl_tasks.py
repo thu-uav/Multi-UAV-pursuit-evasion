@@ -1,5 +1,5 @@
 import numpy as np
-tasks = np.load('/home/chenjy/OmniDrones/scripts/outputs/omega0_0_load_checktasks_v_1_5_5000/03-15_16-16/wandb/run-20240315_161607-3vj4pva6/files/tasks/tasks_0.npy')
+tasks = np.load('/home/chenjy/OmniDrones/scripts/outputs/omega0_0_load_checktasks_v_1_5_5000/03-15_16-39/wandb/run-20240315_163917-ail1oawq/files/tasks/tasks_0.npy')
 num_0 = (tasks[:,-8:].sum(-1)==0).sum()
 num_1 = (tasks[:,-8:].sum(-1)==1).sum()
 num_2 = (tasks[:,-8:].sum(-1)==2).sum()

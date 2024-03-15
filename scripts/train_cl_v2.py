@@ -385,7 +385,7 @@ def main(cfg):
             # update the state_buffer
             num_loop = 0
             while base_env.outer_curriculum_module._state_buffer.shape[0] < base_env.outer_curriculum_module.buffer_size \
-                and num_loop <= 5:
+                and num_loop <= 10:
                 info.update(evaluate(seed=cfg.seed))
                 num_loop += 1
                 print('cl_buffer', base_env.outer_curriculum_module._state_buffer.shape[0], 'num_loop', num_loop)

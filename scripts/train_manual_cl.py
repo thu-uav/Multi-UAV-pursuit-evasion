@@ -226,7 +226,7 @@ def main(cfg):
         Evaluate function called every certain steps. 
         Used to record statistics and videos.
         """
-        frames = []
+        # frames = []
 
         # set env to rendering and evaluation mode
         base_env.enable_render(True)
@@ -239,8 +239,8 @@ def main(cfg):
         t = tqdm(total=base_env.max_episode_length)
         
         def record_frame(*args, **kwargs):
-            frame = env.base_env.render(mode="rgb_array")
-            frames.append(frame)
+            # frame = env.base_env.render(mode="rgb_array")
+            # frames.append(frame)
             t.update(2)
 
         # get one episode rollout using current policy and form a trajectory
@@ -286,14 +286,14 @@ def main(cfg):
             for k, v in traj_stats.items()
         }
         
-        # render video
-        if len(frames):
-            # video_array = torch.stack(frames)
-            video_array = np.stack(frames).transpose(0, 3, 1, 2)
-            frames.clear()
-            info["recording"] = wandb.Video(
-                video_array, fps=0.5 / cfg.sim.dt, format="mp4"
-            )
+        # # render video
+        # if len(frames):
+        #     # video_array = torch.stack(frames)
+        #     video_array = np.stack(frames).transpose(0, 3, 1, 2)
+        #     frames.clear()
+        #     info["recording"] = wandb.Video(
+        #         video_array, fps=0.5 / cfg.sim.dt, format="mp4"
+        #     )
         
         # info.update(capture_dict)
         

@@ -182,18 +182,23 @@ class ManualCurriculum(object):
         self._easy_buffer = []
         self.omega_min = 0.5
         self.omega_max = 0.95
-        self.easy_prob = 0.05
+        self.easy_prob = 0.1
+        self.top_k = 1
         
     def update_weights(self, capture_dict):
         # empty the easy buffer
         self._easy_buffer = []
+        weight_list = []
         for idx in range(len(self._state_buffer)):
             num_cylinder = self._state_buffer[idx]
-            self._weight_buffer[idx] = (capture_dict['capture_{}'.format(num_cylinder)] > self.omega_min) and \
-                                        (capture_dict['capture_{}'.format(num_cylinder)] < self.omega_max)
-            if capture_dict['capture_{}'.format(num_cylinder)] >= self.omega_max:
-                self._easy_buffer.append(num_cylinder)
-        self._easy_buffer = np.array(self._easy_buffer)
+            weight_list.append(capture_dict['capture_{}'.format(num_cylinder)])
+        sorted_indices = np.argsort(weight_list)
+        # the least one
+        min_indices = sorted_indices[:self.top_k]
+        easy_indices = sorted_indices[self.top_k:]
+        self._weight_buffer[min_indices] = 1.0
+        self._weight_buffer[easy_indices] = 0.0
+        self._easy_buffer = self._state_buffer[easy_indices]
 
     def sample(self, num_samples):
         """
@@ -590,13 +595,6 @@ class HideAndSeek_circle_static_UED_cl(IsaacEnv):
             self.catch_radius = inner_tasks[0]
             self.v_prey = inner_tasks[1]
 
-        # if self.use_outer_cl:
-        #     # current_tasks contains x, y, z of drones, target, cylinders and cylinder masks
-        #     if self.set_train:
-        #         current_tasks = self.outer_curriculum_module.sample(num_samples=len(env_ids))
-        #     else:
-        #         current_tasks = self.outer_curriculum_module._state_buffer[self.eval_iter * self.num_envs: (self.eval_iter + 1) * self.num_envs]
-        
         if self.use_manual_cl:
             if self.set_train:
                 current_tasks = self.manual_curriculum_module.sample(num_samples=len(env_ids))
@@ -698,19 +696,6 @@ class HideAndSeek_circle_static_UED_cl(IsaacEnv):
         for substep in range(1):
             self.sim.step(self._should_render(substep))
 
-    # # for outer curriculum
-    # def _update_cl_states(self):
-    #     self.outer_curriculum_module.update_states()
-    #     cl_mean_num_cylinders = self.outer_curriculum_module._state_buffer[:, -self.num_cylinders].sum(axis=-1).mean()
-    #     self.stats['cl_mean_num_cylinders'].set_(torch.ones((self.num_envs, 1), device=self.device) * cl_mean_num_cylinders)
-
-    # def _update_curriculum(self, eval_metrics, model_dir, episode):
-    #     self.outer_curriculum_module.update_weights(eval_metrics)
-    #     self.stats["cl_mean_weights"].set_(torch.ones((self.num_envs, 1), device=self.device) * np.mean(self.outer_curriculum_module._weight_buffer))
-    #     self.outer_curriculum_module.save_task(model_dir=model_dir, 
-    #                                            episode=episode)
-    #################
-    
     # for manual CL
     def _update_manual_curriculum(self, capture_dict):
         self.manual_curriculum_module.update_weights(capture_dict=capture_dict)
