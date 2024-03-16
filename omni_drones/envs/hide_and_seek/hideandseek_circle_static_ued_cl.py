@@ -190,11 +190,23 @@ class ManualCurriculum(object):
         self._easy_buffer = []
         for idx in range(len(self._state_buffer)):
             num_cylinder = self._state_buffer[idx]
+            self._weight_buffer[idx] = 0.0
             if capture_dict['capture_{}'.format(num_cylinder)] <= self.omega_max:
                 self._weight_buffer[idx] = 1.0 - capture_dict['capture_{}'.format(num_cylinder)]
             if capture_dict['capture_{}'.format(num_cylinder)] > self.omega_max:
                 self._easy_buffer.append(num_cylinder)
         self._easy_buffer = np.array(self._easy_buffer)
+
+    # adjust the weights of tasks which are not in easy_buffer
+    def soft_update_weights(self, capture_dict):
+        for idx in range(len(self._state_buffer)):
+            num_cylinder = self._state_buffer[idx]
+            self._weight_buffer[idx] = 0.0
+            if num_cylinder not in self._easy_buffer:
+                if capture_dict['capture_{}'.format(num_cylinder)] <= self.omega_max:
+                    self._weight_buffer[idx] = 1.0 - capture_dict['capture_{}'.format(num_cylinder)]
+                if capture_dict['capture_{}'.format(num_cylinder)] > self.omega_max:
+                    self._easy_buffer = np.insert(self._easy_buffer, 0, num_cylinder)
 
     def sample(self, num_samples):
         """
@@ -406,6 +418,12 @@ class HideAndSeek_circle_static_UED_cl(IsaacEnv):
             'capture_3': UnboundedContinuousTensorSpec(1),
             'capture_4': UnboundedContinuousTensorSpec(1),
             'capture_5': UnboundedContinuousTensorSpec(1),
+            'weight_0': UnboundedContinuousTensorSpec(1),
+            'weight_1': UnboundedContinuousTensorSpec(1),
+            'weight_2': UnboundedContinuousTensorSpec(1),
+            'weight_3': UnboundedContinuousTensorSpec(1),
+            'weight_4': UnboundedContinuousTensorSpec(1),
+            'weight_5': UnboundedContinuousTensorSpec(1),
         }).expand(self.num_envs).to(self.device)
         info_spec = CompositeSpec({
             "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13)),
@@ -696,6 +714,12 @@ class HideAndSeek_circle_static_UED_cl(IsaacEnv):
     def _update_manual_curriculum(self, capture_dict):
         self.manual_curriculum_module.update_weights(capture_dict=capture_dict)
         self.stats["manual_cl_sum_weights"].set_(torch.ones((self.num_envs, 1), device=self.device) * np.sum(self.manual_curriculum_module._weight_buffer))
+        self.stats['weight_0'].set_(torch.ones((self.num_envs, 1), device=self.device) * self.manual_curriculum_module._weight_buffer[0])
+        self.stats['weight_1'].set_(torch.ones((self.num_envs, 1), device=self.device) * self.manual_curriculum_module._weight_buffer[1])
+        self.stats['weight_2'].set_(torch.ones((self.num_envs, 1), device=self.device) * self.manual_curriculum_module._weight_buffer[2])
+        self.stats['weight_3'].set_(torch.ones((self.num_envs, 1), device=self.device) * self.manual_curriculum_module._weight_buffer[3])
+        self.stats['weight_4'].set_(torch.ones((self.num_envs, 1), device=self.device) * self.manual_curriculum_module._weight_buffer[4])
+        self.stats['weight_5'].set_(torch.ones((self.num_envs, 1), device=self.device) * self.manual_curriculum_module._weight_buffer[5])
         print('num_easy_list', self.manual_curriculum_module._easy_buffer)
 
     def _pre_sim_step(self, tensordict: TensorDictBase):   
@@ -910,10 +934,23 @@ class HideAndSeek_circle_static_UED_cl(IsaacEnv):
             (self.progress_buf >= self.max_episode_length).unsqueeze(-1)
         )
         
-        # for inner cl
+        # for cl
         if torch.all(done):
             self.mean_eval_capture = torch.mean(self.stats['capture'])
             self.stats['inner_cl_eval_capture'].set_(torch.ones((self.num_envs, 1), device=self.device) * self.mean_eval_capture)
+            
+            capture_dict = dict()
+            eval_num_cylinders = np.arange(self.min_active_cylinders, self.max_active_cylinders + 1)
+            for idx in range(len(eval_num_cylinders)):
+                num_cylinder = eval_num_cylinders[idx]
+                capture_dict.update({'capture_{}'.format(num_cylinder): self.stats['capture_0'].to('cpu').numpy().mean()})
+            self.manual_curriculum_module.soft_update_weights(capture_dict=capture_dict)
+            self.stats['weight_0'].set_(torch.ones((self.num_envs, 1), device=self.device) * self.manual_curriculum_module._weight_buffer[0])
+            self.stats['weight_1'].set_(torch.ones((self.num_envs, 1), device=self.device) * self.manual_curriculum_module._weight_buffer[1])
+            self.stats['weight_2'].set_(torch.ones((self.num_envs, 1), device=self.device) * self.manual_curriculum_module._weight_buffer[2])
+            self.stats['weight_3'].set_(torch.ones((self.num_envs, 1), device=self.device) * self.manual_curriculum_module._weight_buffer[3])
+            self.stats['weight_4'].set_(torch.ones((self.num_envs, 1), device=self.device) * self.manual_curriculum_module._weight_buffer[4])
+            self.stats['weight_5'].set_(torch.ones((self.num_envs, 1), device=self.device) * self.manual_curriculum_module._weight_buffer[5])
         
         self.progress_std = torch.std(self.progress_buf)
 
