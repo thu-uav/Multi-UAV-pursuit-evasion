@@ -94,91 +94,12 @@ class InnerCurriculum(object):
         if len(self.training_order) > 1:
             self.training_order.pop(0)
 
-class OuterCurriculum(object):
-    '''
-    propose new environments
-    '''
-    def __init__(self, cfg, device) -> None:
-        self.OOD_num_cylinders = cfg.task.cylinder.num
-        self.num_drones = cfg.task.num_agents
-        self.max_num_obj = self.num_drones + self.OOD_num_cylinders + 1 # drone + target + cylinders
-        self.cylinder_size = cfg.task.cylinder.size
-        self.arena_size = cfg.task.arena_size
-        self.device = device
-        self.omega_min = 0.5
-        self.omega_max = 0.9
-        self.prob_random = 0.2
-        self.eps = 1e-10
-        self._state_buffer = np.zeros((0, 1), dtype=np.float32)
-        self._weight_buffer = np.zeros((0, 1), dtype=np.float32)
-        self._temp_state_buffer = []
-        self.buffer_size = 5 * cfg.env.num_envs
-    
-    def insert(self, states):
-        """
-        input:
-            states: list of np.array(size=(state_dim, ))
-        """
-        self._temp_state_buffer.append(copy.deepcopy(states))
-
-    def update_states(self):
-        start_time = time.time()
-
-        # concatenate to get all states and all weights
-        all_states = np.array(self._temp_state_buffer)
-        if self._state_buffer.shape[0] != 0:  # state buffer is not empty
-            all_states = np.concatenate([self._state_buffer, all_states], axis=0)
-
-        # update 
-        if all_states.shape[0] <= self.buffer_size:
-            self._state_buffer = all_states
-        else:
-            min_states = np.min(all_states, axis=0)
-            max_states = np.max(all_states, axis=0)
-            all_states_normalized = (all_states - min_states) / (max_states - min_states + self.eps)
-            consider_dim = np.ones(all_states_normalized.shape[-1],dtype=bool)
-            consider_dim[-self.OOD_num_cylinders:] = False # ignore cylinder_masks
-            all_states_tensor = torch.tensor(all_states_normalized[np.newaxis, :, consider_dim])
-            # farthest point sampling
-            fps_idx = farthest_point_sampler(all_states_tensor, self.buffer_size)[0].numpy()
-            self._state_buffer = all_states[fps_idx]
-        
-        # reset temp state and weight buffer
-        self._temp_state_buffer = []
-
-        # print update time
-        end_time = time.time()
-        print(f"curriculum buffer update states time: {end_time - start_time}s")
-
-    def update_weights(self, weights):
-        self._weight_buffer = weights.copy()
-
-    def sample(self, num_samples):
-        """
-        return list of np.array
-        """
-        if self._state_buffer.shape[0] == 0:  # state buffer is empty
-            initial_states = [None for _ in range(num_samples)]
-        else:
-            num_random = int(num_samples * self.prob_random)
-            num_cl = num_samples - num_random
-            weights = self._weight_buffer / np.mean(self._weight_buffer)
-            probs = (weights / np.sum(weights)).squeeze()
-            sample_idx = np.random.choice(self._state_buffer.shape[0], num_cl, replace=True, p=probs)
-            initial_states = [self._state_buffer[idx] for idx in sample_idx]
-            initial_states += [None] * num_random
-        return initial_states
-    
-    def save_task(self, model_dir, episode):
-        np.save('{}/tasks_{}.npy'.format(model_dir,episode), self._state_buffer)
-        np.save('{}/weights_{}.npy'.format(model_dir,episode), self._weight_buffer)
-
 class ManualCurriculum(object):
     def __init__(self, cfg) -> None:
         self.max_active_cylinders = cfg.task.cylinder.max_active
         self.min_active_cylinders = cfg.task.cylinder.min_active
         self._state_buffer = np.arange(self.min_active_cylinders, self.max_active_cylinders + 1)
-        self._weight_buffer = np.zeros_like(self._state_buffer, dtype=np.float32)
+        self._weight_buffer = np.ones_like(self._state_buffer)
         self._easy_buffer = []
         self.omega_min = 0.0
         self.omega_max = 0.9
@@ -200,7 +121,7 @@ class ManualCurriculum(object):
         """
         return list of np.array
         """
-        if np.sum(self._weight_buffer) == 0.0: # all tasks = 0.0
+        if np.sum(self._weight_buffer) < 1.0: # all tasks = 0.0
             initial_states = [None] * num_samples
         else:
             # num_samples = num_cl + num_easy
@@ -219,7 +140,7 @@ class ManualCurriculum(object):
                 initial_states += [self._easy_buffer[idx] for idx in sample_easy_idx]
         return initial_states
 
-class HideAndSeek_circle_static_UED_cl(IsaacEnv): 
+class HideAndSeek_circle_static_UED_addeasy(IsaacEnv): 
     """
     HideAndSeek environment designed for curriculum learning.
 
@@ -323,13 +244,6 @@ class HideAndSeek_circle_static_UED_cl(IsaacEnv):
         if self.use_manual_cl:
             self.manual_curriculum_module = ManualCurriculum(cfg)
         self.set_train = True
-        
-        # # outer CL
-        # self.use_outer_cl = self.cfg.task.use_outer_cl
-        # self.set_train = True
-        # self.eval_iter = 0 # eval 5 times for cl buffer
-        # if self.use_outer_cl:
-        #     self.outer_curriculum_module = OuterCurriculum(cfg=self.cfg, device=self.device)
         
         self.draw = _debug_draw.acquire_debug_draw_interface()
 
@@ -634,17 +548,6 @@ class HideAndSeek_circle_static_UED_cl(IsaacEnv):
             cylinders_pos.append(cylinder_pos_one)
             self.cylinders_mask.append(cylinder_mask_one)
                 
-            # # get cl_task
-            # cl_task_one = []
-            # cl_task_one += drone_pos_one.reshape(-1).to('cpu').numpy().tolist()
-            # cl_task_one += target_pos_one.to('cpu').numpy().tolist()
-            # cl_task_one += cylinder_pos_one.reshape(-1).to('cpu').numpy().tolist()
-            # cl_task_one += cylinder_mask_one.tolist()
-            
-            # if self.use_outer_cl and self.set_train:
-            #     # cl_task: [drone_pos, target_pos, cylinder_pos, cylinder_mask]
-            #     self.outer_curriculum_module.insert(np.array(cl_task_one))
-
             if idx == self.central_env_idx and self._should_render(0):
                 self._draw_court_circle(self.arena_size)
 
