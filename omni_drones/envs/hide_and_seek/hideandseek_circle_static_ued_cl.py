@@ -179,7 +179,7 @@ class ManualCurriculum(object):
         self.min_active_cylinders = cfg.task.cylinder.min_active
         self._state_buffer = np.arange(self.min_active_cylinders, self.max_active_cylinders + 1)
         self._weight_buffer = np.zeros_like(self._state_buffer, dtype=np.float32)
-        self._easy_buffer = []
+        self._easy_buffer = set()
         self.omega_min = 0.0
         self.omega_max = 0.9
         self.easy_prob = 0.05
@@ -187,15 +187,14 @@ class ManualCurriculum(object):
         
     def update_weights(self, capture_dict):
         # empty the easy buffer
-        self._easy_buffer = []
+        self._easy_buffer = set()
         for idx in range(len(self._state_buffer)):
             num_cylinder = self._state_buffer[idx]
             self._weight_buffer[idx] = 0.0
             if capture_dict['capture_{}'.format(num_cylinder)] <= self.omega_max:
                 self._weight_buffer[idx] = 1.0 - capture_dict['capture_{}'.format(num_cylinder)]
             if capture_dict['capture_{}'.format(num_cylinder)] > self.omega_max:
-                self._easy_buffer.append(num_cylinder)
-        self._easy_buffer = np.array(self._easy_buffer)
+                self._easy_buffer.add(num_cylinder)
 
     # adjust the weights of tasks which are not in easy_buffer
     def soft_update_weights(self, capture_dict):
@@ -206,7 +205,7 @@ class ManualCurriculum(object):
                 if capture_dict['capture_{}'.format(num_cylinder)] <= self.omega_max:
                     self._weight_buffer[idx] = 1.0 - capture_dict['capture_{}'.format(num_cylinder)]
                 if capture_dict['capture_{}'.format(num_cylinder)] > self.omega_max:
-                    self._easy_buffer = np.insert(self._easy_buffer, 0, num_cylinder)
+                    self._easy_buffer.add(num_cylinder)
 
     def sample(self, num_samples):
         """
@@ -228,7 +227,7 @@ class ManualCurriculum(object):
             initial_states += [self._state_buffer[idx] for idx in sample_idx]
             if len(self._easy_buffer) > 0:
                 sample_easy_idx = np.random.randint(0, len(self._easy_buffer), size=num_easy)
-                initial_states += [self._easy_buffer[idx] for idx in sample_easy_idx]
+                initial_states += [np.array(list(self._easy_buffer))[idx] for idx in sample_easy_idx]
         return initial_states
 
 class HideAndSeek_circle_static_UED_cl(IsaacEnv): 
@@ -943,8 +942,9 @@ class HideAndSeek_circle_static_UED_cl(IsaacEnv):
             eval_num_cylinders = np.arange(self.min_active_cylinders, self.max_active_cylinders + 1)
             for idx in range(len(eval_num_cylinders)):
                 num_cylinder = eval_num_cylinders[idx]
-                capture_dict.update({'capture_{}'.format(num_cylinder): self.stats['capture_0'].to('cpu').numpy().mean()})
+                capture_dict.update({'capture_{}'.format(num_cylinder): self.stats['capture_{}'.format(num_cylinder)].to('cpu').numpy().mean()})
             self.manual_curriculum_module.soft_update_weights(capture_dict=capture_dict)
+            print('weight', self.manual_curriculum_module._weight_buffer)
             self.stats['weight_0'].set_(torch.ones((self.num_envs, 1), device=self.device) * self.manual_curriculum_module._weight_buffer[0])
             self.stats['weight_1'].set_(torch.ones((self.num_envs, 1), device=self.device) * self.manual_curriculum_module._weight_buffer[1])
             self.stats['weight_2'].set_(torch.ones((self.num_envs, 1), device=self.device) * self.manual_curriculum_module._weight_buffer[2])

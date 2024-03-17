@@ -288,6 +288,7 @@ class MAPPOPolicy(object):
         grad_norm = torch.nn.utils.clip_grad_norm_(
             self.actor_opt.param_groups[0]["params"], self.cfg.max_grad_norm
         )
+        
         self.actor_opt.step()
 
         ess = (2 * ratio.logsumexp(0) - (2 * ratio).logsumexp(0)).exp().mean() / ratio.shape[0]

@@ -51,3 +51,4 @@ cylinder:
   moderate_active: 1
   random_active: True # if False, only train max_active
   prob_easy: 0.05
+  use_soft_update: False
