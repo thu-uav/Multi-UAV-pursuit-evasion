@@ -123,17 +123,18 @@ class ManualCurriculum(object):
                 self._weight_buffer[idx] = 1.0 - capture_dict['capture_{}'.format(num_cylinder)]
 
     def hard_update_weights(self, capture_dict):
-        # if tasks which are not in easy buffer > 0.95
-        # pop _easy_buffer[0]
         num_active = self.max_active_cylinders - self.min_active_cylinders + 1 - len(self._easy_buffer)
         capture_done = 0
+        # if tasks which are not in easy buffer > 0.95
+        # pop _easy_buffer[0]
         for idx in range(len(self._state_buffer)):
             num_cylinder = self._state_buffer[idx]
-            if capture_dict['capture_{}'.format(num_cylinder)] >= self.threshold:
+            if capture_dict['capture_{}'.format(num_cylinder)] >= self.threshold and \
+                (num_cylinder not in self._easy_buffer):
                 capture_done += 1
         if capture_done == num_active:
             if len(self._easy_buffer) > 0:
-                active_cylinder_idx = (self._state_buffer == self._easy_buffer[0])
+                active_cylinder_idx = np.argwhere(self._state_buffer == self._easy_buffer[0]).item()
                 self._weight_buffer[active_cylinder_idx] = 1.0
                 self._easy_buffer = np.delete(self._easy_buffer, 0)
 

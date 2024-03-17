@@ -30,7 +30,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: train0to1_others0_0_5_softupdate_loadcl
+  run_name: train0to1_others0_0_5_hardupdate_loadcl
   # run_name: debug
   job_type: train
   entity: chenjy
