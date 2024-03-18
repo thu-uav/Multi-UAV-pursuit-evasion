@@ -98,20 +98,19 @@ class ManualCurriculum(object):
     def __init__(self, cfg) -> None:
         self.max_active_cylinders = cfg.task.cylinder.max_active
         self.min_active_cylinders = cfg.task.cylinder.min_active
-        self.moderate_active_cylinders = cfg.task.cylinder.moderate_active
         self._state_buffer = np.arange(self.min_active_cylinders, self.max_active_cylinders + 1)
         self._weight_buffer = np.zeros_like(self._state_buffer, dtype=np.float32)
         self._easy_buffer = []
+        self.active_start_idx = 0 
+        self._weight_buffer[self.active_start_idx] = 1.0
         for idx in range(len(self._state_buffer)):
             num_cylinder = self._state_buffer[idx]
-            if num_cylinder >= self.min_active_cylinders and \
-                num_cylinder <= self.moderate_active_cylinders:
-                    self._weight_buffer[idx] = 1.0
-            if num_cylinder > self.moderate_active_cylinders and \
-                num_cylinder <= self.max_active_cylinders:
-                    self._easy_buffer.append(num_cylinder)
+            if idx != self.active_start_idx:
+                self._easy_buffer.append(num_cylinder)
         self._easy_buffer = np.array(self._easy_buffer)
-        self.threshold = 0.95
+        self.threshold = 0.98
+        self.eval_threshold = 3
+        self.eval_num = 0
         self.easy_prob = 0.05
 
     # adjust the weights of tasks which are not in easy_buffer
@@ -123,20 +122,23 @@ class ManualCurriculum(object):
                 self._weight_buffer[idx] = 1.0 - capture_dict['capture_{}'.format(num_cylinder)]
 
     def hard_update_weights(self, capture_dict):
-        num_active = self.max_active_cylinders - self.min_active_cylinders + 1 - len(self._easy_buffer)
-        capture_done = 0
-        # if tasks which are not in easy buffer > 0.95
-        # pop _easy_buffer[0]
         for idx in range(len(self._state_buffer)):
             num_cylinder = self._state_buffer[idx]
+            # self._weight_buffer[idx] = 0.0
             if capture_dict['capture_{}'.format(num_cylinder)] >= self.threshold and \
                 (num_cylinder not in self._easy_buffer):
-                capture_done += 1
-        if capture_done == num_active:
-            if len(self._easy_buffer) > 0:
-                active_cylinder_idx = np.argwhere(self._state_buffer == self._easy_buffer[0]).item()
-                self._weight_buffer[active_cylinder_idx] = 1.0
-                self._easy_buffer = np.delete(self._easy_buffer, 0)
+                self.eval_num += 1
+                    
+        if self.eval_num >= self.eval_threshold:
+            self._weight_buffer[:] = 0.0
+            self.active_start_idx = min(len(self._state_buffer) - 1, self.active_start_idx + 1)
+            self._weight_buffer[self.active_start_idx] = 1.0
+            self.eval_num = 0
+        
+        for idx in range(len(self._state_buffer)):
+            num_cylinder = self._state_buffer[idx]
+            if idx != self.active_start_idx:
+                self._easy_buffer.append(num_cylinder)
 
     def sample(self, num_samples):
         """
@@ -362,7 +364,6 @@ class HideAndSeek_circle_static_UED_addeasy(IsaacEnv):
         self.num_cylinders = self.cfg.task.cylinder.num
         self.max_active_cylinders = self.cfg.task.cylinder.max_active
         self.min_active_cylinders = self.cfg.task.cylinder.min_active
-        self.moderate_active_cylinders = self.cfg.task.cylinder.moderate_active
         self.random_active = self.cfg.task.cylinder.random_active
         self.use_soft_update = self.cfg.task.cylinder.use_soft_update
         self.cylinder_size = self.cfg.task.cylinder.size

@@ -1,6 +1,6 @@
-# model_dir: /home/chenjy/OmniDrones/scripts/outputs/DR_catch0_15_collision001_validation.pt
+# model_dir: /home/chenjy/OmniDrones/scripts/outputs/hardupdate_v_2_loadcl/03-18_10-37/wandb/run-20240318_103711-gw0tjilu/files/checkpoint_498204672.pt
 model_dir: /home/chenjy/OmniDrones/scripts/outputs/cl_catch0_15_collision001_validation.pt
-# model_dir: /home/chenjy/OmniDrones/scripts/outputs/manual_cl_train0to2_loadcl/03-16_13-54/wandb/run-20240316_135421-r9k766ne/files/checkpoint_131203072.pt
+# model_dir: /home/chenjy/OmniDrones/scripts/outputs/cl_hard_update_0and1_done.pt
 # model_dir: null
 
 # hydra.job.chdir: false
@@ -30,7 +30,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: train0to1_others0_0_5_hardupdate_loadcl
+  run_name: hardupdate_v_3_loadv_1_3
   # run_name: debug
   job_type: train
   entity: chenjy
