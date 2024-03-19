@@ -108,30 +108,30 @@ class ManualCurriculum(object):
             if num_cylinder not in self.active_num:
                 self._easy_buffer.add(num_cylinder)
         self.eval_times = 5
+        self.num_eval = 0
         self.threshold = 0.95
         self.easy_prob = 0.05
         self.sub_step = 0.1
-        self.latest_capture_active = [[]] # [len(active_idx), eval_times]
+        self.max_weight = 1.0
+        self.latest_capture_active = [np.zeros(self.eval_times)] # [len(active_idx), eval_times]
 
     # adjust the weights of tasks which are not in easy_buffer
     def soft_update_weights(self, capture_dict):
         for idx, active_num in enumerate(self.active_num):
-            self.latest_capture_active[idx].append(capture_dict['capture_{}'.format(active_num)])
-            self.latest_capture_active[idx] = copy.deepcopy(self.latest_capture_active[idx][len(self.latest_capture_active[idx]) - self.eval_times:])
+            self.latest_capture_active[idx][self.num_eval] = capture_dict['capture_{}'.format(active_num)]
+        self.num_eval = (self.num_eval + 1) % self.eval_times
         
         # check active tasks except the last one
         if self.need_to_update_weights():
             self._weight_buffer[np.argwhere(self.active_num[-1] == self._state_buffer)] += self.sub_step
+            self._weight_buffer = np.clip(self._weight_buffer, 0.0, self.max_weight)
 
     def need_to_update_weights(self):
         check_active_captue = np.array(self.latest_capture_active)
-        if check_active_captue.shape[1] < self.eval_times:
-            return False
-        else:
-            if len(np.mean(check_active_captue, axis=-1)[:-1]) > 0:
-                if np.mean(check_active_captue, axis=-1)[:-1].mean() >= self.threshold:
-                    return True
-            return False
+        if len(np.mean(check_active_captue, axis=-1)[:-1]) > 0:
+            if np.mean(check_active_captue, axis=-1)[:-1].mean() >= self.threshold:
+                return True
+        return False
 
     def hard_update_weights(self, capture_dict):
         for idx in range(len(self._state_buffer)):
@@ -160,6 +160,7 @@ class ManualCurriculum(object):
             if capture_dict['capture_{}'.format(active_num)] < self.threshold:
                 return False
         self.active_num = np.insert(self.active_num, len(self.active_num), self.active_num[-1] + 1)
+        self.latest_capture_active.append(np.zeros(self.eval_times))
 
     def sample(self, num_samples):
         """
