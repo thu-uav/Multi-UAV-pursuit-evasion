@@ -100,26 +100,38 @@ class ManualCurriculum(object):
         self.min_active_cylinders = cfg.task.cylinder.min_active
         self._state_buffer = np.arange(self.min_active_cylinders, self.max_active_cylinders + 1)
         self._weight_buffer = np.zeros_like(self._state_buffer, dtype=np.float32)
-        self._easy_buffer = []
-        self.active_start_idx = 0 
-        self._weight_buffer[self.active_start_idx] = 1.0
+        self._easy_buffer = set()
+        self.active_num = np.array([0])
+        self._weight_buffer[0] = 1.0
         for idx in range(len(self._state_buffer)):
             num_cylinder = self._state_buffer[idx]
-            if idx != self.active_start_idx:
-                self._easy_buffer.append(num_cylinder)
-        self._easy_buffer = np.array(self._easy_buffer)
-        self.threshold = 0.98
-        self.eval_threshold = 3
-        self.eval_num = 0
+            if num_cylinder not in self.active_num:
+                self._easy_buffer.add(num_cylinder)
+        self.eval_times = 5
+        self.threshold = 0.95
         self.easy_prob = 0.05
+        self.sub_step = 0.1
+        self.latest_capture_active = [[]] # [len(active_idx), eval_times]
 
     # adjust the weights of tasks which are not in easy_buffer
     def soft_update_weights(self, capture_dict):
-        for idx in range(len(self._state_buffer)):
-            num_cylinder = self._state_buffer[idx]
-            self._weight_buffer[idx] = 0.0
-            if num_cylinder not in self._easy_buffer:
-                self._weight_buffer[idx] = 1.0 - capture_dict['capture_{}'.format(num_cylinder)]
+        for idx, active_num in enumerate(self.active_num):
+            self.latest_capture_active[idx].append(capture_dict['capture_{}'.format(active_num)])
+            self.latest_capture_active[idx] = copy.deepcopy(self.latest_capture_active[idx][len(self.latest_capture_active[idx]) - self.eval_times:])
+        
+        # check active tasks except the last one
+        if self.need_to_update_weights():
+            self._weight_buffer[np.argwhere(self.active_num[-1] == self._state_buffer)] += self.sub_step
+
+    def need_to_update_weights(self):
+        check_active_captue = np.array(self.latest_capture_active)
+        if check_active_captue.shape[1] < self.eval_times:
+            return False
+        else:
+            if len(np.mean(check_active_captue, axis=-1)[:-1]) > 0:
+                if np.mean(check_active_captue, axis=-1)[:-1].mean() >= self.threshold:
+                    return True
+            return False
 
     def hard_update_weights(self, capture_dict):
         for idx in range(len(self._state_buffer)):
@@ -131,14 +143,23 @@ class ManualCurriculum(object):
                     
         if self.eval_num >= self.eval_threshold:
             self._weight_buffer[:] = 0.0
-            self.active_start_idx = min(len(self._state_buffer) - 1, self.active_start_idx + 1)
-            self._weight_buffer[self.active_start_idx] = 1.0
+            self.active_idx = min(len(self._state_buffer) - 1, self.active_idx + 1)
+            self._weight_buffer[self.active_idx] = 1.0
             self.eval_num = 0
         
+        self._easy_buffer = set()
         for idx in range(len(self._state_buffer)):
             num_cylinder = self._state_buffer[idx]
-            if idx != self.active_start_idx:
-                self._easy_buffer.append(num_cylinder)
+            if idx != self.active_idx:
+                self._easy_buffer.add(num_cylinder)
+
+    def update_active(self, capture_dict):
+        if len(self.active_num) >= self.max_active_cylinders - self.min_active_cylinders + 1:
+            return False
+        for active_num in self.active_num:
+            if capture_dict['capture_{}'.format(active_num)] < self.threshold:
+                return False
+        self.active_num = np.insert(self.active_num, len(self.active_num), self.active_num[-1] + 1)
 
     def sample(self, num_samples):
         """
@@ -160,7 +181,7 @@ class ManualCurriculum(object):
             initial_states += [self._state_buffer[idx] for idx in sample_idx]
             if len(self._easy_buffer) > 0:
                 sample_easy_idx = np.random.randint(0, len(self._easy_buffer), size=num_easy)
-                initial_states += [self._easy_buffer[idx] for idx in sample_easy_idx]
+                initial_states += [list(self._easy_buffer)[idx] for idx in sample_easy_idx]
         return initial_states
 
 class HideAndSeek_circle_static_UED_addeasy(IsaacEnv): 
@@ -353,6 +374,12 @@ class HideAndSeek_circle_static_UED_addeasy(IsaacEnv):
             "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13)),
             'task_capture': UnboundedContinuousTensorSpec(1),
             'task_return': UnboundedContinuousTensorSpec(1),
+            'capture_0': UnboundedContinuousTensorSpec(1),
+            'capture_1': UnboundedContinuousTensorSpec(1),
+            'capture_2': UnboundedContinuousTensorSpec(1),
+            'capture_3': UnboundedContinuousTensorSpec(1),
+            'capture_4': UnboundedContinuousTensorSpec(1),
+            'capture_5': UnboundedContinuousTensorSpec(1),
         }).expand(self.num_envs).to(self.device)
         self.observation_spec["stats"] = stats_spec
         self.observation_spec["info"] = info_spec
@@ -614,6 +641,9 @@ class HideAndSeek_circle_static_UED_addeasy(IsaacEnv):
         for substep in range(1):
             self.sim.step(self._should_render(substep))
 
+    def _update_curriculum(self, capture_dict):
+        self.manual_curriculum_module.update_active(capture_dict=capture_dict)
+
     def _pre_sim_step(self, tensordict: TensorDictBase):   
         self.step_spec += 1
         actions = tensordict[("agents", "action")]
@@ -775,8 +805,10 @@ class HideAndSeek_circle_static_UED_addeasy(IsaacEnv):
         self.stats['capture'].set_(torch.from_numpy(self.stats['capture_episode'].to('cpu').numpy() > 0.0).type(torch.float32).to(self.device))
         
         self.stats['capture_0'].set_(torch.ones_like(self.stats['capture'], device=self.device) * self.stats['capture'][(self.cylinders_mask.sum(-1) == 0)].mean())
+        self.info['capture_0'].set_(self.stats['capture_0'])
         for idx in range(self.max_active_cylinders):
             self.stats['capture_{}'.format(idx + 1)].set_(torch.ones_like(self.stats['capture'], device=self.device) * self.stats['capture'][(self.cylinders_mask.sum(-1) == idx + 1)].mean())
+            self.info['capture_{}'.format(idx + 1)].set_(self.stats['capture_{}'.format(idx + 1)])
         
         self.info['task_capture'] = self.stats['capture'].clone()
         self.stats['capture_per_step'].set_(self.stats['capture_episode'] / self.step_spec)

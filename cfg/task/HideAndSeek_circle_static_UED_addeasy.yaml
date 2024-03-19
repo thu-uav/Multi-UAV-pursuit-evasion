@@ -50,4 +50,4 @@ cylinder:
   min_active: 0
   random_active: True # if False, only train max_active
   prob_easy: 0.05
-  use_soft_update: False
+  use_soft_update: True
