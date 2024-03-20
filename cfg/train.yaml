@@ -1,7 +1,7 @@
 # model_dir: /home/chenjy/OmniDrones/scripts/outputs/hardupdate_v_2_loadcl/03-18_10-37/wandb/run-20240318_103711-gw0tjilu/files/checkpoint_498204672.pt
-model_dir: /home/chenjy/OmniDrones/scripts/outputs/cl_catch0_15_collision001_validation.pt
-# model_dir: /home/chenjy/OmniDrones/scripts/outputs/DR_wo_validation_final/seed0/catch0_15_v_2_0.pt
-# model_dir: null
+# model_dir: /home/chenjy/OmniDrones/scripts/outputs/cl_catch0_15_collision001_validation.pt
+# model_dir: /home/jiayu/OmniDrones/scripts/outputs/cl_v1_5.pt
+model_dir: null
 
 # hydra.job.chdir: false
 
@@ -12,7 +12,7 @@ env: ${task.env}
 
 total_frames: 100_000_000_000
 max_iters: -1
-eval_interval: 50
+eval_interval: -1
 save_interval: 200
 seed: 0
 
@@ -30,7 +30,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: evalupdate_alpha5_windowsize5_eval50_loadv_1_3
+  run_name: DR_validation_random3
   # run_name: debug
   job_type: train
   entity: chenjy
@@ -42,10 +42,11 @@ wandb:
   tags: 
 
 defaults:
-  - task: HideAndSeek_circle_static_UED_addeasy
+  # - task: HideAndSeek_circle_static_UED_addeasy
   # - task: HideAndSeek_circle_static_UED_cl
   # - task: HideAndSeek_circle_static_UED_cl_v2
   # - task: HideAndSeek_circle_static_UED
+  - task: HideAndSeek_circle_static_UED_large_cylinder
   # - task: HideAndSeek_circle_eval
   - algo: mappo
   - _self_
