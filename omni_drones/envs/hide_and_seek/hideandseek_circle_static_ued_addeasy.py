@@ -185,6 +185,43 @@ class ManualCurriculum(object):
                 initial_states += [list(self._easy_buffer)[idx] for idx in sample_easy_idx]
         return initial_states
 
+class ManualCurriculum2(object):
+    def __init__(self, cfg) -> None:
+        self.max_active_cylinders = cfg.task.cylinder.max_active
+        self.min_active_cylinders = cfg.task.cylinder.min_active
+        self._state_buffer = np.arange(self.min_active_cylinders, self.max_active_cylinders + 1) # 1~5
+        self._weight_buffer = np.zeros_like(self._state_buffer, dtype=np.float32)
+        self._easy_buffer = [] # invalid
+        self.alpha = 5
+        self.p_0 = 0.2
+
+    # adjust the weights of tasks which are not in easy_buffer
+    def soft_update_weights(self, capture_dict):
+        for num_cylinder in self._state_buffer:
+            self._weight_buffer[num_cylinder] = (1.0 - capture_dict['capture_{}'.format(num_cylinder)])**self.alpha
+
+    def update_active(self, capture_dict):
+        for num_cylinder in self._state_buffer:
+            self._weight_buffer[num_cylinder] = (1.0 - capture_dict['capture_{}'.format(num_cylinder)])**self.alpha
+
+    def sample(self, num_samples):
+        """
+        return list of np.array
+        """
+        if np.sum(self._weight_buffer) == 0.0: # all tasks = 0.0
+            initial_states = [None] * num_samples
+        else:
+            # num_samples = num_cl + num_p0
+            initial_states = []
+            num_p0 = int(num_samples * self.p_0)
+            num_cl = num_samples - num_p0
+            weights = self._weight_buffer / np.mean(self._weight_buffer)
+            probs = (weights / np.sum(weights)).squeeze()
+            sample_idx = np.random.choice(self._state_buffer.shape[0], num_cl, replace=True, p=probs)
+            initial_states += [self._state_buffer[idx] for idx in sample_idx]
+            initial_states += [0] * num_p0
+        return initial_states
+
 class HideAndSeek_circle_static_UED_addeasy(IsaacEnv): 
     """
     HideAndSeek environment designed for curriculum learning.
@@ -287,7 +324,7 @@ class HideAndSeek_circle_static_UED_addeasy(IsaacEnv):
         # manual cl
         self.use_manual_cl = self.cfg.task.use_manual_cl
         if self.use_manual_cl:
-            self.manual_curriculum_module = ManualCurriculum(cfg)
+            self.manual_curriculum_module = ManualCurriculum2(cfg)
         
         self.draw = _debug_draw.acquire_debug_draw_interface()
 
@@ -434,7 +471,7 @@ class HideAndSeek_circle_static_UED_addeasy(IsaacEnv):
                                                                 num_envs=1, 
                                                                 device=self.device)[:num_inactive]
         cylinder_x_y = torch.concat([active_cylinder_x_y, inactive_cylinders_x_y], dim=0)
-        cylinders_z = torch.ones(self.num_cylinders, device=self.device).unsqueeze(-1) * 1.1
+        cylinders_z = torch.ones(self.num_cylinders, device=self.device).unsqueeze(-1)
         cylinders_pos = torch.concat([cylinder_x_y, cylinders_z], dim=-1)
 
         # init drone
@@ -532,7 +569,7 @@ class HideAndSeek_circle_static_UED_addeasy(IsaacEnv):
                                                                 num_envs=1, 
                                                                 device=self.device)[:num_inactive]
         cylinder_x_y = torch.concat([active_cylinder_x_y, inactive_cylinders_x_y], dim=0)
-        cylinders_z = torch.ones(self.num_cylinders, device=self.device).unsqueeze(-1) * 1.1
+        cylinders_z = torch.ones(self.num_cylinders, device=self.device).unsqueeze(-1)
         cylinders_pos = torch.concat([cylinder_x_y, cylinders_z], dim=-1)
         cylinder_mask = torch.ones(self.num_cylinders, device=self.device)
         # cylinder_mask[num_active_cylinder:] = 0.0
@@ -866,8 +903,6 @@ class HideAndSeek_circle_static_UED_addeasy(IsaacEnv):
                 capture_dict.update({'capture_{}'.format(num_cylinder): self.stats['capture_{}'.format(num_cylinder)].to('cpu').numpy().mean()})
             if self.use_soft_update:
                 self.manual_curriculum_module.soft_update_weights(capture_dict=capture_dict)
-            else:
-                self.manual_curriculum_module.hard_update_weights(capture_dict=capture_dict)
             print('weight', self.manual_curriculum_module._weight_buffer)
             self.stats['weight_0'].set_(torch.ones((self.num_envs, 1), device=self.device) * self.manual_curriculum_module._weight_buffer[0])
             self.stats['weight_1'].set_(torch.ones((self.num_envs, 1), device=self.device) * self.manual_curriculum_module._weight_buffer[1])

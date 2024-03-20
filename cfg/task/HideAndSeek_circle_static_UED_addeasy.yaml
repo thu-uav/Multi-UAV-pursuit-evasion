@@ -6,7 +6,7 @@ defaults:
   - /base/sim_base@_here_
 
 env:
-  num_envs: 1000
+  num_envs: 2048
   max_episode_length: 800
 
 drone_model: Crazyflie
@@ -50,4 +50,4 @@ cylinder:
   min_active: 0
   random_active: True # if False, only train max_active
   prob_easy: 0.05
-  use_soft_update: True
+  use_soft_update: False

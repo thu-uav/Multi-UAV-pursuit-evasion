@@ -322,13 +322,13 @@ def main(cfg):
             }
             info.update(stats)
         
-        # update the policy using rollout data and store the training statistics
-        info.update(policy.train_op(data.to_tensordict()))
-
         # evaluate every certain step
-        if i > 0 and eval_interval > 0 and i % eval_interval == 0:
+        if eval_interval > 0 and i % eval_interval == 0:
             logging.info(f"Eval at {collector._frames} steps.")
             info.update(evaluate())
+        
+        # update the policy using rollout data and store the training statistics
+        info.update(policy.train_op(data.to_tensordict()))
 
         # save policy model every certain step
         if save_interval > 0 and i % save_interval == 0:

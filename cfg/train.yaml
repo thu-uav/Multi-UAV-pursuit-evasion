@@ -18,20 +18,20 @@ seed: 0
 
 viewer:
   resolution: [960, 720]
-  # up
-  eye: [0.001, 0.0, 6.]
-  lookat: [0., 0., 2.]
+  # # up
+  # eye: [0.001, 0.0, 6.]
+  # lookat: [0., 0., 2.]
   # # debug
   # eye: [0., -4., 4.]
   # lookat: [0., 0., 1.]
-  # # front
-  # eye: [4., 0., 4.]
-  # lookat: [0., 0., 1.]
+  # front
+  eye: [0., 4., 4.]
+  lookat: [0., 0., 1.]
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: softupdate_maxweight_2_loadv_1_3
-  run_name: 7_c_DR
+  # run_name: evalupdate_p0_0_2_alpha5_loadv_1_3
+  run_name: 6_c
   job_type: train
   entity: chenjy
   project: PredatorPrey
