@@ -192,9 +192,11 @@ class ManualCurriculum2(object):
         self.min_active_cylinders = cfg.task.cylinder.min_active
         self._state_buffer = np.arange(self.min_active_cylinders, self.max_active_cylinders + 1) # 1~5
         self._weight_buffer = np.zeros_like(self._state_buffer, dtype=np.float32)
+        self.window_size = 5
+        self._moving_capture_buffer = []
         self._easy_buffer = [] # invalid
         self.alpha = 5
-        self.p_0 = 0.2
+        self.p_0 = 0.0
 
     # adjust the weights of tasks which are not in easy_buffer
     def soft_update_weights(self, capture_dict):
@@ -202,12 +204,15 @@ class ManualCurriculum2(object):
             self._weight_buffer[num_cylinder] = (1.0 - capture_dict['capture_{}'.format(num_cylinder)])**self.alpha
 
     def update_active(self, capture_dict):
+        capture_list = []
         for num_cylinder in self._state_buffer:
-            if math.isnan(capture_dict['capture_{}'.format(num_cylinder)]):
-                self._weight_buffer[num_cylinder] = 0.0
-            else:
-                self._weight_buffer[num_cylinder] = (1.0 - capture_dict['capture_{}'.format(num_cylinder)])**self.alpha
+            capture_list.append(capture_dict['capture_{}'.format(num_cylinder)])
+        capture_list = np.array(capture_list)
+        self._moving_capture_buffer.append(capture_list)
+        if len(self._moving_capture_buffer) > self.window_size:
+            self._moving_capture_buffer = self._moving_capture_buffer[len(self._moving_capture_buffer) - self.window_size:]
         
+        self._weight_buffer = (1.0 - np.array(self._moving_capture_buffer).mean(axis=0))**self.alpha
         self._weight_buffer = self._weight_buffer / np.mean(self._weight_buffer)
 
     def sample(self, num_samples):
@@ -225,7 +230,7 @@ class ManualCurriculum2(object):
             probs = (weights / np.sum(weights)).squeeze()
             sample_idx = np.random.choice(self._state_buffer.shape[0], num_cl, replace=True, p=probs)
             initial_states += [self._state_buffer[idx] for idx in sample_idx]
-            initial_states += [0] * num_p0
+            # initial_states += [0] * num_p0
         return initial_states
 
 class HideAndSeek_circle_static_UED_addeasy(IsaacEnv): 
