@@ -32,6 +32,7 @@ import pdb
 import copy
 
 from omni.isaac.debug_draw import _debug_draw
+import math
 
 from .placement import rejection_sampling_with_validation, generate_outside_cylinders_x_y
 from .draw import draw_traj, draw_detection
@@ -202,7 +203,12 @@ class ManualCurriculum2(object):
 
     def update_active(self, capture_dict):
         for num_cylinder in self._state_buffer:
-            self._weight_buffer[num_cylinder] = (1.0 - capture_dict['capture_{}'.format(num_cylinder)])**self.alpha
+            if math.isnan(capture_dict['capture_{}'.format(num_cylinder)]):
+                self._weight_buffer[num_cylinder] = 0.0
+            else:
+                self._weight_buffer[num_cylinder] = (1.0 - capture_dict['capture_{}'.format(num_cylinder)])**self.alpha
+        
+        self._weight_buffer = self._weight_buffer / np.mean(self._weight_buffer)
 
     def sample(self, num_samples):
         """
@@ -438,6 +444,7 @@ class HideAndSeek_circle_static_UED_addeasy(IsaacEnv):
         self.cylinder_height = 2 * size
         self.use_validation = self.cfg.task.use_validation
         self.mean_eval_capture = 0.0 # for inner cl
+        self.set_train = True
 
         obj_pos, _, _, _ = rejection_sampling_with_validation(
             arena_size=self.arena_size, 
@@ -594,7 +601,10 @@ class HideAndSeek_circle_static_UED_addeasy(IsaacEnv):
             self.v_prey = inner_tasks[1]
 
         if self.use_manual_cl:
-            current_tasks = self.manual_curriculum_module.sample(num_samples=len(env_ids))
+            if self.set_train:
+                current_tasks = self.manual_curriculum_module.sample(num_samples=len(env_ids))
+            else:
+                current_tasks = [None] * len(self.env_ids)
         else:
             current_tasks = [None] * len(self.env_ids)
         
