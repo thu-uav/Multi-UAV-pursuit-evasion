@@ -7,7 +7,7 @@ defaults:
   - /base/randomization_base@_here_
 
 env:
-  num_envs: 2048
+  num_envs: 1000
   max_episode_length: 800
 
 drone_model: Crazyflie
@@ -18,7 +18,7 @@ time_encoding: true
 action_transform: rate
 
 # evalution scenario
-evaluation_flag: '5_cross' # '3_cylineder_line', '5_cross', '6_cross', '7_c_1', '8_random'
+evaluation_flag: '7_c_1' # '3_cylineder_line', '5_cross', '6_cross', '7_c_1', '8_random'
 
 use_validation: 1
 
@@ -28,7 +28,7 @@ detect_range: -1.0 # -1.0 means fully-observable
 
 arena_size: 1.0
 v_drone: 1.0
-v_prey: 1.3
+v_prey: 2.0
 
 fixed_config: False # if True, only eval max_config
 use_collision: 1
@@ -40,6 +40,6 @@ use_dynamic: False
 cylinder:
   size: 0.2
   num: 8
-  max_active: 5
+  max_active: 7
   min_active: 0
   random_active: False # if False, only train max_active

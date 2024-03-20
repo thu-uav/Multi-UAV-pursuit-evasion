@@ -112,7 +112,7 @@ class ManualCurriculum(object):
         self.threshold = 0.95
         self.easy_prob = 0.05
         self.sub_step = 0.1
-        self.max_weight = 1.0
+        self.max_weight = 2.0
         self.latest_capture_active = [np.zeros(self.eval_times)] # [len(active_idx), eval_times]
 
     # adjust the weights of tasks which are not in easy_buffer
