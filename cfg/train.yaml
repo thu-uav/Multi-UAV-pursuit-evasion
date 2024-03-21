@@ -30,7 +30,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: DR_validation_random3
+  run_name: DR_validation_random3_v1_3_catch0_5
   # run_name: debug
   job_type: train
   entity: chenjy

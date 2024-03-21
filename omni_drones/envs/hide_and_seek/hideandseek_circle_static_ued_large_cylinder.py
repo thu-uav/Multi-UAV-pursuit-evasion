@@ -94,6 +94,15 @@ class InnerCurriculum(object):
         if len(self.training_order) > 1:
             self.training_order.pop(0)
 
+# set lower cylidner to real pos and height
+def refresh_cylinder_pos_height(max_cylinder_height, origin_cylinder_pos, device):
+    low_cylinder_mask = (origin_cylinder_pos[:,:,-1] == 0.0)
+    origin_cylinder_pos[:,:,-1] = origin_cylinder_pos[:,:,-1] + \
+                low_cylinder_mask * 0.25 * max_cylinder_height
+    origin_height = torch.ones(size=(origin_cylinder_pos.shape[0], origin_cylinder_pos.shape[1]), device=device) * max_cylinder_height * 0.5
+    origin_height = origin_height + ~low_cylinder_mask * 0.5 * max_cylinder_height
+    return origin_cylinder_pos, origin_height
+
 class HideAndSeek_circle_static_UED_large_cylinder(IsaacEnv): 
     """
     HideAndSeek environment designed for curriculum learning.
@@ -593,10 +602,15 @@ class HideAndSeek_circle_static_UED_large_cylinder(IsaacEnv):
 
         # get masked cylinder relative position
         cylinders_pos, _ = self.get_env_poses(self.cylinders.get_world_poses())
+        
+        cylinders_pos, cylinders_height = refresh_cylinder_pos_height(max_cylinder_height=self.cylinder_height,
+                                                                          origin_cylinder_pos=cylinders_pos,
+                                                                          device=self.device)
         cylinders_rpos = vmap(cpos)(drone_pos, cylinders_pos) # [N, n, num_cylinders, 3]
-        cylinders_height = torch.tensor([self.cylinder_height for _ in range(self.num_cylinders)], 
-                                        device=self.device).unsqueeze(0).unsqueeze(0).unsqueeze(-1).expand(
-                                            self.num_envs, self.drone.n, -1, -1)
+        # cylinders_height = torch.tensor([self.cylinder_height for _ in range(self.num_cylinders)], 
+        #                                 device=self.device).unsqueeze(0).unsqueeze(0).unsqueeze(-1).expand(
+        #                                     self.num_envs, self.drone.n, -1, -1)
+        cylinders_height = cylinders_height.unsqueeze(1).unsqueeze(-1).expand(-1, self.drone.n, -1, -1)
         cylinders_radius = torch.tensor([self.cylinder_size for _ in range(self.num_cylinders)],
                                         device=self.device).unsqueeze(0).unsqueeze(0).unsqueeze(-1).expand(
                                             self.num_envs, self.drone.n, -1, -1)
@@ -684,6 +698,9 @@ class HideAndSeek_circle_static_UED_large_cylinder(IsaacEnv):
         coll_reward = torch.zeros(self.num_envs, self.num_agents, device=self.device)
         
         cylinders_pos, _ = self.cylinders.get_world_poses()
+        cylinders_pos, cylinders_height = refresh_cylinder_pos_height(max_cylinder_height=self.cylinder_height,
+                                                                          origin_cylinder_pos=cylinders_pos,
+                                                                          device=self.device)
         for i in range(self.num_cylinders):
             relative_pos = drone_pos[..., :2] - cylinders_pos[:, i, :2].unsqueeze(-2)
             norm_r = torch.norm(relative_pos, dim=-1)
@@ -752,6 +769,9 @@ class HideAndSeek_circle_static_UED_large_cylinder(IsaacEnv):
         
         # cylinders
         cylinders_pos, _ = self.cylinders.get_world_poses()
+        cylinders_pos, cylinders_height = refresh_cylinder_pos_height(max_cylinder_height=self.cylinder_height,
+                                                                          origin_cylinder_pos=cylinders_pos,
+                                                                          device=self.device)
         dist_pos = torch.norm(prey_pos[..., :3] - cylinders_pos[..., :3],dim=-1).unsqueeze(-1).expand(-1, -1, 3) # expand to 3-D
         direction_c = (prey_pos[..., :3] - cylinders_pos[..., :3]) / (dist_pos + 1e-5)
         force_c = direction_c * (1 / (dist_pos + 1e-5))
