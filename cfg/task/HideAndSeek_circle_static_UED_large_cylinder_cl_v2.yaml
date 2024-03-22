@@ -1,4 +1,4 @@
-name: HideAndSeek_circle_static_UED_large_cylinder
+name: HideAndSeek_circle_static_UED_large_cylinder_cl_v2
 
 defaults:
   # see https://hydra.cc/docs/advanced/overriding_packages/
@@ -19,6 +19,9 @@ action_transform: rate
 # inner cl
 use_inner_cl: 0
 capture_threshold: 0.98
+
+# outer cl
+use_outer_cl: 1
 
 # use rejection sampling validation
 use_validation: 1

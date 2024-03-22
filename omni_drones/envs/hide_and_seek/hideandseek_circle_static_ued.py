@@ -263,6 +263,10 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
             'capture_3': UnboundedContinuousTensorSpec(1),
             'capture_4': UnboundedContinuousTensorSpec(1),
             'capture_5': UnboundedContinuousTensorSpec(1),
+            'collision_return': UnboundedContinuousTensorSpec(1),
+            'speed_return': UnboundedContinuousTensorSpec(1),
+            'distance_return': UnboundedContinuousTensorSpec(1),
+            'capture_return': UnboundedContinuousTensorSpec(1),
         }).expand(self.num_envs).to(self.device)
         info_spec = CompositeSpec({
             "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13)),
@@ -689,7 +693,8 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
         
         self.stats['capture_per_step'].set_(self.stats['capture_episode'] / self.step_spec)
         # catch_reward = 10 * capture_flag.sum(-1).unsqueeze(-1).expand_as(capture_flag)
-        catch_reward = 10 * capture_flag.type(torch.float32)
+        # catch_reward = 10 * capture_flag.type(torch.float32) # selfish
+        catch_reward = 10 * torch.any(capture_flag, dim=-1).unsqueeze(-1).expand_as(capture_flag) # cooperative
         catch_flag = torch.any(catch_reward, dim=1).unsqueeze(-1)
         self.stats['first_capture_step'][catch_flag * (self.stats['first_capture_step'] >= self.step_spec)] = self.step_spec
 
@@ -713,7 +718,8 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
             coll_reward -= if_coll * tmp_cylinder_mask # sparse
 
         # distance reward
-        min_dist = target_dist
+        # min_dist = target_dist
+        min_dist = (torch.min(target_dist, dim=-1)[0].unsqueeze(-1).expand_as(target_dist))
         dist_reward_mask = (min_dist > self.catch_radius)
         distance_reward = - 1.0 * min_dist * dist_reward_mask
         if self.cfg.task.use_collision:
@@ -724,6 +730,12 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
         self._tensordict["return"] += reward.unsqueeze(-1)
         self.returns = self._tensordict["return"].sum(1)
         self.stats["return"].set_(self.returns)
+        
+        # other reward
+        self.stats['collision_return'].add_(5 * coll_reward.sum(1).unsqueeze(-1))
+        self.stats['speed_return'].add_(speed_reward.sum(1).unsqueeze(-1))
+        self.stats['distance_return'].add_(distance_reward.sum(1).unsqueeze(-1))
+        self.stats['capture_return'].add_(catch_reward.sum(1).unsqueeze(-1))
 
         done  = (
             (self.progress_buf >= self.max_episode_length).unsqueeze(-1)
@@ -773,7 +785,7 @@ class HideAndSeek_circle_static_UED(IsaacEnv):
         
         # cylinders
         cylinders_pos, _ = self.cylinders.get_world_poses()
-        dist_pos = torch.norm(prey_pos[..., :3] - cylinders_pos[..., :3],dim=-1).unsqueeze(-1).expand(-1, -1, 3) # expand to 3-D
+        dist_pos = (torch.norm(prey_pos[..., :3] - cylinders_pos[..., :3],dim=-1) - self.cylinder_size).unsqueeze(-1).expand(-1, -1, 3) # expand to 3-D
         direction_c = (prey_pos[..., :3] - cylinders_pos[..., :3]) / (dist_pos + 1e-5)
         force_c = direction_c * (1 / (dist_pos + 1e-5))
         cylinder_force_mask = self.cylinders_mask.unsqueeze(-1).expand(-1, -1, 3)

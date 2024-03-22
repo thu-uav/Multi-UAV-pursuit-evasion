@@ -322,8 +322,18 @@ def main(cfg):
             return_contiguous=False
         )
 
+        # # manual cl evaluation
+        # eval_num_cylinders = np.arange(cfg.task.cylinder.min_active, cfg.task.cylinder.max_active + 1)
+        # capture_dict = dict()
+        # for idx in range(len(eval_num_cylinders)):
+        #     num_cylinder = eval_num_cylinders[idx]
+        #     capture_dict.update({'capture_{}'.format(num_cylinder): trajs['info']['capture_{}'.format(num_cylinder)][:, -1].mean().cpu().numpy()})
+        # base_env.update_base_cl(capture_dict=capture_dict)
+
         # after rollout, set rendering mode to not headless and reset env
         base_env.enable_render(not cfg.headless)
+        env.train() # set env back to training mode after evaluation
+        base_env.set_train = True
         env.reset()
 
         # get first done index of each trajectory
@@ -356,6 +366,10 @@ def main(cfg):
     if not os.path.exists(cl_model_dir):
         os.makedirs(cl_model_dir)
     
+    # 代表细粒度的cl，metric: distance
+    # 内层一直存中等难度的
+    # 外层一直更新
+    
     # for each iteration, the collector perform one step in the env
     # and get the result rollout as data
     for i, data in enumerate(pbar):
@@ -378,22 +392,10 @@ def main(cfg):
         info.update(policy.train_op(data.to_tensordict()))
 
         # update cl before sampling
-        # if training_data contains done, update CL
-        if i == 0 or ('train/stats.capture' in info.keys() and info['train/stats.capture'] > 0.95):
-            # empty the state_buffer
-            base_env.outer_curriculum_module._state_buffer = np.zeros((0, 1), dtype=np.float32)
-            # update the state_buffer
-            num_loop = 0
-            while base_env.outer_curriculum_module._state_buffer.shape[0] < base_env.outer_curriculum_module.buffer_size \
-                and num_loop <= 10:
-                info.update(evaluate(seed=cfg.seed))
-                num_loop += 1
-                print('cl_buffer', base_env.outer_curriculum_module._state_buffer.shape[0], 'num_loop', num_loop)
-            # save cl tasks
-            base_env.outer_curriculum_module.save_task(model_dir=cl_model_dir, episode=i)
-            env.train() # set env back to training mode after evaluation
-            base_env.set_train = True
-            env.reset()
+        if eval_interval > 0 and i % eval_interval == 0:
+            logging.info(f"Eval at {collector._frames} steps.")
+            info.update(evaluate())
+            base_env.outer_curriculum_module.save_task(cl_model_dir, i)
 
         # save policy model every certain step
         if save_interval > 0 and i % save_interval == 0:

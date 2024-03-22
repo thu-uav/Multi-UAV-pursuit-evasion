@@ -681,8 +681,8 @@ class HideAndSeek_circle_static_UED_large_cylinder(IsaacEnv):
                 self.info['capture_{}'.format(idx + 1)].set_(torch.ones_like(self.stats['capture'], device=self.device) * self.stats['capture'][(self.cylinders_mask.sum(-1) == idx + 1)].mean())
         
         self.stats['capture_per_step'].set_(self.stats['capture_episode'] / self.step_spec)
-        # catch_reward = 10 * capture_flag.sum(-1).unsqueeze(-1).expand_as(capture_flag)
-        catch_reward = 10 * capture_flag.type(torch.float32)
+        # catch_reward = 10 * capture_flag.type(torch.float32) # selfish
+        catch_reward = 10 * torch.any(capture_flag, dim=-1).unsqueeze(-1).expand_as(capture_flag) # cooperative
         catch_flag = torch.any(catch_reward, dim=1).unsqueeze(-1)
         self.stats['first_capture_step'][catch_flag * (self.stats['first_capture_step'] >= self.step_spec)] = self.step_spec
 
@@ -709,7 +709,8 @@ class HideAndSeek_circle_static_UED_large_cylinder(IsaacEnv):
             coll_reward -= if_coll * tmp_cylinder_mask # sparse
 
         # distance reward
-        min_dist = target_dist
+        # min_dist = target_dist
+        min_dist = (torch.min(target_dist, dim=-1)[0].unsqueeze(-1).expand_as(target_dist))
         dist_reward_mask = (min_dist > self.catch_radius)
         distance_reward = - 1.0 * min_dist * dist_reward_mask
         if self.cfg.task.use_collision:
@@ -772,7 +773,7 @@ class HideAndSeek_circle_static_UED_large_cylinder(IsaacEnv):
         cylinders_pos, cylinders_height = refresh_cylinder_pos_height(max_cylinder_height=self.cylinder_height,
                                                                           origin_cylinder_pos=cylinders_pos,
                                                                           device=self.device)
-        dist_pos = torch.norm(prey_pos[..., :3] - cylinders_pos[..., :3],dim=-1).unsqueeze(-1).expand(-1, -1, 3) # expand to 3-D
+        dist_pos = (torch.norm(prey_pos[..., :3] - cylinders_pos[..., :3],dim=-1) - self.cylinder_size).unsqueeze(-1).expand(-1, -1, 3) # expand to 3-D
         direction_c = (prey_pos[..., :3] - cylinders_pos[..., :3]) / (dist_pos + 1e-5)
         force_c = direction_c * (1 / (dist_pos + 1e-5))
         cylinder_force_mask = self.cylinders_mask.unsqueeze(-1).expand(-1, -1, 3)
