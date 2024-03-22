@@ -541,7 +541,7 @@ class HideAndSeek_circle_static_UED_cl_v2(IsaacEnv):
 
         if self.use_outer_cl:
             # current_tasks contains x, y, z of drones, target, cylinders and cylinder masks
-            if not self.set_train:
+            if self.set_train:
                 current_tasks = self.outer_curriculum_module.sample(num_samples=len(env_ids))
             else:
                 current_tasks = [None] * self.num_envs

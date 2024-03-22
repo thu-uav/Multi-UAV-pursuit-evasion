@@ -272,6 +272,11 @@ class HideAndSeek_circle_static_UED_large_cylinder(IsaacEnv):
             'capture_3': UnboundedContinuousTensorSpec(1),
             'capture_4': UnboundedContinuousTensorSpec(1),
             'capture_5': UnboundedContinuousTensorSpec(1),
+            'min_distance': UnboundedContinuousTensorSpec(1),
+            'collision_return': UnboundedContinuousTensorSpec(1),
+            'speed_return': UnboundedContinuousTensorSpec(1),
+            'distance_return': UnboundedContinuousTensorSpec(1),
+            'capture_return': UnboundedContinuousTensorSpec(1),
         }).expand(self.num_envs).to(self.device)
         info_spec = CompositeSpec({
             "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13)),
@@ -503,7 +508,10 @@ class HideAndSeek_circle_static_UED_large_cylinder(IsaacEnv):
         self.stats['catch_radius'].set_(torch.ones_like(self.stats['catch_radius'], device=self.device) * self.catch_radius)
         self.stats['v_prey'].set_(torch.ones_like(self.stats['v_prey'], device=self.device) * self.v_prey)
         self.stats['first_capture_step'].set_(torch.ones_like(self.stats['first_capture_step']) * self.max_episode_length)
-                
+
+        # reset info
+        self.stats['min_distance'].set_(torch.Tensor(self.num_envs, 1).fill_(float('inf')).to(self.device))
+
         for substep in range(1):
             self.sim.step(self._should_render(substep))
 
@@ -711,6 +719,8 @@ class HideAndSeek_circle_static_UED_large_cylinder(IsaacEnv):
         # distance reward
         # min_dist = target_dist
         min_dist = (torch.min(target_dist, dim=-1)[0].unsqueeze(-1).expand_as(target_dist))
+        current_min_dist = torch.min(target_dist, dim=-1).values.unsqueeze(-1)
+        self.stats['min_distance'].set_(torch.min(current_min_dist, self.stats['min_distance']))
         dist_reward_mask = (min_dist > self.catch_radius)
         distance_reward = - 1.0 * min_dist * dist_reward_mask
         if self.cfg.task.use_collision:
@@ -721,6 +731,12 @@ class HideAndSeek_circle_static_UED_large_cylinder(IsaacEnv):
         self._tensordict["return"] += reward.unsqueeze(-1)
         self.returns = self._tensordict["return"].sum(1)
         self.stats["return"].set_(self.returns)
+
+        # other reward
+        self.stats['collision_return'].add_(5 * coll_reward.sum(1).unsqueeze(-1))
+        self.stats['speed_return'].add_(speed_reward.sum(1).unsqueeze(-1))
+        self.stats['distance_return'].add_(distance_reward.sum(1).unsqueeze(-1))
+        self.stats['capture_return'].add_(catch_reward.sum(1).unsqueeze(-1))
 
         done  = (
             (self.progress_buf >= self.max_episode_length).unsqueeze(-1)

@@ -368,6 +368,10 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
             'capture_4': UnboundedContinuousTensorSpec(1),
             'capture_5': UnboundedContinuousTensorSpec(1),
             'min_distance': UnboundedContinuousTensorSpec(1),
+            'collision_return': UnboundedContinuousTensorSpec(1),
+            'speed_return': UnboundedContinuousTensorSpec(1),
+            'distance_return': UnboundedContinuousTensorSpec(1),
+            'capture_return': UnboundedContinuousTensorSpec(1),
         }).expand(self.num_envs).to(self.device)
         info_spec = CompositeSpec({
             "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13)),
@@ -532,7 +536,7 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
 
         if self.use_outer_cl:
             # current_tasks contains x, y, z of drones, target, cylinders and cylinder masks
-            if not self.set_train:
+            if self.set_train:
                 current_tasks = self.outer_curriculum_module.sample(num_samples=len(env_ids))
             else:
                 current_tasks = [None] * self.num_envs
@@ -840,6 +844,12 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         self._tensordict["return"] += reward.unsqueeze(-1)
         self.returns = self._tensordict["return"].sum(1)
         self.stats["return"].set_(self.returns)
+
+        # other reward
+        self.stats['collision_return'].add_(5 * coll_reward.sum(1).unsqueeze(-1))
+        self.stats['speed_return'].add_(speed_reward.sum(1).unsqueeze(-1))
+        self.stats['distance_return'].add_(distance_reward.sum(1).unsqueeze(-1))
+        self.stats['capture_return'].add_(catch_reward.sum(1).unsqueeze(-1))
 
         done  = (
             (self.progress_buf >= self.max_episode_length).unsqueeze(-1)
