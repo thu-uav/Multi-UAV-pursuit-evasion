@@ -108,8 +108,8 @@ class OuterCurriculum(object):
         self.arena_size = cfg.task.arena_size
         self.device = device
         # distance range: catch_radius ~ 2 * sqrt(2) * arena_size
-        self.lower_dist_threshold = 0.6 * cfg.task.catch_radius
-        self.higher_dist_threshold = 0.9 * cfg.task.catch_radius
+        self.lower_dist_threshold = 0.9 * cfg.task.catch_radius
+        self.higher_dist_threshold = 1.1 * cfg.task.catch_radius
         self.prob_random = 0.0
         self.eps = 1e-10
         self._state_buffer = np.zeros((0, 1), dtype=np.float32)
@@ -143,16 +143,16 @@ class OuterCurriculum(object):
         if all_states.shape[0] <= self.buffer_size:
             self._state_buffer = all_states
         else:
-            self._state_buffer = all_states[len(all_states) - self.buffer_size:]
-            # min_states = np.min(all_states, axis=0)
-            # max_states = np.max(all_states, axis=0)
-            # all_states_normalized = (all_states - min_states) / (max_states - min_states + self.eps)
-            # consider_dim = np.ones(all_states_normalized.shape[-1], dtype=bool)
-            # # consider_dim[-self.OOD_num_cylinders:] = False # ignore cylinder_masks
-            # all_states_tensor = torch.tensor(all_states_normalized[np.newaxis, :, consider_dim])
-            # # farthest point sampling
-            # fps_idx = farthest_point_sampler(all_states_tensor, self.buffer_size)[0].numpy()
-            # self._state_buffer = all_states[fps_idx]
+            # self._state_buffer = all_states[len(all_states) - self.buffer_size:]
+            min_states = np.min(all_states, axis=0)
+            max_states = np.max(all_states, axis=0)
+            all_states_normalized = (all_states - min_states) / (max_states - min_states + self.eps)
+            consider_dim = np.ones(all_states_normalized.shape[-1], dtype=bool)
+            # consider_dim[-self.OOD_num_cylinders:] = False # ignore cylinder_masks
+            all_states_tensor = torch.tensor(all_states_normalized[np.newaxis, :, consider_dim])
+            # farthest point sampling
+            fps_idx = farthest_point_sampler(all_states_tensor, self.buffer_size)[0].numpy()
+            self._state_buffer = all_states[fps_idx]
         
         # reset temp state and weight buffer
         self._temp_state_buffer = []
@@ -513,9 +513,9 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         inactive_cylinder_pos = torch.concat([inactive_cylinders_x_y, inactive_cylinders_z], dim=-1)
         cylinders_pos = torch.concat([active_cylinder_pos, inactive_cylinder_pos], dim=0)
         cylinder_mask = torch.ones(self.num_cylinders, device=self.device)
-        # cylinder_mask[num_active_cylinder:] = 0.0
-        inactive_indices = torch.randperm(self.num_cylinders)[:num_inactive]
-        cylinder_mask[inactive_indices] = 0.0
+        cylinder_mask[num_active_cylinder:] = 0.0
+        # inactive_indices = torch.randperm(self.num_cylinders)[:num_inactive]
+        # cylinder_mask[inactive_indices] = 0.0
         return drone_pos, target_pos, cylinders_pos, cylinder_mask
 
     def _reset_idx(self, env_ids: torch.Tensor):

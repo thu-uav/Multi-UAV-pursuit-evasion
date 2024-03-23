@@ -395,6 +395,8 @@ def main(cfg):
         if eval_interval > 0 and i % eval_interval == 0:
             logging.info(f"Eval at {collector._frames} steps.")
             info.update(evaluate())
+        
+        if i % 20 == 0:
             base_env.outer_curriculum_module.save_task(cl_model_dir, i)
 
         # save policy model every certain step

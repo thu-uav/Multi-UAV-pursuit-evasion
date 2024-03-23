@@ -418,9 +418,9 @@ class HideAndSeek_circle_static_UED_large_cylinder(IsaacEnv):
         inactive_cylinder_pos = torch.concat([inactive_cylinders_x_y, inactive_cylinders_z], dim=-1)
         cylinders_pos = torch.concat([active_cylinder_pos, inactive_cylinder_pos], dim=0)
         cylinder_mask = torch.ones(self.num_cylinders, device=self.device)
-        # cylinder_mask[num_active_cylinder:] = 0.0
-        inactive_indices = torch.randperm(self.num_cylinders)[:num_inactive]
-        cylinder_mask[inactive_indices] = 0.0
+        cylinder_mask[num_active_cylinder:] = 0.0
+        # inactive_indices = torch.randperm(self.num_cylinders)[:num_inactive]
+        # cylinder_mask[inactive_indices] = 0.0
         return drone_pos, target_pos, cylinders_pos, cylinder_mask
 
     def _reset_idx(self, env_ids: torch.Tensor):
