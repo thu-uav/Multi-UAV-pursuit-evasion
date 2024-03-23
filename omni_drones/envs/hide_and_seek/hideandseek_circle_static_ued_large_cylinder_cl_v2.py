@@ -177,7 +177,7 @@ class OuterCurriculum(object):
             sample_idx = np.random.choice(self._state_buffer.shape[0], num_cl, replace=True, p=probs)
             initial_states = [self._state_buffer[idx] for idx in sample_idx]
             initial_states += [None] * num_random
-        return initial_states
+        return initial_states, num_cl
     
     def save_task(self, model_dir, episode):
         np.save('{}/tasks_{}.npy'.format(model_dir,episode), self._state_buffer)
@@ -537,7 +537,7 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         if self.use_outer_cl:
             # current_tasks contains x, y, z of drones, target, cylinders and cylinder masks
             if self.set_train:
-                current_tasks = self.outer_curriculum_module.sample(num_samples=len(env_ids))
+                current_tasks, num_cl = self.outer_curriculum_module.sample(num_samples=len(env_ids))
             else:
                 current_tasks = [None] * self.num_envs
         
@@ -580,7 +580,8 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
             
             if self.use_outer_cl:
                 # cl_task: [drone_pos, target_pos, cylinder_pos, cylinder_mask]
-                self.outer_curriculum_module.insert(np.array(cl_task_one))
+                if idx > num_cl:
+                    self.outer_curriculum_module.insert(np.array(cl_task_one))
                 
             if idx == self.central_env_idx and self._should_render(0):
                 self._draw_court_circle(self.arena_size)

@@ -12,7 +12,7 @@ env: ${task.env}
 
 total_frames: 100_000_000_000
 max_iters: -1
-eval_interval: 100
+eval_interval: -1
 save_interval: 200
 seed: 0
 
@@ -31,7 +31,7 @@ viewer:
 wandb:
   group: ${oc.select:..task.name}
   # run_name: fixed1_v1_3_catch0_2_large_cl_lower0_9_higher1_1_random0_0_loadcatch0_3
-  run_name: random_eval_cylinder1
+  run_name: large_fixed1_v1_3_catch0_2_loadrandom3
   job_type: train
   entity: chenjy
   project: PredatorPrey
