@@ -33,7 +33,7 @@ import copy
 
 from omni.isaac.debug_draw import _debug_draw
 
-from .placement import rejection_sampling_with_validation_large_cylinder, generate_outside_cylinders_x_y
+from .placement import rejection_sampling_with_validation_large_cylinder_cl, generate_outside_cylinders_x_y
 from .draw import draw_traj, draw_detection
 from .draw_circle import Float3, _COLOR_ACCENT, _carb_float3_add, draw_court_circle
 
@@ -370,6 +370,7 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
             'speed_return': UnboundedContinuousTensorSpec(1),
             'distance_return': UnboundedContinuousTensorSpec(1),
             'capture_return': UnboundedContinuousTensorSpec(1),
+            'cl_bound': UnboundedContinuousTensorSpec(1),
         }).expand(self.num_envs).to(self.device)
         info_spec = CompositeSpec({
             "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13)),
@@ -398,9 +399,9 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         self.cylinder_height = 2 * size
         self.use_validation = self.cfg.task.use_validation
         self.mean_eval_capture = 0.0 # for inner cl
-        self.cl_bound = 2 # start : 2 ~ end: 5
+        self.cl_bound = 3 # start : 3 ~ end: 6
 
-        obj_pos, _, _, _ = rejection_sampling_with_validation_large_cylinder(
+        obj_pos, _, _, _ = rejection_sampling_with_validation_large_cylinder_cl(
             arena_size=self.arena_size, 
             cylinder_size=self.cylinder_size, 
             num_drones=self.num_agents, 
@@ -491,13 +492,14 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         return ["/World/defaultGroundPlane"]
 
     def uniform_generate_envs(self, num_active_cylinder):
-        obj_pos, _, _, _ = rejection_sampling_with_validation_large_cylinder(
+        obj_pos, _, _, _ = rejection_sampling_with_validation_large_cylinder_cl(
             arena_size=self.arena_size, 
             cylinder_size=self.cylinder_size, 
             num_drones=self.num_agents, 
             num_cylinders=num_active_cylinder, 
             device=self.device,
-            use_validation=self.use_validation)
+            use_validation=self.use_validation,
+            cl_bound=self.cl_bound)
         
         drone_pos = obj_pos[:self.num_agents].clone()
         target_pos = obj_pos[self.num_agents].clone()
@@ -539,6 +541,7 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
                 current_tasks, num_cl = self.outer_curriculum_module.sample(num_samples=len(env_ids))
             else:
                 current_tasks = [None] * self.num_envs
+                num_cl = 0
         
         n_envs = len(env_ids)
         drone_pos = []
@@ -630,7 +633,7 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
     def update_base_cl(self, capture_dict):
         # TODO: only max_cylinder
         if capture_dict['capture_{}'.format(self.max_active_cylinders)] >= 0.95:
-            self.cl_bound = min(5, self.cl_bound + 1)
+            self.cl_bound = min(6, self.cl_bound + 1)
 
     def _pre_sim_step(self, tensordict: TensorDictBase):   
         self.step_spec += 1
@@ -862,6 +865,7 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         
         if torch.all(done):
             self.outer_curriculum_module.update_curriculum(min_dist_list=self.stats['min_distance'])
+            self.stats['cl_bound'].set_(torch.ones_like(self.stats['cl_bound'], device=self.device) * self.cl_bound)
         
         self.progress_std = torch.std(self.progress_buf)
 

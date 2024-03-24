@@ -468,7 +468,7 @@ def rejection_sampling_all_obj_large_cylinder(arena_size, cylinder_size, num_dro
         cylinder_occupancy_matrix, path_cylinder_occupancy_matrix, start_grid, target_grid
 
 # cl_bound: generate drone and target in [-bound, bound], large scene
-# cl_bound: 2~6
+# cl_bound: 3~6
 def generate_cylinder_large(arena_size, cylinder_size, num_cylinders, device):
     # set cylinders by rejection sampling
     grid_size = 0.8
@@ -832,8 +832,8 @@ def check_dist(): # check drone, target and cylinder dist
             cylinder_occupancy_matrix = \
             rejection_sampling_with_validation_large_cylinder_cl(arena_size=1.2, 
                                                  cylinder_size=0.4, 
-                                                 num_drones=3, 
-                                                 num_cylinders=3, 
+                                                 num_drones=4, 
+                                                 num_cylinders=2, 
                                                  device='cpu',
                                                  cl_bound=6)
         task_list.append(task_one.numpy().reshape(-1))
@@ -850,9 +850,9 @@ def check_dist(): # check drone, target and cylinder dist
     get_occupation_matrix(drone_pos[:, 9:12], arena_size=1.2, matrix_size=12, grid_size=0.2, name='drone3')
     get_occupation_matrix(target_pos[:, :3], arena_size=1.2, matrix_size=12, grid_size=0.2, name='target')
     get_occupation_matrix(cylinder_pos[:, :3], arena_size=1.2, matrix_size=3, grid_size=0.8, name='cylinder1')
-    get_occupation_matrix(cylinder_pos[:, 3:6], arena_size=1.2, matrix_size=3, grid_size=0.8, name='cylinder2')
-    plot_heatmap(drone_target_occupancy, 'drone_target_check')
-    plot_heatmap(cylinder_occupancy, 'cylinder_check')
+    # get_occupation_matrix(cylinder_pos[:, 3:6], arena_size=1.2, matrix_size=3, grid_size=0.8, name='cylinder2')
+    # plot_heatmap(drone_target_occupancy, 'drone_target_check')
+    # plot_heatmap(cylinder_occupancy, 'cylinder_check')
 
 if __name__ == '__main__':
     # plot_circle_square()
