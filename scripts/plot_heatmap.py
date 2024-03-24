@@ -2,19 +2,18 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 import copy
-tasks = np.load('/home/jiayu/OmniDrones/scripts/outputs/large_fixed1_v1_3_catch0_2_0_9to1_1_random0_3_cl_loadrandom3/03-23_20-05/wandb/run-20240323_200520-y40xzg3b/files/tasks/tasks_20.npy')
+tasks = np.load('/home/jiayu/OmniDrones/scripts/outputs/large_fixed1_v1_3_catch0_2_0_9to1_1_random0_3_cl_loadrandom3/03-24_14-35/wandb/run-20240324_143551-a0ye5445/files/tasks/tasks_2300.npy')
 num_drone = 4
 num_target = 1
 num_active_cylinder = 1
 num_all_cylinder = 5
-breakpoint()
 drones_pos = tasks[:, :num_drone * 3]
 target_pos = tasks[:, num_drone * 3: num_drone * 3 + num_target * 3]
 active_cylinder_pos = tasks[:, num_drone * 3 + num_target * 3: num_drone * 3 + num_target * 3 + num_active_cylinder * 3]
 cylinder_mask = tasks[:, -5:]
 
 # heatmap
-show_pos = copy.deepcopy(active_cylinder_pos)
+show_pos = copy.deepcopy(target_pos)
 # 绘制二维热度图（x-y 平面）
 plt.figure(figsize=(10, 5))
 
@@ -33,7 +32,7 @@ plt.ylabel('Frequency')
 plt.title('1D Heatmap (Z Axis)')
 
 plt.tight_layout()
-plt.savefig('hm_cylinder.png')
+plt.savefig('hm_target.png')
 breakpoint()
 
 np.random.seed(42)

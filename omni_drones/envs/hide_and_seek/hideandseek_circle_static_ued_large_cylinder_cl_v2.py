@@ -398,6 +398,7 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         self.cylinder_height = 2 * size
         self.use_validation = self.cfg.task.use_validation
         self.mean_eval_capture = 0.0 # for inner cl
+        self.cl_bound = 2 # start : 2 ~ end: 5
 
         obj_pos, _, _, _ = rejection_sampling_with_validation_large_cylinder(
             arena_size=self.arena_size, 
@@ -625,6 +626,11 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
 
         for substep in range(1):
             self.sim.step(self._should_render(substep))
+
+    def update_base_cl(self, capture_dict):
+        # TODO: only max_cylinder
+        if capture_dict['capture_{}'.format(self.max_active_cylinders)] >= 0.95:
+            self.cl_bound = min(5, self.cl_bound + 1)
 
     def _pre_sim_step(self, tensordict: TensorDictBase):   
         self.step_spec += 1

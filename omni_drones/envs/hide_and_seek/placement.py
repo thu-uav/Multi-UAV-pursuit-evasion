@@ -86,6 +86,7 @@ def has_feasible_path(matrix, start_points, target):
     return False
 
 ###################################################
+# small scene
 
 def rejection_sampling_drone_target_xy(arena_size, cylinder_size, num_drones, device, occupancy_matrix):
     # occupancy_matrix : (matrix_size, matrix_size) 
@@ -227,6 +228,123 @@ def rejection_sampling_all_obj_xy(arena_size, cylinder_size, num_drones, num_cyl
     return objects_pos, occupancy_matrix, drone_target_occupancy_matrix, \
         cylinder_occupancy_matrix, start_grid, target_grid
 
+# cl_bound: generate drone and target in [-bound, bound], small scene
+def generate_cylinder_xy(arena_size, cylinder_size, num_cylinders, device):
+    # set cylinders by rejection sampling
+    grid_size = 2 * cylinder_size
+    matrix_size = int(2 * arena_size / grid_size)
+    origin_grid = [int(matrix_size / 2), int(matrix_size / 2)]
+    origin_pos = [0.0, 0.0] # left corner
+    occupancy_matrix = np.zeros((matrix_size, matrix_size))
+
+    # first randomize the grid pos of cylinders
+    # occupy the matrix
+    x_y_grid_list = [[0,2], [1,1], [1,2], [1,3], [2,0], [2,1], [2,2], [2,3], [2,4], \
+                        [3,1], [3,2], [3,3], [4,2]]
+    cylinders_pos = []
+    for cylinder_idx in range(num_cylinders):
+        while True:
+            grid_idx = torch.randint(0, len(x_y_grid_list), (1,)).item()
+            x_grid = int(x_y_grid_list[grid_idx][0])
+            y_grid = int(x_y_grid_list[grid_idx][1])
+            # x_grid = torch.randint(0, matrix_size, (1,))
+            # y_grid = torch.randint(0, matrix_size, (1,))
+            
+            x = (x_grid - origin_grid[0]) * grid_size
+            y = (y_grid - origin_grid[1]) * grid_size
+
+            # Check if the new object overlaps with existing objects
+            if x_grid >= 0 and x_grid < matrix_size and y_grid >= 0 and y_grid < matrix_size:
+                if occupancy_matrix[x_grid, y_grid] == 0:
+                    cylinders_pos.append(torch.tensor([x, y], device=device))
+                    occupancy_matrix[x_grid, y_grid] = 1
+                    break
+    if num_cylinders == 0:
+        cylinders_pos = torch.tensor([], device=device)
+    else:
+        cylinders_pos = torch.stack(cylinders_pos)
+   
+    return cylinders_pos, occupancy_matrix
+
+def generate_drone_target_xy_after_cylinder(cylinder_size, num_drones, device, occupancy_matrix, cl_bound=5):
+    # init
+    grid_size = 2 * cylinder_size
+
+    # expand to 10 * 10, and set corner to 1.0
+    occupancy_matrix = np.kron(occupancy_matrix, np.ones((2, 2), dtype=occupancy_matrix.dtype))
+    # set disabled idx to 1.0
+    # up
+    occupancy_matrix[0,0] = 1.0; occupancy_matrix[0,1] = 1.0; occupancy_matrix[0,2] = 1.0
+    occupancy_matrix[0, -1] = 1.0; occupancy_matrix[0, -2] = 1.0; occupancy_matrix[0, -3] = 1.0
+    occupancy_matrix[1,0] = 1.0; occupancy_matrix[1,1] = 1.0
+    occupancy_matrix[1,-1] = 1.0; occupancy_matrix[1,-2] = 1.0
+    occupancy_matrix[2,0] = 1.0; occupancy_matrix[2,-1] = 1.0
+    # down
+    occupancy_matrix[-1,0] = 1.0; occupancy_matrix[-1,1] = 1.0; occupancy_matrix[-1,2] = 1.0
+    occupancy_matrix[-1, -1] = 1.0; occupancy_matrix[-1, -2] = 1.0; occupancy_matrix[-1, -3] = 1.0
+    occupancy_matrix[-2,0] = 1.0; occupancy_matrix[-2,1] = 1.0
+    occupancy_matrix[-2,-1] = 1.0; occupancy_matrix[-2,-2] = 1.0
+    occupancy_matrix[-3,0] = 1.0; occupancy_matrix[-3,-1] = 1.0
+    cylinder_occupancy_matrix = occupancy_matrix.copy()
+
+    drone_target_pos = []
+    start_grid = ()
+    target_grid = ()
+    small_reference_grid = [0, 0]
+    small_reference_pos = [-0.9, -0.9]
+    small_grid_size = grid_size / 2.0
+    small_matrix_size = len(occupancy_matrix)
+    
+    # cl_bound
+    for idx in range(num_drones + 1):
+        num_loop_inner = 0
+        while num_loop_inner <= 10:
+            # x_grid: [5 - cl_bound, 4 + cl_bound]
+            # y_grid: [5 - cl_bound, 4 + cl_bound]
+            grid_idx = torch.randint(5 - cl_bound, 5 + cl_bound, (2,))
+            # grid_idx = torch.randint(0, len(occupancy_matrix), (2,))
+            x_grid = int(grid_idx[0])
+            y_grid = int(grid_idx[1])
+            
+            x = (x_grid - small_reference_grid[0]) * small_grid_size + small_reference_pos[0]
+            y = (y_grid - small_reference_grid[1]) * small_grid_size + small_reference_pos[1]
+
+            # Check if the new object overlaps with existing objects
+            if x_grid >= 0 and x_grid < small_matrix_size and y_grid >= 0 and y_grid < small_matrix_size:
+                if occupancy_matrix[x_grid, y_grid] == 0:
+                    drone_target_pos.append(torch.tensor([x, y], device=device))
+                    occupancy_matrix[x_grid, y_grid] = 1
+                    if idx >= num_drones: # target
+                        target_grid += (x_grid, y_grid)
+                    else: # drones
+                        start_grid += ((x_grid, y_grid), )
+                    break
+            num_loop_inner += 1
+    
+    drone_target_pos = torch.stack(drone_target_pos)
+    drone_target_occupancy_matrix = occupancy_matrix - cylinder_occupancy_matrix
+    
+    return drone_target_pos, occupancy_matrix, cylinder_occupancy_matrix, drone_target_occupancy_matrix, \
+                start_grid, target_grid
+
+def rejection_sampling_all_obj_xy_cl(arena_size, cylinder_size, num_drones, num_cylinders, device, cl_bound=5):        
+    while True:
+        cylinders_pos, occupancy_matrix = generate_cylinder_xy(arena_size, cylinder_size, num_cylinders, device)
+        
+        drone_target_pos, occupancy_matrix, cylinder_occupancy_matrix, drone_target_occupancy_matrix, \
+            start_grid, target_grid = generate_drone_target_xy_after_cylinder(cylinder_size, num_drones, device, occupancy_matrix, cl_bound=cl_bound)
+        
+        if drone_target_pos.shape[0] == (num_drones + 1):
+            break
+    
+    objects_pos = torch.concat([drone_target_pos, cylinders_pos])
+    
+    return objects_pos, occupancy_matrix, drone_target_occupancy_matrix, \
+        cylinder_occupancy_matrix, start_grid, target_grid
+
+###################################################
+
+# large scene
 def rejection_sampling_all_obj_large_cylinder(arena_size, cylinder_size, num_drones, num_cylinders, device):
     # set cylinders by rejection sampling
     grid_size = 0.8
@@ -349,124 +467,156 @@ def rejection_sampling_all_obj_large_cylinder(arena_size, cylinder_size, num_dro
     return objects_pos, occupancy_matrix, drone_target_occupancy_matrix, \
         cylinder_occupancy_matrix, path_cylinder_occupancy_matrix, start_grid, target_grid
 
-# cl_bound: generate drone and target in [-bound, bound]
-def generate_cylinder_xy(arena_size, cylinder_size, num_cylinders, device):
+# cl_bound: generate drone and target in [-bound, bound], large scene
+# cl_bound: 2~6
+def generate_cylinder_large(arena_size, cylinder_size, num_cylinders, device):
     # set cylinders by rejection sampling
-    grid_size = 2 * cylinder_size
-    matrix_size = int(2 * arena_size / grid_size)
-    origin_grid = [int(matrix_size / 2), int(matrix_size / 2)]
-    origin_pos = [0.0, 0.0] # left corner
+    grid_size = 0.8
+    arena_size = 1.2
+    cylinder_size = 0.4
+    matrix_size = 3
+    max_z = arena_size # z = max_z or 0.5 * max_z
+    origin_grid = [1, 1]
     occupancy_matrix = np.zeros((matrix_size, matrix_size))
-
+    path_occupancy_matrix = np.zeros((matrix_size, matrix_size))
+    
     # first randomize the grid pos of cylinders
     # occupy the matrix
-    x_y_grid_list = [[0,2], [1,1], [1,2], [1,3], [2,0], [2,1], [2,2], [2,3], [2,4], \
-                        [3,1], [3,2], [3,3], [4,2]]
+    x_y_grid_list = [[0, 1], [1, 1], [1, 0], [1,2], [2, 1]]
     cylinders_pos = []
     for cylinder_idx in range(num_cylinders):
         while True:
             grid_idx = torch.randint(0, len(x_y_grid_list), (1,)).item()
             x_grid = int(x_y_grid_list[grid_idx][0])
             y_grid = int(x_y_grid_list[grid_idx][1])
-            # x_grid = torch.randint(0, matrix_size, (1,))
-            # y_grid = torch.randint(0, matrix_size, (1,))
             
             x = (x_grid - origin_grid[0]) * grid_size
             y = (y_grid - origin_grid[1]) * grid_size
+            
+            z = torch.randint(0, 2, (1,)).item() # 0 means low, 1 means high
 
             # Check if the new object overlaps with existing objects
             if x_grid >= 0 and x_grid < matrix_size and y_grid >= 0 and y_grid < matrix_size:
                 if occupancy_matrix[x_grid, y_grid] == 0:
-                    cylinders_pos.append(torch.tensor([x, y], device=device))
+                    cylinders_pos.append(torch.tensor([x, y, z * max_z], device=device))
+                    path_occupancy_matrix[x_grid, y_grid] = z
                     occupancy_matrix[x_grid, y_grid] = 1
                     break
     if num_cylinders == 0:
         cylinders_pos = torch.tensor([], device=device)
     else:
         cylinders_pos = torch.stack(cylinders_pos)
-   
-    return cylinders_pos, occupancy_matrix
+    
+    return cylinders_pos, occupancy_matrix, path_occupancy_matrix
 
-def generate_drone_target_xy_after_cylinder(cylinder_size, num_drones, device, occupancy_matrix, cl_bound=5):
-    # init
-    grid_size = 2 * cylinder_size
-
-    # expand to 10 * 10, and set corner to 1.0
-    occupancy_matrix = np.kron(occupancy_matrix, np.ones((2, 2), dtype=occupancy_matrix.dtype))
+def generate_drone_target_large_after_cylinder(cylinder_size, num_drones, device, occupancy_matrix, path_occupancy_matrix, cl_bound=6):
+    # set cylinders by rejection sampling
+    grid_size = 0.8
+    arena_size = 1.2
+    
+    # expand to 12 * 12, and set corner to 1.0
+    small_expand = 4
+    occupancy_matrix = np.kron(occupancy_matrix, np.ones((small_expand, small_expand), dtype=occupancy_matrix.dtype))
+    path_occupancy_matrix = np.kron(path_occupancy_matrix, np.ones((small_expand, small_expand), dtype=path_occupancy_matrix.dtype))
     # set disabled idx to 1.0
     # up
-    occupancy_matrix[0,0] = 1.0; occupancy_matrix[0,1] = 1.0; occupancy_matrix[0,2] = 1.0
-    occupancy_matrix[0, -1] = 1.0; occupancy_matrix[0, -2] = 1.0; occupancy_matrix[0, -3] = 1.0
-    occupancy_matrix[1,0] = 1.0; occupancy_matrix[1,1] = 1.0
-    occupancy_matrix[1,-1] = 1.0; occupancy_matrix[1,-2] = 1.0
-    occupancy_matrix[2,0] = 1.0; occupancy_matrix[2,-1] = 1.0
+    occupancy_matrix[0,0] = 1.0; occupancy_matrix[0,1] = 1.0; occupancy_matrix[0,2] = 1.0; occupancy_matrix[0,3] = 1.0; occupancy_matrix[0,4] = 1.0
+    occupancy_matrix[0,-1] = 1.0; occupancy_matrix[0,-2] = 1.0; occupancy_matrix[0,-3] = 1.0; occupancy_matrix[0,-4] = 1.0; occupancy_matrix[0,-5] = 1.0
+    occupancy_matrix[1,0] = 1.0; occupancy_matrix[1,1] = 1.0; occupancy_matrix[1,2] = 1.0
+    occupancy_matrix[1,-1] = 1.0; occupancy_matrix[1,-2] = 1.0; occupancy_matrix[1,-3] = 1.0
+    occupancy_matrix[2,0] = 1.0; occupancy_matrix[2,1] = 1.0
+    occupancy_matrix[2,-1] = 1.0; occupancy_matrix[2,-2] = 1.0
+    occupancy_matrix[3,0] = 1.0; occupancy_matrix[3,-1] = 1.0
+    occupancy_matrix[4,0] = 1.0; occupancy_matrix[4,-1] = 1.0
+
+    path_occupancy_matrix[0,0] = 1.0; path_occupancy_matrix[0,1] = 1.0; path_occupancy_matrix[0,2] = 1.0; path_occupancy_matrix[0,3] = 1.0; path_occupancy_matrix[0,4] = 1.0
+    path_occupancy_matrix[0,-1] = 1.0; path_occupancy_matrix[0,-2] = 1.0; path_occupancy_matrix[0,-3] = 1.0; path_occupancy_matrix[0,-4] = 1.0; path_occupancy_matrix[0,-5] = 1.0
+    path_occupancy_matrix[1,0] = 1.0; path_occupancy_matrix[1,1] = 1.0; path_occupancy_matrix[1,2] = 1.0
+    path_occupancy_matrix[1,-1] = 1.0; path_occupancy_matrix[1,-2] = 1.0; path_occupancy_matrix[1,-3] = 1.0
+    path_occupancy_matrix[2,0] = 1.0; path_occupancy_matrix[2,1] = 1.0
+    path_occupancy_matrix[2,-1] = 1.0; path_occupancy_matrix[2,-2] = 1.0
+    path_occupancy_matrix[3,0] = 1.0; path_occupancy_matrix[3,-1] = 1.0
+    path_occupancy_matrix[4,0] = 1.0; path_occupancy_matrix[4,-1] = 1.0
     # down
-    occupancy_matrix[-1,0] = 1.0; occupancy_matrix[-1,1] = 1.0; occupancy_matrix[-1,2] = 1.0
-    occupancy_matrix[-1, -1] = 1.0; occupancy_matrix[-1, -2] = 1.0; occupancy_matrix[-1, -3] = 1.0
-    occupancy_matrix[-2,0] = 1.0; occupancy_matrix[-2,1] = 1.0
-    occupancy_matrix[-2,-1] = 1.0; occupancy_matrix[-2,-2] = 1.0
-    occupancy_matrix[-3,0] = 1.0; occupancy_matrix[-3,-1] = 1.0
+    occupancy_matrix[-1,0] = 1.0; occupancy_matrix[-1,1] = 1.0; occupancy_matrix[-1,2] = 1.0; occupancy_matrix[-1,3] = 1.0; occupancy_matrix[-1,4] = 1.0
+    occupancy_matrix[-1,-1] = 1.0; occupancy_matrix[-1,-2] = 1.0; occupancy_matrix[-1,-3] = 1.0; occupancy_matrix[-1,-4] = 1.0; occupancy_matrix[-1,-5] = 1.0
+    occupancy_matrix[-2,0] = 1.0; occupancy_matrix[-2,1] = 1.0; occupancy_matrix[-2,2] = 1.0
+    occupancy_matrix[-2,-1] = 1.0; occupancy_matrix[-2,-2] = 1.0; occupancy_matrix[-2,-3] = 1.0
+    occupancy_matrix[-3,0] = 1.0; occupancy_matrix[-3,1] = 1.0
+    occupancy_matrix[-3,-1] = 1.0; occupancy_matrix[-3,-2] = 1.0
+    occupancy_matrix[-4,0] = 1.0; occupancy_matrix[-4,-1] = 1.0
+    occupancy_matrix[-5,0] = 1.0; occupancy_matrix[-5,-1] = 1.0
+
+    path_occupancy_matrix[-1,0] = 1.0; path_occupancy_matrix[-1,1] = 1.0; path_occupancy_matrix[-1,2] = 1.0; path_occupancy_matrix[-1,3] = 1.0; path_occupancy_matrix[-1,4] = 1.0
+    path_occupancy_matrix[-1,-1] = 1.0; path_occupancy_matrix[-1,-2] = 1.0; path_occupancy_matrix[-1,-3] = 1.0; path_occupancy_matrix[-1,-4] = 1.0; path_occupancy_matrix[-1,-5] = 1.0
+    path_occupancy_matrix[-2,0] = 1.0; path_occupancy_matrix[-2,1] = 1.0; path_occupancy_matrix[-2,2] = 1.0
+    path_occupancy_matrix[-2,-1] = 1.0; path_occupancy_matrix[-2,-2] = 1.0; path_occupancy_matrix[-2,-3] = 1.0
+    path_occupancy_matrix[-3,0] = 1.0; path_occupancy_matrix[-3,1] = 1.0
+    path_occupancy_matrix[-3,-1] = 1.0; path_occupancy_matrix[-3,-2] = 1.0
+    path_occupancy_matrix[-4,0] = 1.0; path_occupancy_matrix[-4,-1] = 1.0
+    path_occupancy_matrix[-5,0] = 1.0; path_occupancy_matrix[-5,-1] = 1.0
+
     cylinder_occupancy_matrix = occupancy_matrix.copy()
 
     drone_target_pos = []
     start_grid = ()
     target_grid = ()
     small_reference_grid = [0, 0]
-    small_reference_pos = [-0.9, -0.9]
-    small_grid_size = grid_size / 2.0
+    small_grid_size = grid_size / small_expand
+    small_reference_pos = [-arena_size + small_grid_size / 2, -arena_size + small_grid_size / 2]
     small_matrix_size = len(occupancy_matrix)
     
     # cl_bound
     for idx in range(num_drones + 1):
-        num_loop_inner = 0
-        while num_loop_inner <= 10:
-            # x_grid: [5 - cl_bound, 4 + cl_bound]
-            # y_grid: [5 - cl_bound, 4 + cl_bound]
-            grid_idx = torch.randint(5 - cl_bound, 5 + cl_bound, (2,))
+        while True:
+            # x_grid: [6 - cl_bound, 5 + cl_bound]
+            # y_grid: [6 - cl_bound, 5 + cl_bound]
+            grid_idx = torch.randint(6 - cl_bound, 6 + cl_bound, (2,))
             # grid_idx = torch.randint(0, len(occupancy_matrix), (2,))
             x_grid = int(grid_idx[0])
             y_grid = int(grid_idx[1])
             
             x = (x_grid - small_reference_grid[0]) * small_grid_size + small_reference_pos[0]
             y = (y_grid - small_reference_grid[1]) * small_grid_size + small_reference_pos[1]
+            z = D.Uniform(
+                torch.tensor([0.1]),
+                torch.tensor([2 * arena_size])
+            ).sample()
 
             # Check if the new object overlaps with existing objects
             if x_grid >= 0 and x_grid < small_matrix_size and y_grid >= 0 and y_grid < small_matrix_size:
                 if occupancy_matrix[x_grid, y_grid] == 0:
-                    drone_target_pos.append(torch.tensor([x, y], device=device))
+                    drone_target_pos.append(torch.tensor([x, y, z], device=device))
                     occupancy_matrix[x_grid, y_grid] = 1
                     if idx >= num_drones: # target
                         target_grid += (x_grid, y_grid)
                     else: # drones
                         start_grid += ((x_grid, y_grid), )
                     break
-            num_loop_inner += 1
-    
     drone_target_pos = torch.stack(drone_target_pos)
     drone_target_occupancy_matrix = occupancy_matrix - cylinder_occupancy_matrix
     
     return drone_target_pos, occupancy_matrix, cylinder_occupancy_matrix, drone_target_occupancy_matrix, \
-                start_grid, target_grid
+            path_occupancy_matrix, start_grid, target_grid
 
-def rejection_sampling_all_obj_xy_cl(arena_size, cylinder_size, num_drones, num_cylinders, device, cl_bound=5):    
-    # # init
-    # grid_size = 2 * cylinder_size
-    
+def rejection_sampling_all_obj_large_cylinder_cl(arena_size, cylinder_size, num_drones, num_cylinders, device, cl_bound=6):
     while True:
-        cylinders_pos, occupancy_matrix = generate_cylinder_xy(arena_size, cylinder_size, num_cylinders, device)
+        cylinders_pos, occupancy_matrix, path_occupancy_matrix = generate_cylinder_large(arena_size, cylinder_size, num_cylinders, device)
         
         drone_target_pos, occupancy_matrix, cylinder_occupancy_matrix, drone_target_occupancy_matrix, \
-            start_grid, target_grid = generate_drone_target_xy_after_cylinder(cylinder_size, num_drones, device, occupancy_matrix, cl_bound=cl_bound)
+            path_cylinder_occupancy_matrix, start_grid, target_grid = generate_drone_target_large_after_cylinder(cylinder_size, num_drones, device, occupancy_matrix, path_occupancy_matrix, cl_bound=cl_bound)
         
         if drone_target_pos.shape[0] == (num_drones + 1):
             break
     
     objects_pos = torch.concat([drone_target_pos, cylinders_pos])
-    
-    return objects_pos, occupancy_matrix, drone_target_occupancy_matrix, \
-        cylinder_occupancy_matrix, start_grid, target_grid
-#######
 
+    return objects_pos, occupancy_matrix, drone_target_occupancy_matrix, \
+        cylinder_occupancy_matrix, path_cylinder_occupancy_matrix, start_grid, target_grid
+
+###################################################
+# add validation
+# small scene
 def rejection_sampling_with_validation(arena_size, cylinder_size, num_drones, num_cylinders, device, use_validation=True):
     if not use_validation:
         task_one, occupancy_matrix, drone_target_occupancy_matrix, \
@@ -488,31 +638,6 @@ def rejection_sampling_with_validation(arena_size, cylinder_size, num_drones, nu
                                                     num_cylinders=num_cylinders, 
                                                     device=device)
             if has_feasible_path(cylinder_occupancy_matrix, start_grid, target_grid):
-                return task_one, occupancy_matrix, drone_target_occupancy_matrix, cylinder_occupancy_matrix
-            num_loop += 1
-        raise NotImplementedError
-
-def rejection_sampling_with_validation_large_cylinder(arena_size, cylinder_size, num_drones, num_cylinders, device, use_validation=True):
-    if not use_validation:
-        task_one, occupancy_matrix, drone_target_occupancy_matrix, \
-            cylinder_occupancy_matrix, path_cylinder_occupancy_matrix, start_grid, target_grid = \
-            rejection_sampling_all_obj_large_cylinder(arena_size=arena_size, 
-                                                cylinder_size=cylinder_size, 
-                                                num_drones=num_drones, 
-                                                num_cylinders=num_cylinders, 
-                                                device=device)
-        return task_one, occupancy_matrix, drone_target_occupancy_matrix, cylinder_occupancy_matrix
-    else:
-        num_loop = 0
-        while(num_loop <= 100):
-            task_one, occupancy_matrix, drone_target_occupancy_matrix, \
-                cylinder_occupancy_matrix, path_cylinder_occupancy_matrix, start_grid, target_grid = \
-                rejection_sampling_all_obj_large_cylinder(arena_size=arena_size, 
-                                                    cylinder_size=cylinder_size, 
-                                                    num_drones=num_drones, 
-                                                    num_cylinders=num_cylinders, 
-                                                    device=device)
-            if has_feasible_path(path_cylinder_occupancy_matrix, start_grid, target_grid):
                 return task_one, occupancy_matrix, drone_target_occupancy_matrix, cylinder_occupancy_matrix
             num_loop += 1
         raise NotImplementedError
@@ -540,6 +665,59 @@ def rejection_sampling_with_validation_cl(arena_size, cylinder_size, num_drones,
                                                     device=device,
                                                     cl_bound=cl_bound)
             if has_feasible_path(cylinder_occupancy_matrix, start_grid, target_grid):
+                return task_one, occupancy_matrix, drone_target_occupancy_matrix, cylinder_occupancy_matrix
+            num_loop += 1
+        raise NotImplementedError
+
+# large scene
+def rejection_sampling_with_validation_large_cylinder(arena_size, cylinder_size, num_drones, num_cylinders, device, use_validation=True):
+    if not use_validation:
+        task_one, occupancy_matrix, drone_target_occupancy_matrix, \
+            cylinder_occupancy_matrix, path_cylinder_occupancy_matrix, start_grid, target_grid = \
+            rejection_sampling_all_obj_large_cylinder(arena_size=arena_size, 
+                                                cylinder_size=cylinder_size, 
+                                                num_drones=num_drones, 
+                                                num_cylinders=num_cylinders, 
+                                                device=device)
+        return task_one, occupancy_matrix, drone_target_occupancy_matrix, cylinder_occupancy_matrix
+    else:
+        num_loop = 0
+        while(num_loop <= 100):
+            task_one, occupancy_matrix, drone_target_occupancy_matrix, \
+                cylinder_occupancy_matrix, path_cylinder_occupancy_matrix, start_grid, target_grid = \
+                rejection_sampling_all_obj_large_cylinder(arena_size=arena_size, 
+                                                    cylinder_size=cylinder_size, 
+                                                    num_drones=num_drones, 
+                                                    num_cylinders=num_cylinders, 
+                                                    device=device)
+            if has_feasible_path(path_cylinder_occupancy_matrix, start_grid, target_grid):
+                return task_one, occupancy_matrix, drone_target_occupancy_matrix, cylinder_occupancy_matrix
+            num_loop += 1
+        raise NotImplementedError
+
+def rejection_sampling_with_validation_large_cylinder_cl(arena_size, cylinder_size, num_drones, num_cylinders, device, use_validation=True, cl_bound=6):
+    if not use_validation:
+        task_one, occupancy_matrix, drone_target_occupancy_matrix, \
+            cylinder_occupancy_matrix, path_cylinder_occupancy_matrix, start_grid, target_grid = \
+            rejection_sampling_all_obj_large_cylinder_cl(arena_size=arena_size, 
+                                                cylinder_size=cylinder_size, 
+                                                num_drones=num_drones, 
+                                                num_cylinders=num_cylinders, 
+                                                device=device,
+                                                cl_bound=cl_bound)
+        return task_one, occupancy_matrix, drone_target_occupancy_matrix, cylinder_occupancy_matrix
+    else:
+        num_loop = 0
+        while(num_loop <= 100):
+            task_one, occupancy_matrix, drone_target_occupancy_matrix, \
+                cylinder_occupancy_matrix, path_cylinder_occupancy_matrix, start_grid, target_grid = \
+                rejection_sampling_all_obj_large_cylinder_cl(arena_size=arena_size, 
+                                                    cylinder_size=cylinder_size, 
+                                                    num_drones=num_drones, 
+                                                    num_cylinders=num_cylinders, 
+                                                    device=device,
+                                                    cl_bound=cl_bound)
+            if has_feasible_path(path_cylinder_occupancy_matrix, start_grid, target_grid):
                 return task_one, occupancy_matrix, drone_target_occupancy_matrix, cylinder_occupancy_matrix
             num_loop += 1
         raise NotImplementedError
@@ -652,33 +830,34 @@ def check_dist(): # check drone, target and cylinder dist
     for _ in range(10000):
         task_one, occupancy_matrix, drone_target_occupancy_matrix, \
             cylinder_occupancy_matrix = \
-            rejection_sampling_with_validation_large_cylinder(arena_size=1.2, 
+            rejection_sampling_with_validation_large_cylinder_cl(arena_size=1.2, 
                                                  cylinder_size=0.4, 
-                                                 num_drones=4, 
+                                                 num_drones=3, 
                                                  num_cylinders=3, 
-                                                 device='cpu')
+                                                 device='cpu',
+                                                 cl_bound=6)
         task_list.append(task_one.numpy().reshape(-1))
         cylinder_occupancy += cylinder_occupancy_matrix
         drone_target_occupancy += drone_target_occupancy_matrix
     task_list = np.array(task_list)
-    drone_pos = task_list[:, :8]
-    target_pos = task_list[:, 8:10]
-    cylinder_pos = task_list[:, 10:]
+    drone_pos = task_list[:, :12]
+    target_pos = task_list[:, 12:15]
+    cylinder_pos = task_list[:, 15:]
     
-    get_occupation_matrix(drone_pos[:, :2], arena_size=1.2, matrix_size=12, grid_size=0.2, name='drone0')
-    get_occupation_matrix(drone_pos[:, 2:4], arena_size=1.2, matrix_size=12, grid_size=0.2, name='drone1')
-    get_occupation_matrix(drone_pos[:, 4:6], arena_size=1.2, matrix_size=12, grid_size=0.2, name='drone2')
-    get_occupation_matrix(drone_pos[:, 6:8], arena_size=1.2, matrix_size=12, grid_size=0.2, name='drone3')
-    get_occupation_matrix(target_pos[:, :2], arena_size=1.2, matrix_size=12, grid_size=0.2, name='target')
-    get_occupation_matrix(cylinder_pos[:, :2], arena_size=1.2, matrix_size=3, grid_size=0.8, name='cylinder1')
-    get_occupation_matrix(cylinder_pos[:, 2:4], arena_size=1.2, matrix_size=3, grid_size=0.8, name='cylinder2')
+    get_occupation_matrix(drone_pos[:, :3], arena_size=1.2, matrix_size=12, grid_size=0.2, name='drone0')
+    get_occupation_matrix(drone_pos[:, 3:6], arena_size=1.2, matrix_size=12, grid_size=0.2, name='drone1')
+    get_occupation_matrix(drone_pos[:, 6:9], arena_size=1.2, matrix_size=12, grid_size=0.2, name='drone2')
+    get_occupation_matrix(drone_pos[:, 9:12], arena_size=1.2, matrix_size=12, grid_size=0.2, name='drone3')
+    get_occupation_matrix(target_pos[:, :3], arena_size=1.2, matrix_size=12, grid_size=0.2, name='target')
+    get_occupation_matrix(cylinder_pos[:, :3], arena_size=1.2, matrix_size=3, grid_size=0.8, name='cylinder1')
+    get_occupation_matrix(cylinder_pos[:, 3:6], arena_size=1.2, matrix_size=3, grid_size=0.8, name='cylinder2')
     plot_heatmap(drone_target_occupancy, 'drone_target_check')
     plot_heatmap(cylinder_occupancy, 'cylinder_check')
 
 if __name__ == '__main__':
     # plot_circle_square()
-    check_path()
-    # check_dist()
+    # check_path()
+    check_dist()
     # check = generate_outside_cylinders_x_y(arena_size=1.0, 
     #                                        num_envs=10, 
     #                                        device='cpu')
