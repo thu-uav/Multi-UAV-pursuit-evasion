@@ -88,6 +88,7 @@ def has_feasible_path(matrix, start_points, target):
 ###################################################
 # small scene
 
+# for evaluation
 def rejection_sampling_drone_target_xy(arena_size, cylinder_size, num_drones, device, occupancy_matrix):
     # occupancy_matrix : (matrix_size, matrix_size) 
     grid_size = 2 * cylinder_size
