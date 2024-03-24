@@ -353,6 +353,8 @@ def main(cfg):
             "eval/stats." + k: torch.nanmean(v.float()).item() 
             for k, v in traj_stats.items()
         }
+        
+        info.update(capture_dict)
                         
         return info
 

@@ -105,14 +105,14 @@ class OuterCurriculum(object):
         self.num_drones = cfg.task.num_agents
         self.device = device
         # distance range: catch_radius ~ 2 * sqrt(2) * arena_size
-        self.lower_dist_threshold = 0.9 * cfg.task.catch_radius
-        self.higher_dist_threshold = 1.1 * cfg.task.catch_radius
+        self.lower_dist_threshold = 1.1 * cfg.task.catch_radius
+        self.higher_dist_threshold = 1.5 * cfg.task.catch_radius
         self.prob_random = 0.3
         self.eps = 1e-10
         self._state_buffer = np.zeros((0, 1), dtype=np.float32)
         self._weight_buffer = np.zeros((0, 1), dtype=np.float32)
         self._temp_state_buffer = []
-        self.buffer_size = 10000
+        self.buffer_size = 2000
     
     def insert(self, states):
         """
