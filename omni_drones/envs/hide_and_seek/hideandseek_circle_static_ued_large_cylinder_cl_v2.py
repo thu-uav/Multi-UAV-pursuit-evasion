@@ -103,14 +103,11 @@ class OuterCurriculum(object):
         self.max_active_cylinder = cfg.task.cylinder.max_active
         self.min_active_cylinder = cfg.task.cylinder.min_active
         self.num_drones = cfg.task.num_agents
-        self.max_num_obj = self.num_drones + self.OOD_num_cylinders + 1 # drone + target + cylinders
-        self.cylinder_size = cfg.task.cylinder.size
-        self.arena_size = cfg.task.arena_size
         self.device = device
         # distance range: catch_radius ~ 2 * sqrt(2) * arena_size
         self.lower_dist_threshold = 0.9 * cfg.task.catch_radius
         self.higher_dist_threshold = 1.1 * cfg.task.catch_radius
-        self.prob_random = 0.0
+        self.prob_random = 0.3
         self.eps = 1e-10
         self._state_buffer = np.zeros((0, 1), dtype=np.float32)
         self._weight_buffer = np.zeros((0, 1), dtype=np.float32)
@@ -148,7 +145,7 @@ class OuterCurriculum(object):
             max_states = np.max(all_states, axis=0)
             all_states_normalized = (all_states - min_states) / (max_states - min_states + self.eps)
             consider_dim = np.ones(all_states_normalized.shape[-1], dtype=bool)
-            # consider_dim[-self.OOD_num_cylinders:] = False # ignore cylinder_masks
+            consider_dim[-self.OOD_num_cylinders:] = False # ignore cylinder_masks
             all_states_tensor = torch.tensor(all_states_normalized[np.newaxis, :, consider_dim])
             # farthest point sampling
             fps_idx = farthest_point_sampler(all_states_tensor, self.buffer_size)[0].numpy()
@@ -169,6 +166,7 @@ class OuterCurriculum(object):
         """
         if self._state_buffer.shape[0] == 0:  # state buffer is empty
             initial_states = [None for _ in range(num_samples)]
+            num_cl = 0
         else:
             num_random = int(num_samples * self.prob_random)
             num_cl = num_samples - num_random
