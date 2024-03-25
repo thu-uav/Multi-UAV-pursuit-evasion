@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 import copy
-tasks = np.load('/home/jiayu/OmniDrones/scripts/outputs/large_fixed1_v1_3_catch0_2_1_1to1_5_random0_3_expand_cl_loadrandom3/03-25_00-01/wandb/run-20240325_000117-nndkl4v6/files/tasks/tasks_9000.npy')
+tasks = np.load('/home/jiayu/OmniDrones/scripts/outputs/large_random3_cl_loadrandom3/03-25_12-06/wandb/run-20240325_120659-ac4bkkts/files/tasks/tasks_3400.npy')
 num_drone = 4
 num_target = 1
 num_active_cylinder = 1
@@ -32,7 +32,7 @@ plt.ylabel('Frequency')
 plt.title('1D Heatmap (Z Axis)')
 
 plt.tight_layout()
-plt.savefig('hm_drone_9000.png')
+plt.savefig('hm_drone.png')
 breakpoint()
 
 np.random.seed(42)

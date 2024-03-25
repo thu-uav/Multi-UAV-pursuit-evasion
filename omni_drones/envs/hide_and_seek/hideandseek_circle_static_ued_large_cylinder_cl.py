@@ -33,7 +33,7 @@ import copy
 
 from omni.isaac.debug_draw import _debug_draw
 
-from .placement import rejection_sampling_with_validation_large_cylinder_cl, generate_outside_cylinders_x_y
+from .placement import rejection_sampling_with_validation_large_cylinder, generate_outside_cylinders_x_y
 from .draw import draw_traj, draw_detection
 from .draw_circle import Float3, _COLOR_ACCENT, _carb_float3_add, draw_court_circle
 
@@ -194,6 +194,64 @@ class OuterCurriculum(object):
         np.save('{}/tasks_{}.npy'.format(model_dir,episode), self._state_buffer)
         np.save('{}/weights_{}.npy'.format(model_dir,episode), self._weight_buffer)
 
+class ManualCurriculum(object):
+    def __init__(self, cfg) -> None:
+        self.max_active_cylinders = cfg.task.cylinder.max_active
+        self.min_active_cylinders = cfg.task.cylinder.min_active
+        self._state_buffer = np.arange(self.min_active_cylinders, self.max_active_cylinders + 1)
+        self._weight_buffer = np.zeros_like(self._state_buffer, dtype=np.float32)
+        self.window_size = 5
+        self._moving_capture_buffer = []
+        self._easy_buffer = []
+        self.alpha = 5
+        self.easy_prob = 0.05
+        self.easy_threshold = 0.95
+        
+    def update_active(self, capture_dict):
+        capture_list = []
+        for num_cylinder in self._state_buffer:
+            capture_list.append(capture_dict['capture_{}'.format(num_cylinder)])
+        capture_list = np.array(capture_list)
+        self._moving_capture_buffer.append(capture_list)
+        if len(self._moving_capture_buffer) > self.window_size:
+            self._moving_capture_buffer = self._moving_capture_buffer[len(self._moving_capture_buffer) - self.window_size:]
+        
+        # easy and active
+        self._weight_buffer = (1.0 - np.array(self._moving_capture_buffer).mean(axis=0))**self.alpha
+        self._easy_buffer = []
+        for idx, num_cylinder in enumerate(self._state_buffer):
+            if np.array(self._moving_capture_buffer).mean(axis=0)[idx] > self.easy_threshold:
+                self._weight_buffer[idx] = 0.0
+                self._easy_buffer.append(num_cylinder)
+        self._weight_buffer = self._weight_buffer / np.mean(self._weight_buffer)
+
+    def soft_update_weights(self, capture_dict):
+        for num_cylinder in self._state_buffer:
+            self._weight_buffer[num_cylinder] = (1.0 - capture_dict['capture_{}'.format(num_cylinder)])**self.alpha
+
+    def sample(self, num_samples):
+        """
+        return list of np.array
+        """
+        if np.sum(self._weight_buffer) == 0.0: # all tasks = 0.0
+            initial_states = [None] * num_samples
+        else:
+            # num_samples = num_cl + num_easy
+            initial_states = []
+            if len(self._easy_buffer) > 0:
+                num_easy = int(num_samples * self.easy_prob)
+            else:
+                num_easy = 0
+            num_cl = num_samples - num_easy
+            weights = self._weight_buffer / np.mean(self._weight_buffer)
+            probs = (weights / np.sum(weights)).squeeze()
+            sample_idx = np.random.choice(self._state_buffer.shape[0], num_cl, replace=True, p=probs)
+            initial_states += [self._state_buffer[idx] for idx in sample_idx]
+            if len(self._easy_buffer) > 0:
+                sample_easy_idx = np.random.randint(0, len(self._easy_buffer), size=num_easy)
+                initial_states += [np.array(list(self._easy_buffer))[idx] for idx in sample_easy_idx]
+        return initial_states
+
 # set lower cylidner to real pos and height
 def refresh_cylinder_pos_height(max_cylinder_height, origin_cylinder_pos, device):
     low_cylinder_mask = (origin_cylinder_pos[:,:,-1] == 0.0)
@@ -203,7 +261,7 @@ def refresh_cylinder_pos_height(max_cylinder_height, origin_cylinder_pos, device
     origin_height = origin_height + ~low_cylinder_mask * 0.5 * max_cylinder_height
     return origin_cylinder_pos, origin_height
 
-class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv): 
+class HideAndSeek_circle_static_UED_large_cylinder_cl(IsaacEnv): 
     """
     HideAndSeek environment designed for curriculum learning.
 
@@ -302,11 +360,12 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
                 num_agents=self.num_agents
                 )
 
-        # outer CL
-        self.use_outer_cl = self.cfg.task.use_outer_cl
+        # manual cl
+        self.use_manual_cl = self.cfg.task.use_manual_cl
+        if self.use_manual_cl:
+            self.manual_curriculum_module = ManualCurriculum(cfg)
+            self.use_soft_update = self.cfg.task.use_soft_update
         self.set_train = True
-        if self.use_outer_cl:
-            self.outer_curriculum_module = OuterCurriculum(cfg=self.cfg, device=self.device)
         
         self.draw = _debug_draw.acquire_debug_draw_interface()
 
@@ -383,7 +442,10 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
             'speed_return': UnboundedContinuousTensorSpec(1),
             'distance_return': UnboundedContinuousTensorSpec(1),
             'capture_return': UnboundedContinuousTensorSpec(1),
-            'cl_bound': UnboundedContinuousTensorSpec(1),
+            'weight_0': UnboundedContinuousTensorSpec(1),
+            'weight_1': UnboundedContinuousTensorSpec(1),
+            'weight_2': UnboundedContinuousTensorSpec(1),
+            'weight_3': UnboundedContinuousTensorSpec(1),
         }).expand(self.num_envs).to(self.device)
         info_spec = CompositeSpec({
             "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13)),
@@ -412,9 +474,8 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         self.cylinder_height = 2 * size
         self.use_validation = self.cfg.task.use_validation
         self.mean_eval_capture = 0.0 # for inner cl
-        self.cl_bound = 3 # start : 3 ~ end: 6
 
-        obj_pos, _, _, _ = rejection_sampling_with_validation_large_cylinder_cl(
+        obj_pos, _, _, _ = rejection_sampling_with_validation_large_cylinder(
             arena_size=self.arena_size, 
             cylinder_size=self.cylinder_size, 
             num_drones=self.num_agents, 
@@ -505,14 +566,13 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         return ["/World/defaultGroundPlane"]
 
     def uniform_generate_envs(self, num_active_cylinder):
-        obj_pos, _, _, _ = rejection_sampling_with_validation_large_cylinder_cl(
+        obj_pos, _, _, _ = rejection_sampling_with_validation_large_cylinder(
             arena_size=self.arena_size, 
             cylinder_size=self.cylinder_size, 
             num_drones=self.num_agents, 
             num_cylinders=num_active_cylinder, 
             device=self.device,
-            use_validation=self.use_validation,
-            cl_bound=self.cl_bound)
+            use_validation=self.use_validation,)
         
         drone_pos = obj_pos[:self.num_agents].clone()
         target_pos = obj_pos[self.num_agents].clone()
@@ -548,13 +608,13 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
             self.catch_radius = inner_tasks[0]
             self.v_prey = inner_tasks[1]
 
-        if self.use_outer_cl:
-            # current_tasks contains x, y, z of drones, target, cylinders and cylinder masks
+        if self.use_manual_cl:
             if self.set_train:
-                current_tasks, num_cl = self.outer_curriculum_module.sample(num_samples=len(env_ids))
+                current_tasks = self.manual_curriculum_module.sample(num_samples=len(env_ids))
             else:
-                current_tasks = [None] * self.num_envs
-                num_cl = 0
+                current_tasks = [None] * len(self.env_ids)
+        else:
+            current_tasks = [None] * len(self.env_ids)
         
         n_envs = len(env_ids)
         drone_pos = []
@@ -575,11 +635,16 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
                 drone_pos_one, target_pos_one, \
                     cylinder_pos_one, cylinder_mask_one = self.uniform_generate_envs(num_active_cylinder=num_active_cylinder)
             else:
-                drone_pos_one = torch.from_numpy(current_tasks[idx][:self.num_agents * 3].reshape(-1, 3)).to(self.device)
-                target_pos_one = torch.from_numpy(current_tasks[idx][self.num_agents * 3: self.num_agents * 3 + 3]).to(self.device)
-                cylinder_pos_one = torch.from_numpy(current_tasks[idx][self.num_agents * 3 + 3: \
-                    self.num_agents * 3 + 3 + self.num_cylinders * 3].reshape(-1, 3)).to(self.device)
-                cylinder_mask_one = torch.from_numpy(current_tasks[idx][-self.num_cylinders:]).to(self.device)
+                if self.use_manual_cl:
+                    num_active_cylinder = current_tasks[idx]
+                    drone_pos_one, target_pos_one, \
+                        cylinder_pos_one, cylinder_mask_one = self.uniform_generate_envs(num_active_cylinder=num_active_cylinder)
+                else:
+                    drone_pos_one = torch.from_numpy(current_tasks[idx][:self.num_agents * 3].reshape(-1, 3)).to(self.device)
+                    target_pos_one = torch.from_numpy(current_tasks[idx][self.num_agents * 3: self.num_agents * 3 + 3]).to(self.device)
+                    cylinder_pos_one = torch.from_numpy(current_tasks[idx][self.num_agents * 3 + 3: \
+                        self.num_agents * 3 + 3 + self.num_cylinders * 3].reshape(-1, 3)).to(self.device)
+                    cylinder_mask_one = torch.from_numpy(current_tasks[idx][-self.num_cylinders:]).to(self.device)
             
             drone_pos.append(drone_pos_one)
             target_pos.append(target_pos_one)
@@ -593,11 +658,6 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
             cl_task_one += cylinder_pos_one.reshape(-1).to('cpu').numpy().tolist()
             cl_task_one += cylinder_mask_one.tolist()
             
-            if self.use_outer_cl:
-                # cl_task: [drone_pos, target_pos, cylinder_pos, cylinder_mask]
-                if idx > num_cl:
-                    self.outer_curriculum_module.insert(np.array(cl_task_one))
-                
             if idx == self.central_env_idx and self._should_render(0):
                 self._draw_court_circle(self.arena_size)
 
@@ -643,16 +703,8 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         for substep in range(1):
             self.sim.step(self._should_render(substep))
 
-    def update_base_cl(self, capture_dict):
-        if self.random_active:
-            check_list = []
-            for num_cylinder in range(self.min_active_cylinders, self.max_active_cylinders + 1):
-                check_list.append(capture_dict['capture_{}'.format(num_cylinder)])
-            check_list = np.mean(check_list)
-        else:
-            check_list = capture_dict['capture_{}'.format(self.max_active_cylinders)]
-        if check_list >= 0.95:
-            self.cl_bound = min(6, self.cl_bound + 1)
+    def _update_curriculum(self, capture_dict):
+        self.manual_curriculum_module.update_active(capture_dict=capture_dict)
 
     def _pre_sim_step(self, tensordict: TensorDictBase):   
         self.step_spec += 1
@@ -882,9 +934,23 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
             (self.progress_buf >= self.max_episode_length).unsqueeze(-1)
         )
         
+        # for cl
         if torch.all(done):
-            self.outer_curriculum_module.update_curriculum(min_dist_list=self.stats['min_distance'])
-            self.stats['cl_bound'].set_(torch.ones_like(self.stats['cl_bound'], device=self.device) * self.cl_bound)
+            self.mean_eval_capture = torch.mean(self.stats['capture'])
+            self.stats['inner_cl_eval_capture'].set_(torch.ones((self.num_envs, 1), device=self.device) * self.mean_eval_capture)
+            
+            capture_dict = dict()
+            eval_num_cylinders = np.arange(self.min_active_cylinders, self.max_active_cylinders + 1)
+            for idx in range(len(eval_num_cylinders)):
+                num_cylinder = eval_num_cylinders[idx]
+                capture_dict.update({'capture_{}'.format(num_cylinder): self.stats['capture_{}'.format(num_cylinder)].to('cpu').numpy().mean()})
+            if self.use_soft_update:
+                self.manual_curriculum_module.soft_update_weights(capture_dict=capture_dict)
+            print('weight', self.manual_curriculum_module._weight_buffer)
+            self.stats['weight_0'].set_(torch.ones((self.num_envs, 1), device=self.device) * self.manual_curriculum_module._weight_buffer[0])
+            self.stats['weight_1'].set_(torch.ones((self.num_envs, 1), device=self.device) * self.manual_curriculum_module._weight_buffer[1])
+            self.stats['weight_2'].set_(torch.ones((self.num_envs, 1), device=self.device) * self.manual_curriculum_module._weight_buffer[2])
+            self.stats['weight_3'].set_(torch.ones((self.num_envs, 1), device=self.device) * self.manual_curriculum_module._weight_buffer[3])
         
         self.progress_std = torch.std(self.progress_buf)
 
