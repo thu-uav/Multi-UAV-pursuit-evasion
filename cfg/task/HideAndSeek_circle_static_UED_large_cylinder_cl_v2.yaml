@@ -46,6 +46,6 @@ use_dynamic: False
 cylinder:
   size: 0.4
   num: 5
-  max_active: 1
+  max_active: 3
   min_active: 0
-  random_active: False # if False, only train max_active
+  random_active: True # if False, only train max_active

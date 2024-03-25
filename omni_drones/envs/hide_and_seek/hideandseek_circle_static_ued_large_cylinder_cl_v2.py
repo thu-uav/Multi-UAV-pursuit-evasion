@@ -631,8 +631,14 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
             self.sim.step(self._should_render(substep))
 
     def update_base_cl(self, capture_dict):
-        # TODO: only max_cylinder
-        if capture_dict['capture_{}'.format(self.max_active_cylinders)] >= 0.95:
+        if self.random_active:
+            check_list = []
+            for num_cylinder in range(self.min_active_cylinders, self.max_active_cylinders + 1):
+                check_list.append(capture_dict['capture_{}'.format(num_cylinder)])
+            check_list = np.mean(check_list)
+        else:
+            check_list = capture_dict['capture_{}'.format(self.max_active_cylinders)]
+        if check_list >= 0.95:
             self.cl_bound = min(6, self.cl_bound + 1)
 
     def _pre_sim_step(self, tensordict: TensorDictBase):   
