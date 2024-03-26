@@ -199,15 +199,14 @@ class ManualCurriculum(object):
         self.max_active_cylinders = cfg.task.cylinder.max_active
         self.min_active_cylinders = cfg.task.cylinder.min_active
         self._state_buffer = np.arange(self.min_active_cylinders, self.max_active_cylinders + 1)
-        self._weight_buffer = np.zeros_like(self._state_buffer, dtype=np.float32)
+        self._weight_buffer = np.ones_like(self._state_buffer, dtype=np.float32)
         self.window_size = 5
         self._moving_capture_buffer = []
-        self._easy_buffer = []
+        self._active_buffer = []
         self.alpha = 5
-        self.easy_prob = 0.05
-        self.easy_threshold = 0.95
-        
-    def update_active(self, capture_dict):
+        self.active_prob = 0.5
+
+    def soft_update_weights(self, capture_dict):
         capture_list = []
         for num_cylinder in self._state_buffer:
             capture_list.append(capture_dict['capture_{}'.format(num_cylinder)])
@@ -216,19 +215,10 @@ class ManualCurriculum(object):
         if len(self._moving_capture_buffer) > self.window_size:
             self._moving_capture_buffer = self._moving_capture_buffer[len(self._moving_capture_buffer) - self.window_size:]
         
-        # easy and active
-        self._weight_buffer = (1.0 - np.array(self._moving_capture_buffer).mean(axis=0))**self.alpha
-        self._easy_buffer = []
-        for idx, num_cylinder in enumerate(self._state_buffer):
-            if np.array(self._moving_capture_buffer).mean(axis=0)[idx] > self.easy_threshold:
-                self._weight_buffer[idx] = 0.0
-                self._easy_buffer.append(num_cylinder)
-        self._weight_buffer = self._weight_buffer / np.mean(self._weight_buffer)
-
-    def soft_update_weights(self, capture_dict):
-        for num_cylinder in self._state_buffer:
-            self._weight_buffer[num_cylinder] = (1.0 - capture_dict['capture_{}'.format(num_cylinder)])**self.alpha
-
+        active_idx = np.argmin(np.array(self._moving_capture_buffer).mean(axis=0))
+        self._active_buffer = []
+        self._active_buffer.append(self._state_buffer[active_idx])
+        
     def sample(self, num_samples):
         """
         return list of np.array
@@ -236,20 +226,20 @@ class ManualCurriculum(object):
         if np.sum(self._weight_buffer) == 0.0: # all tasks = 0.0
             initial_states = [None] * num_samples
         else:
-            # num_samples = num_cl + num_easy
+            # num_samples = num_active + num_random
             initial_states = []
-            if len(self._easy_buffer) > 0:
-                num_easy = int(num_samples * self.easy_prob)
+            if len(self._active_buffer) > 0:
+                num_active = int(num_samples * self.active_prob)
             else:
-                num_easy = 0
-            num_cl = num_samples - num_easy
+                num_active = 0
+            num_random = num_samples - num_active
             weights = self._weight_buffer / np.mean(self._weight_buffer)
             probs = (weights / np.sum(weights)).squeeze()
-            sample_idx = np.random.choice(self._state_buffer.shape[0], num_cl, replace=True, p=probs)
+            sample_idx = np.random.choice(self._state_buffer.shape[0], num_random, replace=True, p=probs)
             initial_states += [self._state_buffer[idx] for idx in sample_idx]
-            if len(self._easy_buffer) > 0:
-                sample_easy_idx = np.random.randint(0, len(self._easy_buffer), size=num_easy)
-                initial_states += [np.array(list(self._easy_buffer))[idx] for idx in sample_easy_idx]
+            if len(self._active_buffer) > 0:
+                sample_active_idx = np.random.randint(0, len(self._active_buffer), size=num_active)
+                initial_states += [np.array(list(self._active_buffer))[idx] for idx in sample_active_idx]
         return initial_states
 
 # set lower cylidner to real pos and height
@@ -446,6 +436,7 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl(IsaacEnv):
             'weight_1': UnboundedContinuousTensorSpec(1),
             'weight_2': UnboundedContinuousTensorSpec(1),
             'weight_3': UnboundedContinuousTensorSpec(1),
+            'active_cylinder': UnboundedContinuousTensorSpec(1),
         }).expand(self.num_envs).to(self.device)
         info_spec = CompositeSpec({
             "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13)),
@@ -946,11 +937,12 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl(IsaacEnv):
                 capture_dict.update({'capture_{}'.format(num_cylinder): self.stats['capture_{}'.format(num_cylinder)].to('cpu').numpy().mean()})
             if self.use_soft_update:
                 self.manual_curriculum_module.soft_update_weights(capture_dict=capture_dict)
-            print('weight', self.manual_curriculum_module._weight_buffer)
-            self.stats['weight_0'].set_(torch.ones((self.num_envs, 1), device=self.device) * self.manual_curriculum_module._weight_buffer[0])
-            self.stats['weight_1'].set_(torch.ones((self.num_envs, 1), device=self.device) * self.manual_curriculum_module._weight_buffer[1])
-            self.stats['weight_2'].set_(torch.ones((self.num_envs, 1), device=self.device) * self.manual_curriculum_module._weight_buffer[2])
-            self.stats['weight_3'].set_(torch.ones((self.num_envs, 1), device=self.device) * self.manual_curriculum_module._weight_buffer[3])
+            self.stats['active_cylinder'].set_(torch.ones((self.num_envs, 1), device=self.device) * self.manual_curriculum_module._active_buffer[0])
+            # print('weight', self.manual_curriculum_module._weight_buffer)
+            # self.stats['weight_0'].set_(torch.ones((self.num_envs, 1), device=self.device) * self.manual_curriculum_module._weight_buffer[0])
+            # self.stats['weight_1'].set_(torch.ones((self.num_envs, 1), device=self.device) * self.manual_curriculum_module._weight_buffer[1])
+            # self.stats['weight_2'].set_(torch.ones((self.num_envs, 1), device=self.device) * self.manual_curriculum_module._weight_buffer[2])
+            # self.stats['weight_3'].set_(torch.ones((self.num_envs, 1), device=self.device) * self.manual_curriculum_module._weight_buffer[3])
         
         self.progress_std = torch.std(self.progress_buf)
 

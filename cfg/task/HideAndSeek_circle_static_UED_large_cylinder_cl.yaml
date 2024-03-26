@@ -22,7 +22,7 @@ capture_threshold: 0.98
 
 # manual cl
 use_manual_cl: 1
-use_soft_update: 0
+use_soft_update: 1
 
 # use rejection sampling validation
 use_validation: 1
