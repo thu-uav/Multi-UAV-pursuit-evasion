@@ -348,9 +348,9 @@ def rejection_sampling_all_obj_xy_cl(arena_size, cylinder_size, num_drones, num_
 # large scene
 def rejection_sampling_all_obj_large_cylinder(arena_size, cylinder_size, num_drones, num_cylinders, device):
     # set cylinders by rejection sampling
-    grid_size = 0.8
-    arena_size = 1.2
-    cylinder_size = 0.4
+    grid_size = 2 * arena_size / 3
+    # arena_size = 1.2
+    # cylinder_size = 0.4
     matrix_size = 3
     max_z = arena_size # z = max_z or 0.5 * max_z
     origin_grid = [1, 1]
@@ -385,7 +385,6 @@ def rejection_sampling_all_obj_large_cylinder(arena_size, cylinder_size, num_dro
     else:
         cylinders_pos = torch.stack(cylinders_pos)
     
-    # expand to 12 * 12, and set corner to 1.0
     small_expand = 4
     occupancy_matrix = np.kron(occupancy_matrix, np.ones((small_expand, small_expand), dtype=occupancy_matrix.dtype))
     path_occupancy_matrix = np.kron(path_occupancy_matrix, np.ones((small_expand, small_expand), dtype=path_occupancy_matrix.dtype))
@@ -472,9 +471,9 @@ def rejection_sampling_all_obj_large_cylinder(arena_size, cylinder_size, num_dro
 # cl_bound: 3~6
 def generate_cylinder_large(arena_size, cylinder_size, num_cylinders, device):
     # set cylinders by rejection sampling
-    grid_size = 0.8
-    arena_size = 1.2
-    cylinder_size = 0.4
+    grid_size = 2 * arena_size / 3
+    # arena_size = 1.2
+    # cylinder_size = 0.4
     matrix_size = 3
     max_z = arena_size # z = max_z or 0.5 * max_z
     origin_grid = [1, 1]
@@ -510,10 +509,9 @@ def generate_cylinder_large(arena_size, cylinder_size, num_cylinders, device):
     
     return cylinders_pos, occupancy_matrix, path_occupancy_matrix
 
-def generate_drone_target_large_after_cylinder(cylinder_size, num_drones, device, occupancy_matrix, path_occupancy_matrix, cl_bound=6):
+def generate_drone_target_large_after_cylinder(arena_size, num_drones, device, occupancy_matrix, path_occupancy_matrix, cl_bound=6):
     # set cylinders by rejection sampling
-    grid_size = 0.8
-    arena_size = 1.2
+    grid_size = 2 * arena_size / 3
     
     # expand to 12 * 12, and set corner to 1.0
     small_expand = 4
@@ -605,7 +603,7 @@ def rejection_sampling_all_obj_large_cylinder_cl(arena_size, cylinder_size, num_
         cylinders_pos, occupancy_matrix, path_occupancy_matrix = generate_cylinder_large(arena_size, cylinder_size, num_cylinders, device)
         
         drone_target_pos, occupancy_matrix, cylinder_occupancy_matrix, drone_target_occupancy_matrix, \
-            path_cylinder_occupancy_matrix, start_grid, target_grid = generate_drone_target_large_after_cylinder(cylinder_size, num_drones, device, occupancy_matrix, path_occupancy_matrix, cl_bound=cl_bound)
+            path_cylinder_occupancy_matrix, start_grid, target_grid = generate_drone_target_large_after_cylinder(arena_size, num_drones, device, occupancy_matrix, path_occupancy_matrix, cl_bound=cl_bound)
         
         if drone_target_pos.shape[0] == (num_drones + 1):
             break
@@ -826,13 +824,16 @@ def check_dist(): # check drone, target and cylinder dist
     # task_list = np.load('/home/chenjy/OmniDrones/scripts/outputs/Disagreement_emptytransfer_0and1/03-04_18-08/wandb/run-20240304_180822-3e0txp70/files/tasks/tasks_2313.npy')
     # weights_list = np.load('/home/chenjy/OmniDrones/scripts/outputs/Disagreement_emptytransfer_0and1/03-04_18-08/wandb/run-20240304_180822-3e0txp70/files/tasks/weights_2313.npy')
     task_list = []
+    arena_size = 0.6
+    grid_size = 2 * arena_size / 3
+    small_grid_size = grid_size / 4
     cylinder_occupancy = np.zeros((12, 12))
     drone_target_occupancy = np.zeros((12, 12))
     for _ in range(10000):
         task_one, occupancy_matrix, drone_target_occupancy_matrix, \
             cylinder_occupancy_matrix = \
-            rejection_sampling_with_validation_large_cylinder_cl(arena_size=1.2, 
-                                                 cylinder_size=0.4, 
+            rejection_sampling_with_validation_large_cylinder_cl(arena_size=arena_size, 
+                                                 cylinder_size=0.3, 
                                                  num_drones=4, 
                                                  num_cylinders=2, 
                                                  device='cpu',
@@ -845,12 +846,12 @@ def check_dist(): # check drone, target and cylinder dist
     target_pos = task_list[:, 12:15]
     cylinder_pos = task_list[:, 15:]
     
-    get_occupation_matrix(drone_pos[:, :3], arena_size=1.2, matrix_size=12, grid_size=0.2, name='drone0')
-    get_occupation_matrix(drone_pos[:, 3:6], arena_size=1.2, matrix_size=12, grid_size=0.2, name='drone1')
-    get_occupation_matrix(drone_pos[:, 6:9], arena_size=1.2, matrix_size=12, grid_size=0.2, name='drone2')
-    get_occupation_matrix(drone_pos[:, 9:12], arena_size=1.2, matrix_size=12, grid_size=0.2, name='drone3')
-    get_occupation_matrix(target_pos[:, :3], arena_size=1.2, matrix_size=12, grid_size=0.2, name='target')
-    get_occupation_matrix(cylinder_pos[:, :3], arena_size=1.2, matrix_size=3, grid_size=0.8, name='cylinder1')
+    get_occupation_matrix(drone_pos[:, :3], arena_size=arena_size, matrix_size=12, grid_size=small_grid_size, name='drone0')
+    get_occupation_matrix(drone_pos[:, 3:6], arena_size=arena_size, matrix_size=12, grid_size=small_grid_size, name='drone1')
+    get_occupation_matrix(drone_pos[:, 6:9], arena_size=arena_size, matrix_size=12, grid_size=small_grid_size, name='drone2')
+    get_occupation_matrix(drone_pos[:, 9:12], arena_size=arena_size, matrix_size=12, grid_size=small_grid_size, name='drone3')
+    get_occupation_matrix(target_pos[:, :3], arena_size=arena_size, matrix_size=12, grid_size=small_grid_size, name='target')
+    get_occupation_matrix(cylinder_pos[:, :3], arena_size=arena_size, matrix_size=3, grid_size=grid_size, name='cylinder1')
     # get_occupation_matrix(cylinder_pos[:, 3:6], arena_size=1.2, matrix_size=3, grid_size=0.8, name='cylinder2')
     # plot_heatmap(drone_target_occupancy, 'drone_target_check')
     # plot_heatmap(cylinder_occupancy, 'cylinder_check')
