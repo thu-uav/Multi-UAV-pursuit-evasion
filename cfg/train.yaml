@@ -18,20 +18,20 @@ seed: 0
 
 viewer:
   resolution: [960, 720]
-  # # up
-  # eye: [0.001, 0.0, 6.]
-  # lookat: [0., 0., 2.]
+  # up
+  eye: [0.001, 0.0, 6.]
+  lookat: [0., 0., 2.]
   # # debug
   # eye: [0., -4., 4.]
   # lookat: [0., 0., 1.]
-  # front
-  eye: [0., -4., 4.]
-  lookat: [0., 0., 1.]
+  # # front
+  # eye: [0., -4., 4.]
+  # lookat: [0., 0., 1.]
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: small_arena_fixed3_v1_1_catch0_2
-  # run_name: large_fixed1_v1_3_catch0_2_0_9to1_1_random0_3_cl_loadrandom3
+  run_name: small_arena_fixed3_v2_0_catch0_2
+  # run_name: debug
   job_type: train
   entity: chenjy
   project: PredatorPrey
