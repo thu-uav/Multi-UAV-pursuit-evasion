@@ -178,7 +178,6 @@ class HideAndSeek_circle_static_UED_large_cylinder(IsaacEnv):
 
         self.target_init_vel = self.target.get_velocities(clone=True)
         self.env_ids = torch.from_numpy(np.arange(0, cfg.env.num_envs))
-        self.arena_size = self.cfg.task.arena_size
         self.returns = self.progress_buf * 0
         self.catch_radius = self.cfg.task.catch_radius
         self.collision_radius = self.cfg.task.collision_radius
@@ -301,13 +300,14 @@ class HideAndSeek_circle_static_UED_large_cylinder(IsaacEnv):
         self.cylinder_size = self.cfg.task.cylinder.size
         self.detect_range = self.cfg.task.detect_range
         self.arena_size = self.cfg.task.arena_size
-        size = self.arena_size
-        self.cylinder_height = 2 * size
+        self.max_height = self.cfg.task.max_height
+        self.cylinder_height = self.max_height
         self.use_validation = self.cfg.task.use_validation
         self.mean_eval_capture = 0.0 # for inner cl
 
         obj_pos, _, _, _ = rejection_sampling_with_validation_large_cylinder(
             arena_size=self.arena_size, 
+            max_height=self.max_height,
             cylinder_size=self.cylinder_size, 
             num_drones=self.num_agents, 
             num_cylinders=self.max_active_cylinders, 
@@ -326,7 +326,7 @@ class HideAndSeek_circle_static_UED_large_cylinder(IsaacEnv):
         inactive_cylinders_x_y = generate_outside_cylinders_x_y(arena_size=self.arena_size, 
                                                                 num_envs=1, 
                                                                 device=self.device)[:num_inactive]
-        inactive_cylinders_z = torch.ones(num_inactive, device=self.device).unsqueeze(-1) * self.arena_size
+        inactive_cylinders_z = torch.ones(num_inactive, device=self.device).unsqueeze(-1) * self.max_height / 2.0
         inactive_cylinders_pos = torch.concat([inactive_cylinders_x_y, inactive_cylinders_z], dim=-1)
         cylinders_pos = torch.concat([active_cylinder_pos, inactive_cylinders_pos], dim=0)
 
@@ -377,7 +377,7 @@ class HideAndSeek_circle_static_UED_large_cylinder(IsaacEnv):
             prim_path="/World/envs/env_0/Cylinder",
             name="ground",
             translation= torch.tensor([0., 0., 0.], device=self.device),
-            radius=size,
+            radius=self.arena_size,
             height=0.001,
             color=np.array([0.0, 0.0, 0.0]),
         )
@@ -398,7 +398,8 @@ class HideAndSeek_circle_static_UED_large_cylinder(IsaacEnv):
 
     def uniform_generate_envs(self, num_active_cylinder):
         obj_pos, _, _, _ = rejection_sampling_with_validation_large_cylinder(
-            arena_size=self.arena_size, 
+            arena_size=self.arena_size,
+            max_height=self.max_height,
             cylinder_size=self.cylinder_size, 
             num_drones=self.num_agents, 
             num_cylinders=num_active_cylinder, 
@@ -414,7 +415,7 @@ class HideAndSeek_circle_static_UED_large_cylinder(IsaacEnv):
                                                                 num_envs=1, 
                                                                 device=self.device,
                                                                 num_active=self.num_cylinders)[:num_inactive]
-        inactive_cylinders_z = torch.ones(num_inactive, device=self.device).unsqueeze(-1) * self.arena_size
+        inactive_cylinders_z = torch.ones(num_inactive, device=self.device).unsqueeze(-1) * self.max_height / 2.0
         inactive_cylinder_pos = torch.concat([inactive_cylinders_x_y, inactive_cylinders_z], dim=-1)
         cylinders_pos = torch.concat([active_cylinder_pos, inactive_cylinder_pos], dim=0)
         cylinder_mask = torch.ones(self.num_cylinders, device=self.device)
@@ -763,16 +764,16 @@ class HideAndSeek_circle_static_UED_large_cylinder(IsaacEnv):
         
         force = torch.zeros(self.num_envs, 3, device=self.device)
 
-        # predators
-        # active mask : if drone is failed, do not get force from it
-        drone_vel = self.drone.get_velocities()
-        active_mask = (torch.norm(drone_vel[...,:3],dim=-1) > 1e-5).unsqueeze(-1).expand(-1,-1,3)
-        prey_pos_all = prey_pos.expand(-1,self.num_agents,-1)
-        dist_pos = torch.norm(prey_pos_all - pos,dim=-1).unsqueeze(-1).expand(-1,-1,3)
-        direction_p = (prey_pos_all - pos) / (dist_pos + 1e-5)
-        # force_p = direction_p * (1 / (dist_pos + 1e-5)) * active_mask
-        force_p = direction_p * (1 / (dist_pos + 1e-5))
-        force += torch.sum(force_p, dim=1)
+        # # predators
+        # # active mask : if drone is failed, do not get force from it
+        # drone_vel = self.drone.get_velocities()
+        # active_mask = (torch.norm(drone_vel[...,:3],dim=-1) > 1e-5).unsqueeze(-1).expand(-1,-1,3)
+        # prey_pos_all = prey_pos.expand(-1,self.num_agents,-1)
+        # dist_pos = torch.norm(prey_pos_all - pos,dim=-1).unsqueeze(-1).expand(-1,-1,3)
+        # direction_p = (prey_pos_all - pos) / (dist_pos + 1e-5)
+        # # force_p = direction_p * (1 / (dist_pos + 1e-5)) * active_mask
+        # force_p = direction_p * (1 / (dist_pos + 1e-5))
+        # force += torch.sum(force_p, dim=1)
 
         # arena
         # 3D
@@ -781,7 +782,7 @@ class HideAndSeek_circle_static_UED_large_cylinder(IsaacEnv):
         prey_origin_dist = torch.norm(prey_env_pos[:, :2],dim=-1)
         force_r[..., 0] = - prey_env_pos[:,0] / ((self.arena_size - prey_origin_dist)**2 + 1e-5)
         force_r[..., 1] = - prey_env_pos[:,1] / ((self.arena_size - prey_origin_dist)**2 + 1e-5)
-        force_r[...,2] += 1 / (prey_env_pos[:,2] - 0 + 1e-5) - 1 / (2 * self.arena_size - prey_env_pos[:,2] + 1e-5)
+        force_r[...,2] += 1 / (prey_env_pos[:,2] - 0 + 1e-5) - 1 / (self.max_height - prey_env_pos[:,2] + 1e-5)
         force += force_r
         
         # cylinders
