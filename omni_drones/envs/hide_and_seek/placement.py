@@ -86,7 +86,7 @@ def has_feasible_path(matrix, start_points, target):
     return False
 
 ###################################################
-# small scene
+# 5 active cylinders
 
 # for evaluation
 def rejection_sampling_drone_target_xy(arena_size, cylinder_size, num_drones, device, occupancy_matrix):
@@ -343,16 +343,68 @@ def rejection_sampling_all_obj_xy_cl(arena_size, cylinder_size, num_drones, num_
     return objects_pos, occupancy_matrix, drone_target_occupancy_matrix, \
         cylinder_occupancy_matrix, start_grid, target_grid
 
+def rejection_sampling_with_validation(arena_size, cylinder_size, num_drones, num_cylinders, device, use_validation=True):
+    if not use_validation:
+        task_one, occupancy_matrix, drone_target_occupancy_matrix, \
+            cylinder_occupancy_matrix, start_grid, target_grid = \
+            rejection_sampling_all_obj_xy(arena_size=arena_size, 
+                                                cylinder_size=cylinder_size, 
+                                                num_drones=num_drones, 
+                                                num_cylinders=num_cylinders, 
+                                                device=device)
+        return task_one, occupancy_matrix, drone_target_occupancy_matrix, cylinder_occupancy_matrix
+    else:
+        num_loop = 0
+        while(num_loop <= 100):
+            task_one, occupancy_matrix, drone_target_occupancy_matrix, \
+                cylinder_occupancy_matrix, start_grid, target_grid = \
+                rejection_sampling_all_obj_xy(arena_size=arena_size, 
+                                                    cylinder_size=cylinder_size, 
+                                                    num_drones=num_drones, 
+                                                    num_cylinders=num_cylinders, 
+                                                    device=device)
+            if has_feasible_path(cylinder_occupancy_matrix, start_grid, target_grid):
+                return task_one, occupancy_matrix, drone_target_occupancy_matrix, cylinder_occupancy_matrix
+            num_loop += 1
+        raise NotImplementedError
+
+def rejection_sampling_with_validation_cl(arena_size, cylinder_size, num_drones, num_cylinders, device, use_validation=True, cl_bound=5):
+    if not use_validation:
+        task_one, occupancy_matrix, drone_target_occupancy_matrix, \
+            cylinder_occupancy_matrix, start_grid, target_grid = \
+            rejection_sampling_all_obj_xy_cl(arena_size=arena_size, 
+                                                cylinder_size=cylinder_size, 
+                                                num_drones=num_drones, 
+                                                num_cylinders=num_cylinders, 
+                                                device=device,
+                                                cl_bound=cl_bound)
+        return task_one, occupancy_matrix, drone_target_occupancy_matrix, cylinder_occupancy_matrix
+    else:
+        num_loop = 0
+        while(num_loop <= 100):
+            task_one, occupancy_matrix, drone_target_occupancy_matrix, \
+                cylinder_occupancy_matrix, start_grid, target_grid = \
+                rejection_sampling_all_obj_xy_cl(arena_size=arena_size, 
+                                                    cylinder_size=cylinder_size, 
+                                                    num_drones=num_drones, 
+                                                    num_cylinders=num_cylinders, 
+                                                    device=device,
+                                                    cl_bound=cl_bound)
+            if has_feasible_path(cylinder_occupancy_matrix, start_grid, target_grid):
+                return task_one, occupancy_matrix, drone_target_occupancy_matrix, cylinder_occupancy_matrix
+            num_loop += 1
+        raise NotImplementedError
+
 ###################################################
 
-# large scene
+# 3 active cylinders
 def rejection_sampling_all_obj_large_cylinder(arena_size, max_height, cylinder_size, num_drones, num_cylinders, device):
     # set cylinders by rejection sampling
     grid_size = 2 * arena_size / 3
     # arena_size = 1.2
     # cylinder_size = 0.4
     matrix_size = 3
-    max_z = arena_size # z = max_z or 0.5 * max_z
+    max_z = max_height / 2.0 # z = 0.0 or max_z
     origin_grid = [1, 1]
     occupancy_matrix = np.zeros((matrix_size, matrix_size))
     path_occupancy_matrix = np.zeros((matrix_size, matrix_size))
@@ -469,13 +521,13 @@ def rejection_sampling_all_obj_large_cylinder(arena_size, max_height, cylinder_s
 
 # cl_bound: generate drone and target in [-bound, bound], large scene
 # cl_bound: 3~6
-def generate_cylinder_large(arena_size, cylinder_size, num_cylinders, device):
+def generate_cylinder_large(arena_size, max_height, cylinder_size, num_cylinders, device):
     # set cylinders by rejection sampling
     grid_size = 2 * arena_size / 3
     # arena_size = 1.2
     # cylinder_size = 0.4
     matrix_size = 3
-    max_z = arena_size # z = max_z or 0.5 * max_z
+    max_z = max_height / 2.0 # z = 0.0 or max_z
     origin_grid = [1, 1]
     occupancy_matrix = np.zeros((matrix_size, matrix_size))
     path_occupancy_matrix = np.zeros((matrix_size, matrix_size))
@@ -509,7 +561,7 @@ def generate_cylinder_large(arena_size, cylinder_size, num_cylinders, device):
     
     return cylinders_pos, occupancy_matrix, path_occupancy_matrix
 
-def generate_drone_target_large_after_cylinder(arena_size, num_drones, device, occupancy_matrix, path_occupancy_matrix, cl_bound=6):
+def generate_drone_target_large_after_cylinder(arena_size, max_height, num_drones, device, occupancy_matrix, path_occupancy_matrix, cl_bound=6, height_bound=1.0):
     # set cylinders by rejection sampling
     grid_size = 2 * arena_size / 3
     
@@ -579,7 +631,7 @@ def generate_drone_target_large_after_cylinder(arena_size, num_drones, device, o
             y = (y_grid - small_reference_grid[1]) * small_grid_size + small_reference_pos[1]
             z = D.Uniform(
                 torch.tensor([0.1]),
-                torch.tensor([2 * arena_size])
+                torch.tensor([max_height * height_bound - 0.05])
             ).sample()
 
             # Check if the new object overlaps with existing objects
@@ -598,12 +650,12 @@ def generate_drone_target_large_after_cylinder(arena_size, num_drones, device, o
     return drone_target_pos, occupancy_matrix, cylinder_occupancy_matrix, drone_target_occupancy_matrix, \
             path_occupancy_matrix, start_grid, target_grid
 
-def rejection_sampling_all_obj_large_cylinder_cl(arena_size, cylinder_size, num_drones, num_cylinders, device, cl_bound=6):
+def rejection_sampling_all_obj_large_cylinder_cl(arena_size, max_height, cylinder_size, num_drones, num_cylinders, device, cl_bound=6, height_bound=1.0):
     while True:
-        cylinders_pos, occupancy_matrix, path_occupancy_matrix = generate_cylinder_large(arena_size, cylinder_size, num_cylinders, device)
+        cylinders_pos, occupancy_matrix, path_occupancy_matrix = generate_cylinder_large(arena_size, max_height, cylinder_size, num_cylinders, device)
         
         drone_target_pos, occupancy_matrix, cylinder_occupancy_matrix, drone_target_occupancy_matrix, \
-            path_cylinder_occupancy_matrix, start_grid, target_grid = generate_drone_target_large_after_cylinder(arena_size, num_drones, device, occupancy_matrix, path_occupancy_matrix, cl_bound=cl_bound)
+            path_cylinder_occupancy_matrix, start_grid, target_grid = generate_drone_target_large_after_cylinder(arena_size, max_height, num_drones, device, occupancy_matrix, path_occupancy_matrix, cl_bound=cl_bound, height_bound=height_bound)
         
         if drone_target_pos.shape[0] == (num_drones + 1):
             break
@@ -613,62 +665,7 @@ def rejection_sampling_all_obj_large_cylinder_cl(arena_size, cylinder_size, num_
     return objects_pos, occupancy_matrix, drone_target_occupancy_matrix, \
         cylinder_occupancy_matrix, path_cylinder_occupancy_matrix, start_grid, target_grid
 
-###################################################
 # add validation
-# small scene
-def rejection_sampling_with_validation(arena_size, cylinder_size, num_drones, num_cylinders, device, use_validation=True):
-    if not use_validation:
-        task_one, occupancy_matrix, drone_target_occupancy_matrix, \
-            cylinder_occupancy_matrix, start_grid, target_grid = \
-            rejection_sampling_all_obj_xy(arena_size=arena_size, 
-                                                cylinder_size=cylinder_size, 
-                                                num_drones=num_drones, 
-                                                num_cylinders=num_cylinders, 
-                                                device=device)
-        return task_one, occupancy_matrix, drone_target_occupancy_matrix, cylinder_occupancy_matrix
-    else:
-        num_loop = 0
-        while(num_loop <= 100):
-            task_one, occupancy_matrix, drone_target_occupancy_matrix, \
-                cylinder_occupancy_matrix, start_grid, target_grid = \
-                rejection_sampling_all_obj_xy(arena_size=arena_size, 
-                                                    cylinder_size=cylinder_size, 
-                                                    num_drones=num_drones, 
-                                                    num_cylinders=num_cylinders, 
-                                                    device=device)
-            if has_feasible_path(cylinder_occupancy_matrix, start_grid, target_grid):
-                return task_one, occupancy_matrix, drone_target_occupancy_matrix, cylinder_occupancy_matrix
-            num_loop += 1
-        raise NotImplementedError
-
-def rejection_sampling_with_validation_cl(arena_size, cylinder_size, num_drones, num_cylinders, device, use_validation=True, cl_bound=5):
-    if not use_validation:
-        task_one, occupancy_matrix, drone_target_occupancy_matrix, \
-            cylinder_occupancy_matrix, start_grid, target_grid = \
-            rejection_sampling_all_obj_xy_cl(arena_size=arena_size, 
-                                                cylinder_size=cylinder_size, 
-                                                num_drones=num_drones, 
-                                                num_cylinders=num_cylinders, 
-                                                device=device,
-                                                cl_bound=cl_bound)
-        return task_one, occupancy_matrix, drone_target_occupancy_matrix, cylinder_occupancy_matrix
-    else:
-        num_loop = 0
-        while(num_loop <= 100):
-            task_one, occupancy_matrix, drone_target_occupancy_matrix, \
-                cylinder_occupancy_matrix, start_grid, target_grid = \
-                rejection_sampling_all_obj_xy_cl(arena_size=arena_size, 
-                                                    cylinder_size=cylinder_size, 
-                                                    num_drones=num_drones, 
-                                                    num_cylinders=num_cylinders, 
-                                                    device=device,
-                                                    cl_bound=cl_bound)
-            if has_feasible_path(cylinder_occupancy_matrix, start_grid, target_grid):
-                return task_one, occupancy_matrix, drone_target_occupancy_matrix, cylinder_occupancy_matrix
-            num_loop += 1
-        raise NotImplementedError
-
-# large scene
 def rejection_sampling_with_validation_large_cylinder(arena_size, max_height, cylinder_size, num_drones, num_cylinders, device, use_validation=True):
     if not use_validation:
         task_one, occupancy_matrix, drone_target_occupancy_matrix, \
@@ -696,16 +693,18 @@ def rejection_sampling_with_validation_large_cylinder(arena_size, max_height, cy
             num_loop += 1
         raise NotImplementedError
 
-def rejection_sampling_with_validation_large_cylinder_cl(arena_size, cylinder_size, num_drones, num_cylinders, device, use_validation=True, cl_bound=6):
+def rejection_sampling_with_validation_large_cylinder_cl(arena_size, max_height, cylinder_size, num_drones, num_cylinders, device, use_validation=True, cl_bound=6, height_bound=1.0):
     if not use_validation:
         task_one, occupancy_matrix, drone_target_occupancy_matrix, \
             cylinder_occupancy_matrix, path_cylinder_occupancy_matrix, start_grid, target_grid = \
-            rejection_sampling_all_obj_large_cylinder_cl(arena_size=arena_size, 
+            rejection_sampling_all_obj_large_cylinder_cl(arena_size=arena_size,
+                                                max_height=max_height, 
                                                 cylinder_size=cylinder_size, 
                                                 num_drones=num_drones, 
                                                 num_cylinders=num_cylinders, 
                                                 device=device,
-                                                cl_bound=cl_bound)
+                                                cl_bound=cl_bound,
+                                                height_bound=height_bound)
         return task_one, occupancy_matrix, drone_target_occupancy_matrix, cylinder_occupancy_matrix
     else:
         num_loop = 0
@@ -713,15 +712,19 @@ def rejection_sampling_with_validation_large_cylinder_cl(arena_size, cylinder_si
             task_one, occupancy_matrix, drone_target_occupancy_matrix, \
                 cylinder_occupancy_matrix, path_cylinder_occupancy_matrix, start_grid, target_grid = \
                 rejection_sampling_all_obj_large_cylinder_cl(arena_size=arena_size, 
+                                                    max_height=max_height,
                                                     cylinder_size=cylinder_size, 
                                                     num_drones=num_drones, 
                                                     num_cylinders=num_cylinders, 
                                                     device=device,
-                                                    cl_bound=cl_bound)
+                                                    cl_bound=cl_bound,
+                                                    height_bound=height_bound)
             if has_feasible_path(path_cylinder_occupancy_matrix, start_grid, target_grid):
                 return task_one, occupancy_matrix, drone_target_occupancy_matrix, cylinder_occupancy_matrix
             num_loop += 1
         raise NotImplementedError
+
+###################################################
 
 # plot
 def plot_fessible_scenario():
