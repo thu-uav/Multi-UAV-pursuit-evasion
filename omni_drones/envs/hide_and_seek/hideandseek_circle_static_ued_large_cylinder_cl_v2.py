@@ -384,6 +384,7 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
             'distance_return': UnboundedContinuousTensorSpec(1),
             'capture_return': UnboundedContinuousTensorSpec(1),
             'cl_bound': UnboundedContinuousTensorSpec(1),
+            'height_bound': UnboundedContinuousTensorSpec(1),
         }).expand(self.num_envs).to(self.device)
         info_spec = CompositeSpec({
             "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13)),
@@ -890,6 +891,7 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         if torch.all(done):
             self.outer_curriculum_module.update_curriculum(min_dist_list=self.stats['min_distance'])
             self.stats['cl_bound'].set_(torch.ones_like(self.stats['cl_bound'], device=self.device) * self.cl_bound)
+            self.stats['height_bound'].set_(torch.ones_like(self.stats['height_bound'], device=self.device) * self.height_bound)
         
         self.progress_std = torch.std(self.progress_buf)
 
