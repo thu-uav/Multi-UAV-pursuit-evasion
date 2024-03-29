@@ -135,16 +135,17 @@ class OuterCurriculum(object):
         all_states = np.array(tmp_state_buffer)
         
         # random replace
-        if self._state_buffer.shape[0] != 0:  # state buffer is not empty
-            num_replace = len(all_states) + len(self._state_buffer) - self.buffer_size
-            if num_replace > 0:
-                num_left = len(self._state_buffer) - num_replace
-                np.random.shuffle(self._state_buffer)
-                self._state_buffer = np.concatenate([self._state_buffer[:num_left], all_states], axis=0)
+        if all_states.shape[0] > 0:
+            if self._state_buffer.shape[0] != 0:  # state buffer is not empty
+                num_replace = len(all_states) + len(self._state_buffer) - self.buffer_size
+                if num_replace > 0:
+                    num_left = len(self._state_buffer) - num_replace
+                    np.random.shuffle(self._state_buffer)
+                    self._state_buffer = np.concatenate([self._state_buffer[:num_left], all_states], axis=0)
+                else:
+                    self._state_buffer = np.concatenate([self._state_buffer, all_states], axis=0)
             else:
-                self._state_buffer = np.concatenate([self._state_buffer, all_states], axis=0)
-        else:
-            self._state_buffer = copy.deepcopy(all_states)
+                self._state_buffer = copy.deepcopy(all_states)
         
         # # farthest point sampling
         # if self._state_buffer.shape[0] != 0:  # state buffer is not empty
