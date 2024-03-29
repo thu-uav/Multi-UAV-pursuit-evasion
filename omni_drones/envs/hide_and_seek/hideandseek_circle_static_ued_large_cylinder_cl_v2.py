@@ -656,7 +656,7 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
             check_list = np.mean(check_list)
         else:
             check_list = capture_dict['capture_{}'.format(self.max_active_cylinders)]
-        if check_list >= 0.95:
+        if check_list >= 0.98:
             # self.cl_bound = min(6, self.cl_bound + 1)
             self.height_bound = min(1.0, self.height_bound + 0.2)
 
