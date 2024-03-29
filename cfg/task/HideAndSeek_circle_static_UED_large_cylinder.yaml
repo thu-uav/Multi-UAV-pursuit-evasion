@@ -31,7 +31,7 @@ num_agents: 4
 detect_range: -1.0 # -1.0 means fully-observable
 
 arena_size: 0.9 # 0.9
-max_height: 1.5 # 2 * arena_size
+max_height: 1.2 # 2 * arena_size
 v_drone: 1.0
 v_prey: 1.0
 
