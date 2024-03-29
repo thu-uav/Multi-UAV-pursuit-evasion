@@ -1,7 +1,7 @@
-model_dir: /home/chenjy/OmniDrones/scripts/outputs/random0to3_final/v2_0_catch0_2_height0_6_size0_9.pt
+# model_dir: /home/chenjy/OmniDrones/scripts/outputs/random0to3_final/v2_0_catch0_2_height0_6_size0_9.pt
 # model_dir: /home/chenjy/OmniDrones/scripts/outputs/cl_catch0_15_collision001_validation.pt
 # model_dir: /home/jiayu/OmniDrones/scripts/outputs/fixed3_final/v1_3_catch0_2_height0_6_size0_6.pt
-# model_dir: null
+model_dir: null
 
 # hydra.job.chdir: false
 
@@ -12,7 +12,7 @@ env: ${task.env}
 
 total_frames: 100_000_000_000
 max_iters: -1
-eval_interval: 100
+eval_interval: -1
 save_interval: 200
 seed: 0
 
@@ -30,7 +30,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: fixed3_v1_3_catch0_2_size0_9
+  # run_name: check_debug
   run_name: v2_0_catch0_2_height0_9_size1_8_cl_v2_loadheight0_6
   job_type: train
   entity: chenjy

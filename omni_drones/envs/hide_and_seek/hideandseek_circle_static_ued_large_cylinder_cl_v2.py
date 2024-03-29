@@ -772,7 +772,6 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
             cylinders_height,
             cylinders_radius
         ], dim=-1)
-
         
         cylinders_mdist_z = torch.abs(cylinders_rpos[..., 2]) - cylinders_height.squeeze(-1) / 2
         cylinders_mdist_xy = torch.norm(cylinders_rpos[..., :2], dim=-1) - cylinders_radius.squeeze(-1)

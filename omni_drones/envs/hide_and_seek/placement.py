@@ -76,7 +76,7 @@ def has_path(matrix, start, target):
 
 def has_feasible_path(matrix, start_points, target):
     reached_targets = 0
-    num_threshold = 3
+    num_threshold = 4
     for start_point in start_points:
         visited = set()
         if dfs(matrix, start_point, target, visited):
