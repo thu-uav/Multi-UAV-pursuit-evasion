@@ -390,16 +390,16 @@ def main(cfg):
             }
             info.update(stats)
         
-        # # update the policy using rollout data and store the training statistics
-        # info.update(policy.train_op(data.to_tensordict()))
+        # update the policy using rollout data and store the training statistics
+        info.update(policy.train_op(data.to_tensordict()))
 
-        # # update cl before sampling
-        # if eval_interval > 0 and i % eval_interval == 0:
-        #     logging.info(f"Eval at {collector._frames} steps.")
-        #     info.update(evaluate())
-        #     base_env.outer_curriculum_module.save_task(cl_model_dir, i)
+        # update cl before sampling
+        if eval_interval > 0 and i % eval_interval == 0:
+            logging.info(f"Eval at {collector._frames} steps.")
+            info.update(evaluate())
+            base_env.outer_curriculum_module.save_task(cl_model_dir, i)
         
-        info.update(render())
+        # info.update(render())
 
         # save policy model every certain step
         if save_interval > 0 and i % save_interval == 0:
