@@ -913,10 +913,10 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
             self.update_base_cl(capture_dict=capture_dict)
             
             # info
-            self.stats['num_buffer_0'] = (self.outer_curriculum_module._state_buffer[:, -5:].sum(-1) == 0.0).sum()
-            self.stats['num_buffer_1'] = (self.outer_curriculum_module._state_buffer[:, -5:].sum(-1) == 1.0).sum()
-            self.stats['num_buffer_2'] = (self.outer_curriculum_module._state_buffer[:, -5:].sum(-1) == 2.0).sum()
-            self.stats['num_buffer_3'] = (self.outer_curriculum_module._state_buffer[:, -5:].sum(-1) == 3.0).sum()
+            self.stats['num_buffer_0'].set_(torch.ones_like(self.stats['num_buffer_0'], device=self.device) * (self.outer_curriculum_module._state_buffer[:, -5:].sum(-1) == 0.0).sum())
+            self.stats['num_buffer_1'].set_(torch.ones_like(self.stats['num_buffer_1'], device=self.device) * (self.outer_curriculum_module._state_buffer[:, -5:].sum(-1) == 1.0).sum())
+            self.stats['num_buffer_2'].set_(torch.ones_like(self.stats['num_buffer_2'], device=self.device) * (self.outer_curriculum_module._state_buffer[:, -5:].sum(-1) == 2.0).sum())
+            self.stats['num_buffer_3'].set_(torch.ones_like(self.stats['num_buffer_3'], device=self.device) * (self.outer_curriculum_module._state_buffer[:, -5:].sum(-1) == 3.0).sum())
         
         self.progress_std = torch.std(self.progress_buf)
 

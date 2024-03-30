@@ -30,13 +30,13 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: debug
-  # run_name: v1_6_cl_emptybuffer_from_heightbound0_3_threshold_1toinf
+  # run_name: debug
+  run_name: v1_6_cl_emptybuffer_from_heightbound0_3_threshold_1toinf
   job_type: train
   entity: chenjy
   project: PredatorPrey
-  # mode: online
-  mode: disabled # set to 'disabled' when debugging locally
+  mode: online
+  # mode: disabled # set to 'disabled' when debugging locally
   run_id: 
   monitor_gym: True
   tags: 
