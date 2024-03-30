@@ -23,6 +23,7 @@ capture_threshold: 0.98
 # outer cl
 use_outer_cl: 1
 threshold_min: 1.0
+threshold_max: 100.0
 prob_random: 0.3
 
 # use rejection sampling validation

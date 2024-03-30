@@ -106,7 +106,7 @@ class OuterCurriculum(object):
         self.device = device
         # distance range: catch_radius ~ 2 * sqrt(2) * arena_size
         self.lower_dist_threshold = cfg.task.threshold_min * cfg.task.catch_radius
-        self.higher_dist_threshold = 100.0 * cfg.task.catch_radius
+        self.higher_dist_threshold = cfg.task.threshold_max * cfg.task.catch_radius
         self.prob_random = cfg.task.prob_random
         self.eps = 1e-10
         self._state_buffer = np.zeros((0, 1), dtype=np.float32)
@@ -900,7 +900,7 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         )
         
         if torch.all(done):
-            self.outer_curriculum_module.update_curriculum(min_dist_list=self.stats['min_distance'])
+            self.outer_curriculum_module.update_curriculum(min_dist_list=self.stats['min_distance'][self.num_cl:])
             self.stats['cl_bound'].set_(torch.ones_like(self.stats['cl_bound'], device=self.device) * self.cl_bound)
             self.stats['height_bound'].set_(torch.ones_like(self.stats['height_bound'], device=self.device) * self.height_bound)
             
