@@ -420,7 +420,7 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         self.use_validation = self.cfg.task.use_validation
         self.mean_eval_capture = 0.0 # for inner cl
         self.cl_bound = 6 # start : 3 ~ end: 6
-        self.height_bound = 1.0 # 0 ~ 1
+        self.height_bound = 0.3 # 0 ~ 1
 
         obj_pos, _, _, _ = rejection_sampling_with_validation_large_cylinder_cl(
             arena_size=self.arena_size, 
