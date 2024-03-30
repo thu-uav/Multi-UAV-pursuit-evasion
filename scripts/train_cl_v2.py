@@ -349,12 +349,12 @@ def main(cfg):
             for k, v in trajs[("next", "stats")].cpu().items()
         }
 
+        info.update(capture_dict)
+
         info = {
             "eval/stats." + k: torch.nanmean(v.float()).item() 
             for k, v in traj_stats.items()
         }
-        
-        info.update(capture_dict)
                         
         return info
 

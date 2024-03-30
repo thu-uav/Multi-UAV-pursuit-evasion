@@ -22,6 +22,8 @@ capture_threshold: 0.98
 
 # outer cl
 use_outer_cl: 1
+threshold_min: 1.0
+prob_random: 0.3
 
 # use rejection sampling validation
 use_validation: 1
@@ -35,7 +37,7 @@ detect_range: -1.0 # -1.0 means fully-observable
 
 arena_size: 0.9
 max_height: 1.2 # 2 * arena_size
-start_height: 0.3
+start_height: 1.0
 v_drone: 1.0
 v_prey: 1.4
 
