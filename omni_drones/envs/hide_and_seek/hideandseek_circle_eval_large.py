@@ -233,12 +233,14 @@ class HideAndSeek_circle_eval_large(IsaacEnv):
         self.detect_range = self.cfg.task.detect_range
         self.arena_size = self.cfg.task.arena_size
         size = self.arena_size
-        self.cylinder_height = 2 * size
+        self.max_height = self.cfg.task.max_height
+        self.cylinder_height = self.max_height
         self.use_validation = self.cfg.task.use_validation
         self.evaluation_flag = self.cfg.task.evaluation_flag
 
         obj_pos, _, _, _ = rejection_sampling_with_validation_large_cylinder(
             arena_size=self.arena_size, 
+            max_height=self.max_height,
             cylinder_size=self.cylinder_size, 
             num_drones=self.num_agents, 
             num_cylinders=self.max_active_cylinders, 
@@ -257,7 +259,7 @@ class HideAndSeek_circle_eval_large(IsaacEnv):
         inactive_cylinders_x_y = generate_outside_cylinders_x_y(arena_size=self.arena_size, 
                                                                 num_envs=1, 
                                                                 device=self.device)[:num_inactive]
-        inactive_cylinders_z = torch.ones(num_inactive, device=self.device).unsqueeze(-1) * self.arena_size
+        inactive_cylinders_z = torch.ones(num_inactive, device=self.device).unsqueeze(-1) * self.max_height / 2.0
         inactive_cylinders_pos = torch.concat([inactive_cylinders_x_y, inactive_cylinders_z], dim=-1)
         cylinders_pos = torch.concat([active_cylinder_pos, inactive_cylinders_pos], dim=0)
 
@@ -464,6 +466,7 @@ class HideAndSeek_circle_eval_large(IsaacEnv):
     def uniform_generate_envs(self, num_active_cylinder):
         obj_pos, _, _, _ = rejection_sampling_with_validation_large_cylinder(
             arena_size=self.arena_size, 
+            max_height=self.max_height,
             cylinder_size=self.cylinder_size, 
             num_drones=self.num_agents, 
             num_cylinders=num_active_cylinder, 
@@ -479,7 +482,7 @@ class HideAndSeek_circle_eval_large(IsaacEnv):
                                                                 num_envs=1, 
                                                                 device=self.device,
                                                                 num_active=self.num_cylinders)[:num_inactive]
-        inactive_cylinders_z = torch.ones(num_inactive, device=self.device).unsqueeze(-1) * self.arena_size
+        inactive_cylinders_z = torch.ones(num_inactive, device=self.device).unsqueeze(-1) * self.max_height / 2.0
         inactive_cylinder_pos = torch.concat([inactive_cylinders_x_y, inactive_cylinders_z], dim=-1)
         cylinders_pos = torch.concat([active_cylinder_pos, inactive_cylinder_pos], dim=0)
         cylinder_mask = torch.ones(self.num_cylinders, device=self.device)
@@ -809,7 +812,7 @@ class HideAndSeek_circle_eval_large(IsaacEnv):
         prey_origin_dist = torch.norm(prey_env_pos[:, :2],dim=-1)
         force_r[..., 0] = - prey_env_pos[:,0] / ((self.arena_size - prey_origin_dist)**2 + 1e-5)
         force_r[..., 1] = - prey_env_pos[:,1] / ((self.arena_size - prey_origin_dist)**2 + 1e-5)
-        force_r[...,2] += 1 / (prey_env_pos[:,2] - 0 + 1e-5) - 1 / (2 * self.arena_size - prey_env_pos[:,2] + 1e-5)
+        force_r[...,2] += 1 / (prey_env_pos[:,2] - 0 + 1e-5) - 1 / (self.max_height - prey_env_pos[:,2] + 1e-5)
         force += force_r
         
         # cylinders
