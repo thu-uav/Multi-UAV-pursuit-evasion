@@ -1,5 +1,5 @@
 # model_dir: /home/chenjy/OmniDrones/scripts/outputs/random0to3_final/v2_0_catch0_2_height0_6_size0_9.pt
-# model_dir: /home/chenjy/OmniDrones/scripts/outputs/cl_catch0_15_collision001_validation.pt
+# model_dir: /home/chenjy/OmniDrones/scripts/outputs/v1_6_cl_emptybuffer_from_heightbound0_3_threshold_1toinf/03-30_17-53/wandb/run-20240330_175303-f3mpf9ez/files/checkpoint_78774272.pt
 model_dir: /home/chenjy/OmniDrones/scripts/outputs/cl_final/v1_2_catch0_2_height1_2_size0_9.pt
 # model_dir: null
 
@@ -30,13 +30,13 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: v1_4_debug
-  run_name: v1_6_cl_emptybuffer_from_heightbound0_3_threshold_1toinf
+  run_name: debug
+  # run_name: v1_6_cl_emptybuffer_from_heightbound0_3_threshold_1toinf
   job_type: train
   entity: chenjy
   project: PredatorPrey
-  mode: online
-  # mode: disabled # set to 'disabled' when debugging locally
+  # mode: online
+  mode: disabled # set to 'disabled' when debugging locally
   run_id: 
   monitor_gym: True
   tags: 

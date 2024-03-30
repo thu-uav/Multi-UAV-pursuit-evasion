@@ -610,7 +610,7 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
             
             if self.use_outer_cl:
                 # cl_task: [drone_pos, target_pos, cylinder_pos, cylinder_mask]
-                if idx > self.num_cl:
+                if idx >= self.num_cl:
                     self.outer_curriculum_module.insert(np.array(cl_task_one))
                 
             if idx == self.central_env_idx and self._should_render(0):
