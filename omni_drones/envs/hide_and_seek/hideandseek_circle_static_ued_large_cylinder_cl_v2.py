@@ -905,7 +905,7 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
             capture_dict = dict()
             for idx in range(len(eval_num_cylinders)):
                 num_cylinder = eval_num_cylinders[idx]
-                capture_dict.update({'capture_{}'.format(num_cylinder): self.stats['capture'][self.num_cl:][(self.cylinders_mask.sum(-1) == num_cylinder)].mean().cpu().numpy()})
+                capture_dict.update({'capture_{}'.format(num_cylinder): self.stats['capture'][self.num_cl:][(self.cylinders_mask[self.num_cl:].sum(-1) == num_cylinder)].mean().cpu().numpy()})
             self.update_base_cl(capture_dict=capture_dict)
         
         self.progress_std = torch.std(self.progress_buf)

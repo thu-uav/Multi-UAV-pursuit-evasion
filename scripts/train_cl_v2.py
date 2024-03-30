@@ -398,7 +398,7 @@ def main(cfg):
             logging.info(f"Eval at {collector._frames} steps.")
             info.update(evaluate())
         
-        if i % 100 and i > 0:
+        if i % 100 == 0 and i > 0:
             base_env.outer_curriculum_module.save_task(cl_model_dir, i)
         # info.update(render())
 
