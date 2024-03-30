@@ -107,7 +107,7 @@ class OuterCurriculum(object):
         # distance range: catch_radius ~ 2 * sqrt(2) * arena_size
         self.lower_dist_threshold = 1.0 * cfg.task.catch_radius
         self.higher_dist_threshold = 100.0 * cfg.task.catch_radius
-        self.prob_random = 0.5
+        self.prob_random = 0.3
         self.eps = 1e-10
         self._state_buffer = np.zeros((0, 1), dtype=np.float32)
         self._weight_buffer = np.zeros((0, 1), dtype=np.float32)
@@ -173,6 +173,11 @@ class OuterCurriculum(object):
         # print update time
         end_time = time.time()
         print(f"curriculum buffer update states time: {end_time - start_time}s")
+
+    def empty(self):
+        self._state_buffer = np.zeros((0, 1), dtype=np.float32)
+        self._weight_buffer = np.zeros((0, 1), dtype=np.float32)
+        self._temp_state_buffer = []
 
     def sample(self, num_samples):
         """
@@ -415,7 +420,7 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         self.use_validation = self.cfg.task.use_validation
         self.mean_eval_capture = 0.0 # for inner cl
         self.cl_bound = 6 # start : 3 ~ end: 6
-        self.height_bound = 0.3 # 0 ~ 1
+        self.height_bound = 1.0 # 0 ~ 1
 
         obj_pos, _, _, _ = rejection_sampling_with_validation_large_cylinder_cl(
             arena_size=self.arena_size, 
@@ -660,6 +665,7 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         if check_list >= 0.98:
             # self.cl_bound = min(6, self.cl_bound + 1)
             self.height_bound = min(1.0, self.height_bound + 0.2)
+            self.outer_curriculum_module.empty()
 
     def _pre_sim_step(self, tensordict: TensorDictBase):   
         self.step_spec += 1
