@@ -394,7 +394,7 @@ def main(cfg):
         info.update(policy.train_op(data.to_tensordict()))
 
         # update cl before sampling
-        if eval_interval > 0 and i % eval_interval == 0:
+        if i > 0 and eval_interval > 0 and i % eval_interval == 0:
             logging.info(f"Eval at {collector._frames} steps.")
             info.update(evaluate())
         
