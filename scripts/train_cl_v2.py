@@ -328,7 +328,7 @@ def main(cfg):
         for idx in range(len(eval_num_cylinders)):
             num_cylinder = eval_num_cylinders[idx]
             capture_dict.update({'capture_{}'.format(num_cylinder): trajs['info']['capture_{}'.format(num_cylinder)][:, -1].mean().cpu().numpy()})
-        base_env.update_base_cl(capture_dict=capture_dict)
+        # base_env.update_base_cl(capture_dict=capture_dict)
 
         # after rollout, set rendering mode to not headless and reset env
         base_env.enable_render(not cfg.headless)
@@ -397,8 +397,9 @@ def main(cfg):
         if eval_interval > 0 and i % eval_interval == 0:
             logging.info(f"Eval at {collector._frames} steps.")
             info.update(evaluate())
-            base_env.outer_curriculum_module.save_task(cl_model_dir, i)
         
+        if i % 100 and i > 0:
+            base_env.outer_curriculum_module.save_task(cl_model_dir, i)
         # info.update(render())
 
         # save policy model every certain step

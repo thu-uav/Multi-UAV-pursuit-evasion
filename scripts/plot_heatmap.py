@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 import copy
-tasks = np.load('/home/chenjy/OmniDrones/scripts/outputs/v1_4_debug/03-30_15-35/wandb/run-20240330_153540-ed9kdu8b/files/tasks/tasks_131.npy')
+tasks = np.load('/home/chenjy/OmniDrones/scripts/outputs/v1_4_cl_emptybuffer_from_heightbound1_threshold_1toinf/03-30_15-57/wandb/run-20240330_155703-4eebjhdf/files/tasks/tasks_600.npy')
 num_drone = 4
 num_target = 1
 num_active_cylinder = 1

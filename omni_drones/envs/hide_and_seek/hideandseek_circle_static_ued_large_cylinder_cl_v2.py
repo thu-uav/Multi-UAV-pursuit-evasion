@@ -562,10 +562,10 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         if self.use_outer_cl:
             # current_tasks contains x, y, z of drones, target, cylinders and cylinder masks
             if self.set_train:
-                current_tasks, num_cl = self.outer_curriculum_module.sample(num_samples=len(env_ids))
+                current_tasks, self.num_cl = self.outer_curriculum_module.sample(num_samples=len(env_ids))
             else:
                 current_tasks = [None] * self.num_envs
-                num_cl = 0
+                self.num_cl = 0
         
         n_envs = len(env_ids)
         drone_pos = []
@@ -606,7 +606,7 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
             
             if self.use_outer_cl:
                 # cl_task: [drone_pos, target_pos, cylinder_pos, cylinder_mask]
-                if idx > num_cl:
+                if idx > self.num_cl:
                     self.outer_curriculum_module.insert(np.array(cl_task_one))
                 
             if idx == self.central_env_idx and self._should_render(0):
@@ -659,13 +659,14 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
             check_list = []
             for num_cylinder in range(self.min_active_cylinders, self.max_active_cylinders + 1):
                 check_list.append(capture_dict['capture_{}'.format(num_cylinder)])
-            check_list = np.mean(check_list)
+            check_list = np.array(check_list)
         else:
             check_list = capture_dict['capture_{}'.format(self.max_active_cylinders)]
-        if check_list >= 0.98:
+        if np.all(check_list >= 0.98):
             # self.cl_bound = min(6, self.cl_bound + 1)
-            self.height_bound = min(1.0, self.height_bound + 0.2)
-            self.outer_curriculum_module.empty()
+            if self.height_bound < 1.0:
+                self.height_bound = min(1.0, self.height_bound + 0.2)
+                self.outer_curriculum_module.empty()
 
     def _pre_sim_step(self, tensordict: TensorDictBase):   
         self.step_spec += 1
@@ -898,6 +899,14 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
             self.outer_curriculum_module.update_curriculum(min_dist_list=self.stats['min_distance'])
             self.stats['cl_bound'].set_(torch.ones_like(self.stats['cl_bound'], device=self.device) * self.cl_bound)
             self.stats['height_bound'].set_(torch.ones_like(self.stats['height_bound'], device=self.device) * self.height_bound)
+            
+            # cl evaluation
+            eval_num_cylinders = np.arange(self.min_active_cylinders, self.max_active_cylinders + 1)
+            capture_dict = dict()
+            for idx in range(len(eval_num_cylinders)):
+                num_cylinder = eval_num_cylinders[idx]
+                capture_dict.update({'capture_{}'.format(num_cylinder): self.stats['capture'][self.num_cl:][(self.cylinders_mask.sum(-1) == num_cylinder)].mean().cpu().numpy()})
+            self.update_base_cl(capture_dict=capture_dict)
         
         self.progress_std = torch.std(self.progress_buf)
 
