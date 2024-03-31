@@ -2,18 +2,24 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 import copy
-tasks = np.load('/home/chenjy/OmniDrones/scripts/outputs/v1_6_cl_emptybuffer_from_heightbound0_3_threshold_1toinf/03-30_19-39/wandb/run-20240330_193956-habjkq1t/files/tasks/tasks_900.npy')
+tasks = np.load('/home/chenjy/OmniDrones/scripts/outputs/v1_6_cl_heightstep0_1_startheight0_3_threshold1toinf/03-31_17-03/wandb/run-20240331_170305-y0mmokn7/files/tasks/tasks_2300.npy')
 num_drone = 4
 num_target = 1
 num_active_cylinder = 1
 num_all_cylinder = 5
 drones_pos = tasks[:, :num_drone * 3]
 target_pos = tasks[:, num_drone * 3: num_drone * 3 + num_target * 3]
-active_cylinder_pos = tasks[:, num_drone * 3 + num_target * 3: num_drone * 3 + num_target * 3 + num_active_cylinder * 3]
+
+num_idx_0 = (tasks[:, -5:].sum(-1)==0.0)
+num_idx_1 = (tasks[:, -5:].sum(-1)==1.0)
+num_idx_2 = (tasks[:, -5:].sum(-1)==2.0)
+num_idx_3 = (tasks[:, -5:].sum(-1)==3.0)
+
+active_cylinder_pos = tasks[num_idx_3][:, num_drone * 3 + num_target * 3: num_drone * 3 + num_target * 3 + num_active_cylinder * 3]
 cylinder_mask = tasks[:, -5:]
 
 # heatmap
-show_pos = copy.deepcopy(drones_pos)
+show_pos = copy.deepcopy(active_cylinder_pos)
 # 绘制二维热度图（x-y 平面）
 plt.figure(figsize=(10, 5))
 
@@ -32,7 +38,7 @@ plt.ylabel('Frequency')
 plt.title('1D Heatmap (Z Axis)')
 
 plt.tight_layout()
-plt.savefig('hm_drone.png')
+plt.savefig('hm_cylinder.png')
 breakpoint()
 
 np.random.seed(42)

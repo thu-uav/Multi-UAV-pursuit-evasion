@@ -189,10 +189,15 @@ class OuterCurriculum(object):
         else:
             num_random = int(num_samples * self.prob_random)
             num_cl = num_samples - num_random
-            weights = self._weight_buffer / np.mean(self._weight_buffer)
-            probs = (weights / np.sum(weights)).squeeze()
-            sample_idx = np.random.choice(self._state_buffer.shape[0], num_cl, replace=True, p=probs)
-            initial_states = [self._state_buffer[idx] for idx in sample_idx]
+            if self._state_buffer.shape[0] < num_cl:
+                initial_states = [self._state_buffer[idx] for idx in range(self._state_buffer.shape[0])]
+                num_cl = self._state_buffer.shape[0]
+                num_random = num_samples - num_cl
+            else:
+                weights = self._weight_buffer / np.mean(self._weight_buffer)
+                probs = (weights / np.sum(weights)).squeeze()
+                sample_idx = np.random.choice(self._state_buffer.shape[0], num_cl, replace=True, p=probs)
+                initial_states = [self._state_buffer[idx] for idx in sample_idx]
             initial_states += [None] * num_random
         return initial_states, num_cl
     
@@ -425,6 +430,8 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         self.mean_eval_capture = 0.0 # for inner cl
         self.cl_bound = 6 # start : 3 ~ end: 6
         self.height_bound = self.cfg.task.start_height # 0 ~ 1
+        self.height_step = self.cfg.task.height_step
+        self._moving_capture = []
 
         obj_pos, _, _, _ = rejection_sampling_with_validation_large_cylinder_cl(
             arena_size=self.arena_size, 
@@ -666,11 +673,17 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
             check_list = np.array(check_list)
         else:
             check_list = capture_dict['capture_{}'.format(self.max_active_cylinders)]
-        if np.all(check_list >= 0.98):
-            # self.cl_bound = min(6, self.cl_bound + 1)
-            if self.height_bound < 1.0:
-                self.height_bound = min(1.0, self.height_bound + 0.2)
-                self.outer_curriculum_module.empty()
+        self._moving_capture.append(check_list)
+        self._moving_capture = copy.deepcopy(self._moving_capture[-5:])
+        print('_moving_capture', self._moving_capture)
+        if len(self._moving_capture) >= 5:
+            check_capture_flag = np.array(self._moving_capture).max(axis=0) - np.array(self._moving_capture).min(axis=0)
+            if np.all(check_capture_flag <= 0.02):
+                # self.cl_bound = min(6, self.cl_bound + 1)
+                self._moving_capture = []
+                if self.height_bound < 1.0:
+                    self.height_bound = min(1.0, self.height_bound + self.height_step)
+                    # self.outer_curriculum_module.empty()
 
     def _pre_sim_step(self, tensordict: TensorDictBase):   
         self.step_spec += 1
