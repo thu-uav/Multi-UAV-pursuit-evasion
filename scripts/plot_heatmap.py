@@ -20,7 +20,7 @@ def plot_objects(a, b, obstacles):
     plt.axis('equal')
     plt.savefig('show_pos.png')
 
-tasks = np.load('/home/chenjy/OmniDrones/scripts/outputs/v1_6_cl_woupdateheight_startheight0_3_threshold1toinf_randomp0_3/04-01_13-18/wandb/run-20240401_131842-7o1odr7n/files/tasks/tasks_1100.npy')
+tasks = np.load('/home/chenjy/OmniDrones/scripts/outputs/v1_6_cl_woupdateheight_startheight0_3_threshold1toinf_randomp0_3_savemindistance/04-01_16-39/wandb/run-20240401_163922-6ggzgvnr/files/tasks/tasks_100.npy')
 num_drone = 4
 num_target = 1
 num_active_cylinder = 3
@@ -41,7 +41,7 @@ drone_pos3 = drones_pos[num_idx_3]
 target_pos3 = target_pos[num_idx_3]
 
 # plot pos
-show_idx = 800
+show_idx = 10
 plot_objects(drone_pos3[show_idx][:3], target_pos3[show_idx][:3], active_cylinder_pos[show_idx].reshape(-1, 3)[:, :3])
 
 # heatmap
