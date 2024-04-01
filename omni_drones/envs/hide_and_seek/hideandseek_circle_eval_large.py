@@ -33,7 +33,7 @@ import copy
 
 from omni.isaac.debug_draw import _debug_draw
 
-from .placement import rejection_sampling_with_validation_large_cylinder, generate_outside_cylinders_x_y
+from .placement import rejection_sampling_with_validation_large_cylinder_cl, generate_outside_cylinders_x_y
 from .draw import draw_traj, draw_detection
 from .draw_circle import Float3, _COLOR_ACCENT, _carb_float3_add, draw_court_circle
 
@@ -238,14 +238,15 @@ class HideAndSeek_circle_eval_large(IsaacEnv):
         self.use_validation = self.cfg.task.use_validation
         self.evaluation_flag = self.cfg.task.evaluation_flag
 
-        obj_pos, _, _, _ = rejection_sampling_with_validation_large_cylinder(
+        obj_pos, _, _, _ = rejection_sampling_with_validation_large_cylinder_cl(
             arena_size=self.arena_size, 
             max_height=self.max_height,
             cylinder_size=self.cylinder_size, 
             num_drones=self.num_agents, 
             num_cylinders=self.max_active_cylinders, 
             device=self.device,
-            use_validation=self.use_validation)
+            use_validation=self.use_validation,
+            height_bound=1.0)
         
         drone_pos = obj_pos[:self.num_agents].clone()
         target_pos = obj_pos[self.num_agents].clone()
@@ -464,14 +465,15 @@ class HideAndSeek_circle_eval_large(IsaacEnv):
         return drone_pos, target_pos, cylinders_pos, cylinders_mask
 
     def uniform_generate_envs(self, num_active_cylinder):
-        obj_pos, _, _, _ = rejection_sampling_with_validation_large_cylinder(
+        obj_pos, _, _, _ = rejection_sampling_with_validation_large_cylinder_cl(
             arena_size=self.arena_size, 
             max_height=self.max_height,
             cylinder_size=self.cylinder_size, 
             num_drones=self.num_agents, 
             num_cylinders=num_active_cylinder, 
             device=self.device,
-            use_validation=self.use_validation)
+            use_validation=self.use_validation,
+            height_bound=1.0)
         
         drone_pos = obj_pos[:self.num_agents].clone()
         target_pos = obj_pos[self.num_agents].clone()
