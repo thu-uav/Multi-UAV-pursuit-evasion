@@ -60,6 +60,9 @@ def plot_objects_3D(drones, b, obstacles):
     plt.grid(True)
     plt.savefig('3D')
 
+def get_dist(pos1, pos2):
+    return (((pos1 - pos2)**2).sum(-1))**(0.5)
+
 # check inside
 arena_size = 0.9
 max_height = 1.2
@@ -71,7 +74,7 @@ def check_inside(pos):
         return False
     return True
 
-tasks = np.load('/home/chenjy/OmniDrones/scripts/outputs/v1_6_cl_heightstep01_startheight0_1_threshold1toinf_randomp0_3_savemindistance/04-01_18-40/wandb/run-20240401_184043-n8ycemyf/files/tasks/tasks_1400.npy')
+tasks = np.load('/home/chenjy/OmniDrones/scripts/outputs/v1_2_cl_startheight0_1_step0_1_load/04-01_21-59/wandb/run-20240401_215904-kr1bb97i/files/tasks/tasks_1300.npy')
 num_drone = 4
 num_target = 1
 num_active_cylinder = 3
@@ -102,9 +105,11 @@ for idx in range(tasks.shape[0]):
 print('num_inside', num_inside, 'num_tasks', tasks.shape[0])
 
 # plot pos
-show_idx = 500
+show_idx = 341
 plot_objects(drone_pos3[show_idx].reshape(-1, 3), target_pos3[show_idx], active_cylinder_pos[show_idx].reshape(-1, 3))
 plot_objects_3D(drone_pos3[show_idx].reshape(-1, 3), target_pos3[show_idx], active_cylinder_pos[show_idx].reshape(-1, 3))
+
+drone_target_dist = get_dist(drones_pos.reshape(-1, 4, 3), target_pos[:,np.newaxis])
 
 # heatmap
 show_pos = copy.deepcopy(active_cylinder_pos3)

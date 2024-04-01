@@ -116,6 +116,7 @@ class OuterCurriculum(object):
         else:
             self._state_buffer = np.zeros((0, 1), dtype=np.float32)
             self._weight_buffer = np.zeros((0, 1), dtype=np.float32)
+        self._value_buffer = np.zeros(shape=len(self._state_buffer))
         self._temp_state_buffer = []
         self.buffer_size = 2000
         self.arena_size = cfg.task.arena_size
@@ -139,6 +140,7 @@ class OuterCurriculum(object):
     def update_curriculum(self, min_dist_list):
         # pair: [_temp_state_buffer, capture_ratio_list]
         tmp_state_buffer = []
+        # tmp_value_buffer = []
         for task, min_dist in zip(self._temp_state_buffer, min_dist_list):
             if min_dist > self.lower_dist_threshold and min_dist <= self.higher_dist_threshold:
                 drones_pos_one = task[:self.num_drones * 3].reshape(-1, 3)
@@ -148,12 +150,17 @@ class OuterCurriculum(object):
                     and self.check_inside(drones_pos_one[1]) and self.check_inside(drones_pos_one[2]) \
                     and self.check_inside(drones_pos_one[3]):
                     tmp_state_buffer.append(task)
+                    # tmp_value_buffer.append(min_dist.to('cpu').numpy())
         
         # update states
         start_time = time.time()
 
         # concatenate to get all states and all weights
         all_states = np.array(tmp_state_buffer)
+        # all_values = np.array(tmp_value_buffer)
+        
+        # check dist
+        # ((((all_states[0][:12].reshape(-1,3) - all_states[0][12:15])**2).sum(-1)).min())**0.5
         
         # random replace
         if all_states.shape[0] > 0:
@@ -639,9 +646,8 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
             
             if self.use_outer_cl:
                 # cl_task: [drone_pos, target_pos, cylinder_pos, cylinder_mask]
-                if idx >= self.num_cl:
-                    self.min_distance_task.append(np.array(cl_task_one))
-                    # self.outer_curriculum_module.insert(np.array(cl_task_one))
+                self.min_distance_task.append(np.array(cl_task_one))
+                # self.outer_curriculum_module.insert(np.array(cl_task_one))
                 
             if idx == self.central_env_idx and self._should_render(0):
                 self._draw_court_circle(self.arena_size)
@@ -910,8 +916,7 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         cylinders_pos, _ = self.cylinders.get_world_poses()
         
         cylinders_pos, cylinders_height = refresh_cylinder_pos_height(max_cylinder_height=self.cylinder_height,
-                                                                          origin_cylinder_pos=cylinders_pos,
-                                                                          device=self.device)
+                                                                          origin_cylinder_pos=cylinders_pos,                                                               device=self.device)
         for i in range(self.num_cylinders):
             relative_pos = drone_pos[..., :2] - cylinders_pos[:, i, :2].unsqueeze(-2)
             norm_r = torch.norm(relative_pos, dim=-1)
@@ -925,7 +930,7 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         current_min_dist = torch.min(target_dist, dim=-1).values.unsqueeze(-1)
         
         # update min_distance_task
-        for idx, flag in enumerate((current_min_dist < self.stats['min_distance'])[self.num_cl:]):
+        for idx, flag in enumerate((current_min_dist < self.stats['min_distance'])):
             if flag:
                 self.min_distance_task[idx] = copy.deepcopy(self.current_cl_tasks[idx])
         
@@ -957,7 +962,7 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
             self.outer_curriculum_module.height_range[1] = (0.5 + self.height_bound) * self.max_height
             for task in self.min_distance_task:
                 self.outer_curriculum_module.insert(task)
-            self.outer_curriculum_module.update_curriculum(min_dist_list=self.stats['min_distance'][self.num_cl:])
+            self.outer_curriculum_module.update_curriculum(min_dist_list=self.stats['min_distance'])
             self.stats['cl_bound'].set_(torch.ones_like(self.stats['cl_bound'], device=self.device) * self.cl_bound)
             self.stats['height_bound'].set_(torch.ones_like(self.stats['height_bound'], device=self.device) * self.height_bound)
             
