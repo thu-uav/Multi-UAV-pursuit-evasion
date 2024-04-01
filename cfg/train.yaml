@@ -31,7 +31,7 @@ viewer:
 wandb:
   group: ${oc.select:..task.name}
   # run_name: debug
-  run_name: v1_6_cl_startheight0_1_step0_1_load
+  run_name: v1_2_cl_startheight0_1_step0_1_load
   job_type: train
   entity: chenjy
   project: PredatorPrey

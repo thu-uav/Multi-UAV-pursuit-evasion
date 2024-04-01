@@ -139,12 +139,10 @@ class OuterCurriculum(object):
     def update_curriculum(self, min_dist_list):
         # pair: [_temp_state_buffer, capture_ratio_list]
         tmp_state_buffer = []
-        all_tmp_state_buffer = []
         for task, min_dist in zip(self._temp_state_buffer, min_dist_list):
             if min_dist > self.lower_dist_threshold and min_dist <= self.higher_dist_threshold:
                 drones_pos_one = task[:self.num_drones * 3].reshape(-1, 3)
                 target_pos_one = task[self.num_drones * 3: self.num_drones * 3 + 1 * 3]
-                all_tmp_state_buffer.append(task)
                 # inside the fessible area
                 if self.check_inside(target_pos_one) and self.check_inside(drones_pos_one[0]) \
                     and self.check_inside(drones_pos_one[1]) and self.check_inside(drones_pos_one[2]) \
