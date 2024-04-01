@@ -2,10 +2,28 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 import copy
-tasks = np.load('/home/chenjy/OmniDrones/scripts/outputs/v1_6_cl_heightstep0_1_startheight0_3_threshold1toinf/03-31_17-03/wandb/run-20240331_170305-y0mmokn7/files/tasks/tasks_2300.npy')
+
+def plot_objects(a, b, obstacles):
+    plt.figure()
+    plt.plot(a[0], a[1], 'bo', label='drone')
+    plt.plot(b[0], b[1], 'ro', label='target')
+    for obstacle in obstacles:
+        circle = plt.Circle((obstacle[0], obstacle[1]), 0.3, color='g', fill=False, label='Obstacle')
+        plt.gca().add_patch(circle)
+    circle = plt.Circle((0.0, 0.0), 0.9, color='r', fill=False)
+    plt.gca().add_patch(circle)
+    plt.xlabel('X')
+    plt.ylabel('Y')
+    plt.title('Objects and Obstacles')
+    plt.legend()
+    plt.grid(True)
+    plt.axis('equal')
+    plt.savefig('show_pos.png')
+
+tasks = np.load('/home/chenjy/OmniDrones/scripts/outputs/v1_6_cl_woupdateheight_startheight0_3_threshold1toinf_randomp0_3/04-01_13-18/wandb/run-20240401_131842-7o1odr7n/files/tasks/tasks_1100.npy')
 num_drone = 4
 num_target = 1
-num_active_cylinder = 1
+num_active_cylinder = 3
 num_all_cylinder = 5
 drones_pos = tasks[:, :num_drone * 3]
 target_pos = tasks[:, num_drone * 3: num_drone * 3 + num_target * 3]
@@ -16,10 +34,18 @@ num_idx_2 = (tasks[:, -5:].sum(-1)==2.0)
 num_idx_3 = (tasks[:, -5:].sum(-1)==3.0)
 
 active_cylinder_pos = tasks[num_idx_3][:, num_drone * 3 + num_target * 3: num_drone * 3 + num_target * 3 + num_active_cylinder * 3]
-cylinder_mask = tasks[:, -5:]
+active_cylinder_pos1 = active_cylinder_pos[:, 0:3]
+active_cylinder_pos2 = active_cylinder_pos[:, 3:6]
+active_cylinder_pos3 = active_cylinder_pos[:, 6:9]
+drone_pos3 = drones_pos[num_idx_3]
+target_pos3 = target_pos[num_idx_3]
+
+# plot pos
+show_idx = 800
+plot_objects(drone_pos3[show_idx][:3], target_pos3[show_idx][:3], active_cylinder_pos[show_idx].reshape(-1, 3)[:, :3])
 
 # heatmap
-show_pos = copy.deepcopy(active_cylinder_pos)
+show_pos = copy.deepcopy(active_cylinder_pos3)
 # 绘制二维热度图（x-y 平面）
 plt.figure(figsize=(10, 5))
 
@@ -38,7 +64,7 @@ plt.ylabel('Frequency')
 plt.title('1D Heatmap (Z Axis)')
 
 plt.tight_layout()
-plt.savefig('hm_cylinder.png')
+plt.savefig('hm_cylinder3.png')
 breakpoint()
 
 np.random.seed(42)

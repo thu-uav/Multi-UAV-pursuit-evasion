@@ -109,8 +109,13 @@ class OuterCurriculum(object):
         self.higher_dist_threshold = cfg.task.threshold_max * cfg.task.catch_radius
         self.prob_random = cfg.task.prob_random
         self.eps = 1e-10
-        self._state_buffer = np.zeros((0, 1), dtype=np.float32)
-        self._weight_buffer = np.zeros((0, 1), dtype=np.float32)
+        if cfg.task.load_task_buffer:
+            tmp_tasks = np.load(cfg.task.task_model_dir)
+            self._state_buffer = copy.deepcopy(tmp_tasks[tmp_tasks[:, -5:].sum(-1)==3.0])
+            self._weight_buffer = np.ones(shape=len(self._state_buffer))
+        else:
+            self._state_buffer = np.zeros((0, 1), dtype=np.float32)
+            self._weight_buffer = np.zeros((0, 1), dtype=np.float32)
         self._temp_state_buffer = []
         self.buffer_size = 2000
     
@@ -585,6 +590,7 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         self.cylinders_mask = []
         # occupation_matrix = []
         self.cl_tasks = []
+        self.min_distance_task = [] # represent the frontier of tasks
                 
         # start_time = time.time()
         for idx in range(n_envs):
@@ -618,7 +624,8 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
             if self.use_outer_cl:
                 # cl_task: [drone_pos, target_pos, cylinder_pos, cylinder_mask]
                 if idx >= self.num_cl:
-                    self.outer_curriculum_module.insert(np.array(cl_task_one))
+                    self.min_distance_task.append(np.array(cl_task_one))
+                    # self.outer_curriculum_module.insert(np.array(cl_task_one))
                 
             if idx == self.central_env_idx and self._should_render(0):
                 self._draw_court_circle(self.arena_size)
@@ -677,8 +684,8 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         self._moving_capture = copy.deepcopy(self._moving_capture[-5:])
         print('_moving_capture', self._moving_capture)
         if len(self._moving_capture) >= 5:
-            check_capture_flag = np.array(self._moving_capture).max(axis=0) - np.array(self._moving_capture).min(axis=0)
-            if np.all(check_capture_flag <= 0.02):
+            check_capture_flag = np.array(self._moving_capture).mean(axis=0)
+            if np.all(check_capture_flag >= 0.98):
                 # self.cl_bound = min(6, self.cl_bound + 1)
                 self._moving_capture = []
                 if self.height_bound < 1.0:
@@ -781,6 +788,16 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         # get masked cylinder relative position
         cylinders_pos, _ = self.get_env_poses(self.cylinders.get_world_poses())
         
+        # save tasks at step t, for CL
+        ##############################
+        self.current_cl_tasks = []
+        self.current_cl_tasks += [drone_pos.reshape(self.num_envs, -1).to('cpu').numpy()]
+        self.current_cl_tasks += [target_pos.reshape(self.num_envs, -1).to('cpu').numpy()]
+        self.current_cl_tasks += [cylinders_pos.reshape(self.num_envs, -1).to('cpu').numpy()]
+        self.current_cl_tasks += [self.cylinders_mask.reshape(self.num_envs, -1).to('cpu').numpy()]
+        self.current_cl_tasks = np.concatenate(self.current_cl_tasks, axis=-1)
+        ############################## 
+        
         cylinders_pos, cylinders_height = refresh_cylinder_pos_height(max_cylinder_height=self.cylinder_height,
                                                                           origin_cylinder_pos=cylinders_pos,
                                                                           device=self.device)
@@ -875,6 +892,7 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         coll_reward = torch.zeros(self.num_envs, self.num_agents, device=self.device)
         
         cylinders_pos, _ = self.cylinders.get_world_poses()
+        
         cylinders_pos, cylinders_height = refresh_cylinder_pos_height(max_cylinder_height=self.cylinder_height,
                                                                           origin_cylinder_pos=cylinders_pos,
                                                                           device=self.device)
@@ -889,6 +907,12 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         # min_dist = target_dist
         min_dist = (torch.min(target_dist, dim=-1)[0].unsqueeze(-1).expand_as(target_dist))
         current_min_dist = torch.min(target_dist, dim=-1).values.unsqueeze(-1)
+        
+        # update min_distance_task
+        for idx, flag in enumerate((current_min_dist < self.stats['min_distance'])[self.num_cl:]):
+            if flag:
+                self.min_distance_task[idx] = copy.deepcopy(self.current_cl_tasks[idx])
+        
         self.stats['min_distance'].set_(torch.min(current_min_dist, self.stats['min_distance']))
         
         dist_reward_mask = (min_dist > self.catch_radius)
@@ -913,6 +937,8 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         )
         
         if torch.all(done):
+            for task in self.min_distance_task:
+                self.outer_curriculum_module.insert(task)
             self.outer_curriculum_module.update_curriculum(min_dist_list=self.stats['min_distance'][self.num_cl:])
             self.stats['cl_bound'].set_(torch.ones_like(self.stats['cl_bound'], device=self.device) * self.cl_bound)
             self.stats['height_bound'].set_(torch.ones_like(self.stats['height_bound'], device=self.device) * self.height_bound)
@@ -923,7 +949,7 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
             for idx in range(len(eval_num_cylinders)):
                 num_cylinder = eval_num_cylinders[idx]
                 capture_dict.update({'capture_{}'.format(num_cylinder): self.stats['capture'][self.num_cl:][(self.cylinders_mask[self.num_cl:].sum(-1) == num_cylinder)].mean().cpu().numpy()})
-            self.update_base_cl(capture_dict=capture_dict)
+            # self.update_base_cl(capture_dict=capture_dict)
             
             # info
             self.stats['num_buffer_0'].set_(torch.ones_like(self.stats['num_buffer_0'], device=self.device) * (self.outer_curriculum_module._state_buffer[:, -5:].sum(-1) == 0.0).sum())

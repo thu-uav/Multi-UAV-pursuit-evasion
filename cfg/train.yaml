@@ -14,7 +14,7 @@ total_frames: 100_000_000_000
 max_iters: -1
 eval_interval: 200
 save_interval: 200
-seed: 0
+seed: 1
 
 viewer:
   resolution: [960, 720]
@@ -31,7 +31,7 @@ viewer:
 wandb:
   group: ${oc.select:..task.name}
   # run_name: debug
-  run_name: v1_6_cl_heightstep0_05_startheight0_3_threshold1toinf_randomp0_7
+  run_name: v1_6_cl_woupdateheight_startheight0_3_threshold1toinf_randomp0_3_savemindistance
   job_type: train
   entity: chenjy
   project: PredatorPrey

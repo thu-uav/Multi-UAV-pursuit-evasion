@@ -232,7 +232,7 @@ def main(cfg):
         base_env.enable_render(True)
         base_env.eval()
         env.eval()
-        base_env.set_train = False
+        # base_env.set_train = False
         env.set_seed(seed)
 
         from tqdm import tqdm
@@ -400,6 +400,7 @@ def main(cfg):
         
         if i % 100 == 0 and i > 0:
             base_env.outer_curriculum_module.save_task(cl_model_dir, i)
+        
         # info.update(render())
 
         # save policy model every certain step
