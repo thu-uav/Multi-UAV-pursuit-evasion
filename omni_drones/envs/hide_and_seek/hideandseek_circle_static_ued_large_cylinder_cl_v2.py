@@ -688,8 +688,8 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
             if np.all(check_capture_flag >= 0.98):
                 # self.cl_bound = min(6, self.cl_bound + 1)
                 self._moving_capture = []
-                if self.height_bound < 1.0:
-                    self.height_bound = min(1.0, self.height_bound + self.height_step)
+                if self.height_bound < 0.5:
+                    self.height_bound = min(0.5, self.height_bound + self.height_step)
                     # self.outer_curriculum_module.empty()
 
     def _pre_sim_step(self, tensordict: TensorDictBase):   
@@ -991,7 +991,7 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         prey_origin_dist = torch.norm(prey_env_pos[:, :2],dim=-1)
         force_r[..., 0] = - prey_env_pos[:,0] / ((self.arena_size - prey_origin_dist)**2 + 1e-5)
         force_r[..., 1] = - prey_env_pos[:,1] / ((self.arena_size - prey_origin_dist)**2 + 1e-5)
-        force_r[...,2] += 1 / (prey_env_pos[:,2] - 0 + 1e-5) - 1 / (self.max_height * self.height_bound - prey_env_pos[:,2] + 1e-5)
+        force_r[...,2] += 1 / (prey_env_pos[:,2] - (0.5 * self.max_height - self.height_bound * self.max_height) + 1e-5) - 1 / ((0.5 * self.max_height + self.height_bound * self.max_height) - prey_env_pos[:,2] + 1e-5)
         force += force_r
         
         # cylinders

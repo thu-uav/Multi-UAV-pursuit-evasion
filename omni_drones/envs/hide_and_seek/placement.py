@@ -561,7 +561,7 @@ def generate_cylinder_large(arena_size, max_height, cylinder_size, num_cylinders
     
     return cylinders_pos, occupancy_matrix, path_occupancy_matrix
 
-def generate_drone_target_large_after_cylinder(arena_size, max_height, num_drones, device, occupancy_matrix, path_occupancy_matrix, cl_bound=6, height_bound=1.0):
+def generate_drone_target_large_after_cylinder(arena_size, max_height, num_drones, device, occupancy_matrix, path_occupancy_matrix, cl_bound=6, height_bound=0.5):
     # set cylinders by rejection sampling
     grid_size = 2 * arena_size / 3
     
@@ -630,8 +630,8 @@ def generate_drone_target_large_after_cylinder(arena_size, max_height, num_drone
             x = (x_grid - small_reference_grid[0]) * small_grid_size + small_reference_pos[0]
             y = (y_grid - small_reference_grid[1]) * small_grid_size + small_reference_pos[1]
             z = D.Uniform(
-                torch.tensor([0.1]),
-                torch.tensor([max_height * height_bound - 0.05])
+                torch.tensor([0.5 * max_height - height_bound * max_height + 0.02]),
+                torch.tensor([0.5 * max_height + height_bound * max_height - 0.02])
             ).sample()
 
             # Check if the new object overlaps with existing objects
@@ -650,7 +650,7 @@ def generate_drone_target_large_after_cylinder(arena_size, max_height, num_drone
     return drone_target_pos, occupancy_matrix, cylinder_occupancy_matrix, drone_target_occupancy_matrix, \
             path_occupancy_matrix, start_grid, target_grid
 
-def rejection_sampling_all_obj_large_cylinder_cl(arena_size, max_height, cylinder_size, num_drones, num_cylinders, device, cl_bound=6, height_bound=1.0):
+def rejection_sampling_all_obj_large_cylinder_cl(arena_size, max_height, cylinder_size, num_drones, num_cylinders, device, cl_bound=6, height_bound=0.5):
     while True:
         cylinders_pos, occupancy_matrix, path_occupancy_matrix = generate_cylinder_large(arena_size, max_height, cylinder_size, num_cylinders, device)
         
@@ -693,7 +693,7 @@ def rejection_sampling_with_validation_large_cylinder(arena_size, max_height, cy
             num_loop += 1
         raise NotImplementedError
 
-def rejection_sampling_with_validation_large_cylinder_cl(arena_size, max_height, cylinder_size, num_drones, num_cylinders, device, use_validation=True, cl_bound=6, height_bound=1.0):
+def rejection_sampling_with_validation_large_cylinder_cl(arena_size, max_height, cylinder_size, num_drones, num_cylinders, device, use_validation=True, cl_bound=6, height_bound=0.5):
     if not use_validation:
         task_one, occupancy_matrix, drone_target_occupancy_matrix, \
             cylinder_occupancy_matrix, path_cylinder_occupancy_matrix, start_grid, target_grid = \
