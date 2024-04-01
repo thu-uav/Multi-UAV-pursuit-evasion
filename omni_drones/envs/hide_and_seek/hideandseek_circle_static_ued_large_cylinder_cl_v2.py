@@ -118,7 +118,17 @@ class OuterCurriculum(object):
             self._weight_buffer = np.zeros((0, 1), dtype=np.float32)
         self._temp_state_buffer = []
         self.buffer_size = 2000
+        self.arena_size = cfg.task.arena_size
+        self.height_range = [cfg.task.max_height * (0.5 - cfg.task.start_height), cfg.task.max_height * (0.5 + cfg.task.start_height)]
     
+    def check_inside(self, pos):
+        x, y, z = pos
+        if x**2 + y**2 > self.arena_size**2:
+            return False
+        if z < self.height_range[0] or z > self.height_range[1]:
+            return False
+        return True
+
     def insert(self, states):
         """
         input:
@@ -129,9 +139,17 @@ class OuterCurriculum(object):
     def update_curriculum(self, min_dist_list):
         # pair: [_temp_state_buffer, capture_ratio_list]
         tmp_state_buffer = []
+        all_tmp_state_buffer = []
         for task, min_dist in zip(self._temp_state_buffer, min_dist_list):
             if min_dist > self.lower_dist_threshold and min_dist <= self.higher_dist_threshold:
-                tmp_state_buffer.append(task)
+                drones_pos_one = task[:self.num_drones * 3].reshape(-1, 3)
+                target_pos_one = task[self.num_drones * 3: self.num_drones * 3 + 1 * 3]
+                all_tmp_state_buffer.append(task)
+                # inside the fessible area
+                if self.check_inside(target_pos_one) and self.check_inside(drones_pos_one[0]) \
+                    and self.check_inside(drones_pos_one[1]) and self.check_inside(drones_pos_one[2]) \
+                    and self.check_inside(drones_pos_one[3]):
+                    tmp_state_buffer.append(task)
         
         # update states
         start_time = time.time()
@@ -434,7 +452,7 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         self.use_validation = self.cfg.task.use_validation
         self.mean_eval_capture = 0.0 # for inner cl
         self.cl_bound = 6 # start : 3 ~ end: 6
-        self.height_bound = self.cfg.task.start_height # 0 ~ 1
+        self.height_bound = self.cfg.task.start_height # 0 ~ 0.5
         self.height_step = self.cfg.task.height_step
         self._moving_capture = []
 
@@ -937,6 +955,8 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         )
         
         if torch.all(done):
+            self.outer_curriculum_module.height_range[0] = (0.5 - self.height_bound) * self.max_height
+            self.outer_curriculum_module.height_range[1] = (0.5 + self.height_bound) * self.max_height
             for task in self.min_distance_task:
                 self.outer_curriculum_module.insert(task)
             self.outer_curriculum_module.update_curriculum(min_dist_list=self.stats['min_distance'][self.num_cl:])

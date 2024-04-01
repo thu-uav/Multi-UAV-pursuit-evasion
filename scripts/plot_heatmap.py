@@ -60,7 +60,18 @@ def plot_objects_3D(drones, b, obstacles):
     plt.grid(True)
     plt.savefig('3D')
 
-tasks = np.load('/home/jiayu/OmniDrones/scripts/outputs/v1_6_cl_woupdateheight_startheight0_1_threshold1toinf_randomp0_3_savemindistance/04-01_18-27/wandb/run-20240401_182718-a5iv2tj4/files/tasks/tasks_800.npy')
+# check inside
+arena_size = 0.9
+max_height = 1.2
+def check_inside(pos):
+    x, y, z = pos
+    if x**2 + y**2 > arena_size**2:
+        return False
+    if z < 0.0 or z > max_height:
+        return False
+    return True
+
+tasks = np.load('/home/chenjy/OmniDrones/scripts/outputs/v1_6_cl_heightstep01_startheight0_1_threshold1toinf_randomp0_3_savemindistance/04-01_18-40/wandb/run-20240401_184043-n8ycemyf/files/tasks/tasks_1400.npy')
 num_drone = 4
 num_target = 1
 num_active_cylinder = 3
@@ -80,8 +91,18 @@ active_cylinder_pos3 = active_cylinder_pos[:, 6:9]
 drone_pos3 = drones_pos[num_idx_3]
 target_pos3 = target_pos[num_idx_3]
 
+num_inside = 0
+for idx in range(tasks.shape[0]):
+    drones_pos_one = tasks[idx, :num_drone * 3].reshape(-1, 3)
+    target_pos_one = tasks[idx, num_drone * 3: num_drone * 3 + num_target * 3]
+    if check_inside(target_pos_one) and check_inside(drones_pos_one[0]) \
+        and check_inside(drones_pos_one[1]) and check_inside(drones_pos_one[2]) \
+        and check_inside(drones_pos_one[3]):
+        num_inside += 1
+print('num_inside', num_inside, 'num_tasks', tasks.shape[0])
+
 # plot pos
-show_idx = 350
+show_idx = 500
 plot_objects(drone_pos3[show_idx].reshape(-1, 3), target_pos3[show_idx], active_cylinder_pos[show_idx].reshape(-1, 3))
 plot_objects_3D(drone_pos3[show_idx].reshape(-1, 3), target_pos3[show_idx], active_cylinder_pos[show_idx].reshape(-1, 3))
 
