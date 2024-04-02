@@ -150,11 +150,8 @@ class OuterCurriculum(object):
                 if self.check_inside(target_pos_one) and self.check_inside(drones_pos_one[0]) \
                     and self.check_inside(drones_pos_one[1]) and self.check_inside(drones_pos_one[2]) \
                     and self.check_inside(drones_pos_one[3]):
-                    if idx >= num_cl:
+                    if not (task in self._state_buffer):
                         tmp_state_buffer.append(task)
-                    else:
-                        if not (task in self._state_buffer):
-                            tmp_state_buffer.append(task)
                     # tmp_value_buffer.append(min_dist.to('cpu').numpy())
         
         # update states
@@ -222,15 +219,10 @@ class OuterCurriculum(object):
         else:
             num_random = int(num_samples * self.prob_random)
             num_cl = num_samples - num_random
-            if self._state_buffer.shape[0] < num_cl:
-                initial_states = [self._state_buffer[idx] for idx in range(self._state_buffer.shape[0])]
-                num_cl = self._state_buffer.shape[0]
-                num_random = num_samples - num_cl
-            else:
-                weights = self._weight_buffer / np.mean(self._weight_buffer)
-                probs = (weights / np.sum(weights)).squeeze()
-                sample_idx = np.random.choice(self._state_buffer.shape[0], num_cl, replace=True, p=probs)
-                initial_states = [self._state_buffer[idx] for idx in sample_idx]
+            weights = self._weight_buffer / np.mean(self._weight_buffer)
+            probs = (weights / np.sum(weights)).squeeze()
+            sample_idx = np.random.choice(self._state_buffer.shape[0], num_cl, replace=True, p=probs)
+            initial_states = [self._state_buffer[idx] for idx in sample_idx]
             initial_states += [None] * num_random
         return initial_states, num_cl
     
