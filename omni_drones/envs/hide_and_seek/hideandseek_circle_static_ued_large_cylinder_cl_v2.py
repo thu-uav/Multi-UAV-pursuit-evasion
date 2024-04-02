@@ -143,15 +143,19 @@ class OuterCurriculum(object):
         tmp_state_buffer = []
         # tmp_value_buffer = []
         for idx, (task, min_dist) in enumerate(zip(self._temp_state_buffer, min_dist_list)):
-            if min_dist > self.lower_dist_threshold and min_dist <= self.higher_dist_threshold:
-                drones_pos_one = task[:self.num_drones * 3].reshape(-1, 3)
-                target_pos_one = task[self.num_drones * 3: self.num_drones * 3 + 1 * 3]
-                # inside the fessible area
-                if self.check_inside(target_pos_one) and self.check_inside(drones_pos_one[0]) \
-                    and self.check_inside(drones_pos_one[1]) and self.check_inside(drones_pos_one[2]) \
-                    and self.check_inside(drones_pos_one[3]):
-                    if not (task in self._state_buffer):
+            drones_pos_one = task[:self.num_drones * 3].reshape(-1, 3)
+            target_pos_one = task[self.num_drones * 3: self.num_drones * 3 + 1 * 3]
+            # inside the fessible area
+            if self.check_inside(target_pos_one) and self.check_inside(drones_pos_one[0]) \
+                and self.check_inside(drones_pos_one[1]) and self.check_inside(drones_pos_one[2]) \
+                and self.check_inside(drones_pos_one[3]):
+                in_array = np.any(np.all(self._state_buffer == task, axis=1))
+                if min_dist > self.lower_dist_threshold and min_dist <= self.higher_dist_threshold:
+                    if not in_array:
                         tmp_state_buffer.append(task)
+                else:
+                    if in_array:
+                        self._state_buffer = self._state_buffer[~np.all(self._state_buffer == task, axis=1)]
                     # tmp_value_buffer.append(min_dist.to('cpu').numpy())
         
         # update states

@@ -1,19 +1,21 @@
 import matplotlib.pyplot as plt
 
 # 柱状图数据
-x_values = ['', 'DR+DFS', '', '', '', '', 'Ours', '',]
-y_values = [1.0, 0.9, 0.9, 0.85, 1.0, 1.0, 1.0, 1.0]
+x_values = ['', '', 'DR', '', '', '', 'Outer', '','', '', 'Outer+DFS', '', '', '', 'Ours', '',]
+y_values = [0.0, 0.0, 0.0, 0.0, 0.0, 0.9, 0.93, 0.82, 0.0, 0.0, 0.0, 0.0, 0.99, 1.0, 0.98, 0.95]
 
 # 创建画布和子图
 fig, ax = plt.subplots()
 
 # 设置柱子的位置
 bar_width = 0.5
-index = [0.5, 1.5, 2.5, 3.5, 6.5, 7.5, 8.5, 9.5]
+index = [0.5, 1.5, 2.5, 3.5, 6.5, 7.5, 8.5, 9.5, 12.5, 13.5, 14.5, 15.5, 18.5, 19.5, 20.5, 21.5]
 
 # 绘制柱状图
-bars = ax.bar(index[:4], y_values[:4], bar_width, color='purple')
-bars = ax.bar(index[4:], y_values[4:], bar_width, color='red')
+bars = ax.bar(index[:4], y_values[:4], bar_width, color='orange')
+bars = ax.bar(index[4:8], y_values[4:8], bar_width, color='blue')
+bars = ax.bar(index[8:12], y_values[8:12], bar_width, color='purple')
+bars = ax.bar(index[12:], y_values[12:], bar_width, color='red')
 
 # 在柱子上方标注数值
 for i in range(len(index)):
