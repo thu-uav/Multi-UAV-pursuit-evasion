@@ -120,7 +120,7 @@ class OuterCurriculum(object):
         self._temp_state_buffer = []
         self.buffer_size = 2000
         self.arena_size = cfg.task.arena_size
-        self.height_range = [cfg.task.max_height * (0.5 - cfg.task.start_height), cfg.task.max_height * (0.5 + cfg.task.start_height)]
+        self.height_range = [0.0, cfg.task.max_height]
     
     def check_inside(self, pos):
         x, y, z = pos
@@ -955,8 +955,8 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         )
         
         if torch.all(done):
-            self.outer_curriculum_module.height_range[0] = (0.5 - self.height_bound) * self.max_height
-            self.outer_curriculum_module.height_range[1] = (0.5 + self.height_bound) * self.max_height
+            # self.outer_curriculum_module.height_range[0] = (0.5 - self.height_bound) * self.max_height
+            # self.outer_curriculum_module.height_range[1] = (0.5 + self.height_bound) * self.max_height
             for task in self.min_distance_task:
                 self.outer_curriculum_module.insert(task)
             self.outer_curriculum_module.update_curriculum(min_dist_list=self.stats['min_distance'], num_cl=self.num_cl)

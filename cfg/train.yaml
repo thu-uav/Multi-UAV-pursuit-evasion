@@ -31,7 +31,7 @@ viewer:
 wandb:
   group: ${oc.select:..task.name}
   # run_name: debug
-  run_name: v0_8_cl_loadv_1_2
+  run_name: v0_8_cl_loadv_1_2_updatecheckinside_random0_5
   job_type: train
   entity: chenjy
   project: PredatorPrey

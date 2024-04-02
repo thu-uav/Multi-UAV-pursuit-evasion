@@ -24,7 +24,7 @@ capture_threshold: 0.98
 use_outer_cl: 1
 threshold_min: 1.0
 threshold_max: 100.0
-prob_random: 0.3
+prob_random: 0.5
 start_height: 0.1 # 0.1 ~ 0.5
 height_step: 0.1
 load_task_buffer: False

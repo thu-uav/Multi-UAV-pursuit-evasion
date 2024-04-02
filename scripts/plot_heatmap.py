@@ -74,7 +74,7 @@ def check_inside(pos):
         return False
     return True
 
-tasks = np.load('/home/chenjy/OmniDrones/scripts/outputs/v0_8_cl_loadv_1_2/04-02_16-40/wandb/run-20240402_164018-cnxt7b4f/files/tasks/tasks_100.npy')
+tasks = np.load('/home/chenjy/OmniDrones/scripts/outputs/v0_8_cl_loadv_1_2/04-02_17-24/wandb/run-20240402_172418-o86w6c3v/files/tasks/tasks_300.npy')
 num_drone = 4
 num_target = 1
 num_active_cylinder = 3
@@ -105,7 +105,7 @@ for idx in range(tasks.shape[0]):
 print('num_inside', num_inside, 'num_tasks', tasks.shape[0])
 
 # plot pos
-show_idx = 10
+show_idx = 2
 plot_objects(drone_pos3[show_idx].reshape(-1, 3), target_pos3[show_idx], active_cylinder_pos[show_idx].reshape(-1, 3))
 plot_objects_3D(drone_pos3[show_idx].reshape(-1, 3), target_pos3[show_idx], active_cylinder_pos[show_idx].reshape(-1, 3))
 breakpoint()
