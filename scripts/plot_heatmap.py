@@ -74,7 +74,7 @@ def check_inside(pos):
         return False
     return True
 
-tasks = np.load('/home/chenjy/OmniDrones/scripts/outputs/v1_2_cl_startheight0_1_step0_1_load/04-01_21-59/wandb/run-20240401_215904-kr1bb97i/files/tasks/tasks_1300.npy')
+tasks = np.load('/home/chenjy/OmniDrones/scripts/outputs/v1_2_cl_startheight0_1_step0_1_load/04-02_01-19/wandb/run-20240402_011911-89iyc72i/files/tasks/tasks_200.npy')
 num_drone = 4
 num_target = 1
 num_active_cylinder = 3
@@ -105,7 +105,7 @@ for idx in range(tasks.shape[0]):
 print('num_inside', num_inside, 'num_tasks', tasks.shape[0])
 
 # plot pos
-show_idx = 341
+show_idx = 100
 plot_objects(drone_pos3[show_idx].reshape(-1, 3), target_pos3[show_idx], active_cylinder_pos[show_idx].reshape(-1, 3))
 plot_objects_3D(drone_pos3[show_idx].reshape(-1, 3), target_pos3[show_idx], active_cylinder_pos[show_idx].reshape(-1, 3))
 
@@ -134,35 +134,35 @@ plt.tight_layout()
 plt.savefig('hm_cylinder3.png')
 breakpoint()
 
-# np.random.seed(42)
-# # random
-# # Define the range for each dimension
-# dimension_ranges = [(-1.2, 1.2), (-1.2, 1.2), (0.0, 2.4), 
-#                     (-1.2, 1.2), (-1.2, 1.2), (0.0, 2.4),
-#                     (-1.2, 1.2), (-1.2, 1.2), (0.0, 2.4), 
-#                     (-1.2, 1.2), (-1.2, 1.2), (0.0, 2.4), # drone
-#                     (-1.2, 1.2), (-1.2, 1.2), (0.0, 2.4), # target
-#                     ]  # Define ranges for each of the three dimensions
+np.random.seed(42)
+# random
+# Define the range for each dimension
+dimension_ranges = [(-1.2, 1.2), (-1.2, 1.2), (0.0, 2.4), 
+                    (-1.2, 1.2), (-1.2, 1.2), (0.0, 2.4),
+                    (-1.2, 1.2), (-1.2, 1.2), (0.0, 2.4), 
+                    (-1.2, 1.2), (-1.2, 1.2), (0.0, 2.4), # drone
+                    (-1.2, 1.2), (-1.2, 1.2), (0.0, 2.4), # target
+                    ]  # Define ranges for each of the three dimensions
 
-# # Generate random high-dimensional data
-# num_samples = 10000
-# num_dimensions = tasks.shape[-1]
-# X = np.zeros((num_samples, num_dimensions))
-# for i, (min_val, max_val) in enumerate(dimension_ranges):
-#     X[:, i] = np.random.uniform(min_val, max_val, size=num_samples)
+# Generate random high-dimensional data
+num_samples = 10000
+num_dimensions = tasks.shape[-1]
+X = np.zeros((num_samples, num_dimensions))
+for i, (min_val, max_val) in enumerate(dimension_ranges):
+    X[:, i] = np.random.uniform(min_val, max_val, size=num_samples)
 
-# # Perform PCA to reduce dimensionality to 2
-# pca = PCA(n_components=2)
-# X_pca = pca.fit_transform(tasks)
+# Perform PCA to reduce dimensionality to 2
+pca = PCA(n_components=2)
+X_pca = pca.fit_transform(tasks)
 
-# # Plot the original and reduced data
-# plt.figure(figsize=(10, 5))
+# Plot the original and reduced data
+plt.figure(figsize=(10, 5))
 
-# plt.subplot(1, 2, 2)
-# plt.scatter(X_pca[:, 0], X_pca[:, 1], color='r', alpha=0.1)
-# plt.title('Data after PCA (2D)')
-# plt.xlabel('Principal Component 1')
-# plt.ylabel('Principal Component 2')
+plt.subplot(1, 2, 2)
+plt.scatter(X_pca[:, 0], X_pca[:, 1], color='r', alpha=0.1)
+plt.title('Data after PCA (2D)')
+plt.xlabel('Principal Component 1')
+plt.ylabel('Principal Component 2')
 
-# plt.tight_layout()
-# plt.savefig('PCA.png')
+plt.tight_layout()
+plt.savefig('PCA.png')

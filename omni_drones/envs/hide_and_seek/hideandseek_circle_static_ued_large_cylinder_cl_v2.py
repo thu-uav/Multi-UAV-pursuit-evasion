@@ -137,11 +137,12 @@ class OuterCurriculum(object):
         """
         self._temp_state_buffer.append(copy.deepcopy(states))
 
-    def update_curriculum(self, min_dist_list):
-        # pair: [_temp_state_buffer, capture_ratio_list]
+    def update_curriculum(self, min_dist_list, num_cl):
+        # self._temp_state_buffer: cl: [0~num_cl-1], random: [num_cl:]
+        
         tmp_state_buffer = []
         # tmp_value_buffer = []
-        for task, min_dist in zip(self._temp_state_buffer, min_dist_list):
+        for idx, (task, min_dist) in enumerate(zip(self._temp_state_buffer, min_dist_list)):
             if min_dist > self.lower_dist_threshold and min_dist <= self.higher_dist_threshold:
                 drones_pos_one = task[:self.num_drones * 3].reshape(-1, 3)
                 target_pos_one = task[self.num_drones * 3: self.num_drones * 3 + 1 * 3]
@@ -149,7 +150,11 @@ class OuterCurriculum(object):
                 if self.check_inside(target_pos_one) and self.check_inside(drones_pos_one[0]) \
                     and self.check_inside(drones_pos_one[1]) and self.check_inside(drones_pos_one[2]) \
                     and self.check_inside(drones_pos_one[3]):
-                    tmp_state_buffer.append(task)
+                    if idx >= num_cl:
+                        tmp_state_buffer.append(task)
+                    else:
+                        if not (task in self._state_buffer):
+                            tmp_state_buffer.append(task)
                     # tmp_value_buffer.append(min_dist.to('cpu').numpy())
         
         # update states
@@ -962,7 +967,7 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
             self.outer_curriculum_module.height_range[1] = (0.5 + self.height_bound) * self.max_height
             for task in self.min_distance_task:
                 self.outer_curriculum_module.insert(task)
-            self.outer_curriculum_module.update_curriculum(min_dist_list=self.stats['min_distance'])
+            self.outer_curriculum_module.update_curriculum(min_dist_list=self.stats['min_distance'], num_cl=self.num_cl)
             self.stats['cl_bound'].set_(torch.ones_like(self.stats['cl_bound'], device=self.device) * self.cl_bound)
             self.stats['height_bound'].set_(torch.ones_like(self.stats['height_bound'], device=self.device) * self.height_bound)
             
