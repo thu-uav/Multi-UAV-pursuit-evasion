@@ -1,6 +1,6 @@
 # model_dir: /home/chenjy/OmniDrones/scripts/outputs/random0to3_final/v2_0_catch0_2_height0_6_size0_9.pt
 # model_dir: /home/chenjy/OmniDrones/scripts/outputs/v0_8_cl_loadv_1_2/04-02_17-24/wandb/run-20240402_172418-o86w6c3v/files/checkpoint_52559872.pt
-# model_dir: /home/chenjy/OmniDrones/scripts/outputs/cl_final/v1_2_catch0_2_height1_2_size0_9.pt
+# model_dir: /home/jiayu/OmniDrones/scripts/outputs/v0.pt
 model_dir: null
 
 # hydra.job.chdir: false
@@ -31,7 +31,7 @@ viewer:
 wandb:
   group: ${oc.select:..task.name}
   # run_name: debug
-  run_name: v0_5_catch0_5_cl
+  run_name: v0_5_catch0_5_checksamearray
   job_type: train
   entity: chenjy
   project: PredatorPrey
