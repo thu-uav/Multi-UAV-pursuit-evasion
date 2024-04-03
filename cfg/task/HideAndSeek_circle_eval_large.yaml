@@ -6,7 +6,7 @@ defaults:
   - /base/sim_base@_here_
 
 env:
-  num_envs: 1
+  num_envs: 1000
   max_episode_length: 800
 
 drone_model: Crazyflie
@@ -20,7 +20,7 @@ action_transform: rate
 use_validation: 1
 
 # evalution scenario
-evaluation_flag: 3_surround # 'random', '1_middle', '3_narrow', '3_surround'
+evaluation_flag: 5_narrow # 'random', '3_narrow', '3_surround', '5_narrow', '5_surround', '4_search'
 
 # exp
 num_agents: 4
@@ -29,7 +29,7 @@ detect_range: -1.0 # -1.0 means fully-observable
 arena_size: 0.9
 max_height: 1.2 # 2 * arena_size
 v_drone: 1.0
-v_prey: 1.2
+v_prey: 1.6
 
 use_collision: 1
 use_speed_penalty: 1
@@ -40,6 +40,6 @@ use_dynamic: False
 cylinder:
   size: 0.3
   num: 5
-  max_active: 3
+  max_active: 5
   min_active: 0
   random_active: False # if False, only train max_active

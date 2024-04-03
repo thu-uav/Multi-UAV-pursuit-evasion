@@ -1,7 +1,7 @@
 # model_dir: /home/chenjy/OmniDrones/scripts/outputs/random0to3_final/v2_0_catch0_2_height0_6_size0_9.pt
-# model_dir: /home/chenjy/OmniDrones/scripts/outputs/v0_8_cl_loadv_1_2/04-02_17-24/wandb/run-20240402_172418-o86w6c3v/files/checkpoint_52559872.pt
-# model_dir: /home/jiayu/OmniDrones/scripts/outputs/v0.pt
-model_dir: null
+# model_dir: /home/chenjy/OmniDrones/scripts/outputs/final_results/DR_wovalidation/seed0/v1_6_catch0_2_height1_2_size0_9.pt
+model_dir: /home/chenjy/OmniDrones/scripts/outputs/cl_final/v1_2_catch0_2_height1_2_size0_9.pt
+# model_dir: null
 
 # hydra.job.chdir: false
 
@@ -14,7 +14,7 @@ total_frames: 100_000_000_000
 max_iters: -1
 eval_interval: 200
 save_interval: 200
-seed: 1
+seed: 0
 
 viewer:
   resolution: [960, 720]
@@ -30,8 +30,8 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
+  run_name: 5_narrow_cl_v1_6
   # run_name: debug
-  run_name: v0_5_catch0_5_checksamearray
   job_type: train
   entity: chenjy
   project: PredatorPrey
@@ -48,8 +48,8 @@ defaults:
   # - task: HideAndSeek_circle_static_UED
   # - task: HideAndSeek_circle_static_UED_large_cylinder
   # - task: HideAndSeek_circle_static_UED_large_cylinder_cl
-  - task: HideAndSeek_circle_static_UED_large_cylinder_cl_v2
+  # - task: HideAndSeek_circle_static_UED_large_cylinder_cl_v2
   # - task: HideAndSeek_circle_eval
-  # - task: HideAndSeek_circle_eval_large
+  - task: HideAndSeek_circle_eval_large
   - algo: mappo
   - _self_

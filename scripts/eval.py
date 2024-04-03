@@ -279,6 +279,12 @@ def main(cfg):
         if len(frames):
             # video_array = torch.stack(frames)
             video_array = np.stack(frames).transpose(0, 3, 1, 2)
+            # from PIL import Image
+            # for idx in range(len(video_array)):
+            #     image = Image.fromarray(video_array[idx].transpose(1, 2, 0))
+            #     image.save("{}.png".format(idx))
+            #     if idx >= 200:
+            #         break
             frames.clear()
             info["recording"] = wandb.Video(
                 video_array, fps=0.5 / cfg.sim.dt, format="mp4"
