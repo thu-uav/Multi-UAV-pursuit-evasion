@@ -25,13 +25,13 @@ viewer:
   # eye: [0., -4., 4.]
   # lookat: [0., 0., 1.]
   # front
-  eye: [0., 4., 4.]
-  lookat: [0., 0., 1.]
+  eye: [-3., -3., 3.5]
+  lookat: [0., 0., 0.7]
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: debug
-  run_name: v0_5_catch0_5_cl
+  # run_name: render_debug
+  run_name: v0_5_catch0_3_cl_checksamearray
   job_type: train
   entity: chenjy
   project: PredatorPrey

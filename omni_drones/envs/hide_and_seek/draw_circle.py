@@ -9,7 +9,8 @@ _ALPHA_1 = 0.95
 _ALPHA_2 = 0.5
 
 # color palette from https://colorbrewer2.org/
-_COLOR_ACCENT = [(127 / 255., 201 / 255., 127 / 255., 1.),
+_COLOR_ACCENT = [(240 / 255., 240 / 255., 240 / 255., 1.),
+                (127 / 255., 201 / 255., 127 / 255., 1.),
 				(190 / 255., 174 / 255., 212 / 255., 1.),
 				(253 / 255., 192 / 255., 134 / 255., 1.),
 				(255 / 255., 255 / 255., 153 / 255., 1.),
@@ -51,7 +52,7 @@ def draw_edge_circle(
 
 def draw_wall_circle(
     R: float, H: float, color = _COLOR_ACCENT[0],
-    alpha = 0.5, line_size: float = 10.0, num_points: int = 100
+    alpha = 0.1, line_size: float = 10.0, num_points: int = 100
 ):
     point_list_1 = []
     point_list_2 = []
@@ -87,7 +88,7 @@ def _draw_lines_args_merger(*args):
 
 def draw_court_circle(
     R: float, H: float, color_edge: _COLOR_T = (1.0, 1.0, 1.0, 1.0), 
-    color_wall = _COLOR_ACCENT[2], line_size: float = 10.0, num_points: int = 200
+    color_wall = _COLOR_ACCENT[0], line_size: float = 10.0, num_points: int = 200
 ):
     return _draw_lines_args_merger(draw_wall_circle(R, H, color=color_wall, line_size=line_size, num_points=num_points), 
                                    draw_edge_circle(R, H, color=color_edge, line_size=line_size, num_points=num_points))

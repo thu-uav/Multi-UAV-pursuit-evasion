@@ -109,6 +109,7 @@ class OuterCurriculum(object):
         self.higher_dist_threshold = cfg.task.threshold_max * cfg.task.catch_radius
         self.prob_random = cfg.task.prob_random
         self.eps = 1e-10
+        self.check_same_array = 0.1
         if cfg.task.load_task_buffer:
             tmp_tasks = np.load(cfg.task.task_model_dir)
             self._state_buffer = copy.deepcopy(tmp_tasks[tmp_tasks[:, -5:].sum(-1)==3.0])
@@ -149,7 +150,7 @@ class OuterCurriculum(object):
             if self.check_inside(target_pos_one) and self.check_inside(drones_pos_one[0]) \
                 and self.check_inside(drones_pos_one[1]) and self.check_inside(drones_pos_one[2]) \
                 and self.check_inside(drones_pos_one[3]):
-                in_array = np.any(np.all(self._state_buffer == task, axis=1))
+                in_array = np.any(np.all(np.abs(self._state_buffer - task) <= self.check_same_array, axis=1))
                 if min_dist > self.lower_dist_threshold and min_dist <= self.higher_dist_threshold:
                     if not in_array:
                         tmp_state_buffer.append(task)

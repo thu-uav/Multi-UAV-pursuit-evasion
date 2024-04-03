@@ -9,7 +9,8 @@ _ALPHA_1 = 0.95
 _ALPHA_2 = 0.5
 
 # color palette from https://colorbrewer2.org/
-_COLOR_ACCENT = [(127 / 255., 201 / 255., 127 / 255., 1.),
+_COLOR_ACCENT = [
+                (127 / 255., 201 / 255., 127 / 255., 1.),
 				(190 / 255., 174 / 255., 212 / 255., 1.),
 				(253 / 255., 192 / 255., 134 / 255., 1.),
 				(255 / 255., 255 / 255., 153 / 255., 1.),
@@ -206,7 +207,7 @@ def draw_catch(
 
 def draw_detection(
     pos, xaxis, yaxis, zaxis, drange: float,
-    color: _COLOR_T = (1.0, 1.0, 1.0, 0.1), size_range: float = 20.0, num_range: int = 20,
+    color: _COLOR_T = _COLOR_ACCENT[0], size_range: float = 20.0, num_range: int = 20,
     size_axis: float = 5.0, num_axis: int = 20
 ):
     return _draw_points_args_merger(
