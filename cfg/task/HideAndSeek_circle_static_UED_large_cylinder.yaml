@@ -6,7 +6,7 @@ defaults:
   - /base/sim_base@_here_
 
 env:
-  num_envs: 1000
+  num_envs: 100
   max_episode_length: 800
 
 drone_model: Crazyflie
@@ -37,13 +37,13 @@ v_prey: 1.2
 
 use_collision: 1
 use_speed_penalty: 1
-catch_radius: 0.2
+catch_radius: 0.5
 collision_radius: 0.01
 use_dynamic: False
 
 cylinder:
   size: 0.3 # 0.3
   num: 5
-  max_active: 2
+  max_active: 3
   min_active: 0
-  random_active: False # if False, only train max_active
+  random_active: True # if False, only train max_active
