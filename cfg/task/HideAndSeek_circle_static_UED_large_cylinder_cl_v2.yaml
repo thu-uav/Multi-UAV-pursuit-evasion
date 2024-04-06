@@ -24,15 +24,15 @@ capture_threshold: 0.98
 use_outer_cl: 1
 threshold_min: 1.0
 threshold_max: 100.0
-prob_random: 1.0
-start_height: 0.1 # 0.1 ~ 0.5
-height_step: 0.1
+prob_random: 0.3
+start_height: 0.5 # 0.1 ~ 0.5
+height_step: 0.05
+window_size: 20
 load_task_buffer: False
 task_model_dir: null
 
 # use rejection sampling validation
 use_validation: 1
-
 
 # evalution scenario
 evaluation_flag: null # '3_cylineder_line', '5_cylineder_line', '8_cylineder_ring', '7_cylineder_ring'
@@ -46,9 +46,10 @@ max_height: 1.2 # 2 * arena_size
 v_drone: 1.0
 v_prey: 1.6
 
+use_collision: 1
+collision_coef: 1.0
 use_speed_penalty: 1
-# spare reward
-use_distance_reward: 0
+use_distance_reward: 1
 catch_radius: 0.2
 collision_radius: 0.01
 use_dynamic: False
@@ -58,4 +59,4 @@ cylinder:
   num: 5
   max_active: 3
   min_active: 0
-  random_active: False # if False, only train max_active
+  random_active: True # if False, only train max_active

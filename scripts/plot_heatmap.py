@@ -74,7 +74,7 @@ def check_inside(pos):
         return False
     return True
 
-tasks = np.load('/home/jiayu/OmniDrones/scripts/outputs/v1_0_cl_load/04-02_22-25/wandb/run-20240402_222537-uruol9jf/files/tasks/tasks_700.npy')
+tasks = np.load('/home/chenjy/OmniDrones/scripts/outputs/v1_6_catch0_2_cl_threshold1to1_5_fixed3_wodistancereward/04-04_18-01/wandb/run-20240404_180157-3l8zsqgi/files/tasks/tasks_300.npy')
 num_drone = 4
 num_target = 1
 num_active_cylinder = 3
@@ -105,13 +105,13 @@ for idx in range(tasks.shape[0]):
 print('num_inside', num_inside, 'num_tasks', tasks.shape[0])
 
 # plot pos
-show_idx = 1400
+show_idx = -3
 plot_objects(drone_pos3[show_idx].reshape(-1, 3), target_pos3[show_idx], active_cylinder_pos[show_idx].reshape(-1, 3))
 plot_objects_3D(drone_pos3[show_idx].reshape(-1, 3), target_pos3[show_idx], active_cylinder_pos[show_idx].reshape(-1, 3))
 drone_target_dist = get_dist(drones_pos.reshape(-1, 4, 3), target_pos[:,np.newaxis])
 
 # heatmap
-show_pos = copy.deepcopy(active_cylinder_pos)
+show_pos = copy.deepcopy(drone_pos3)
 # 绘制二维热度图（x-y 平面）
 plt.figure(figsize=(10, 5))
 
@@ -130,7 +130,7 @@ plt.ylabel('Frequency')
 plt.title('1D Heatmap (Z Axis)')
 
 plt.tight_layout()
-plt.savefig('hm_cylinder3.png')
+plt.savefig('hm_drone3.png')
 breakpoint()
 
 np.random.seed(42)

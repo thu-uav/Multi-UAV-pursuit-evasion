@@ -462,7 +462,7 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         self.height_bound = self.cfg.task.start_height # 0 ~ 0.5
         self.height_step = self.cfg.task.height_step
         self._moving_capture = []
-        self.use_distance_reward = self.cfg.task.use_distance_reward
+        self._window_size = self.cfg.task.window_size
 
         obj_pos, _, _, _ = rejection_sampling_with_validation_large_cylinder_cl(
             arena_size=self.arena_size, 
@@ -706,9 +706,9 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         else:
             check_list = capture_dict['capture_{}'.format(self.max_active_cylinders)]
         self._moving_capture.append(check_list)
-        self._moving_capture = copy.deepcopy(self._moving_capture[-5:])
+        self._moving_capture = copy.deepcopy(self._moving_capture[-self._window_size:])
         print('_moving_capture', self._moving_capture)
-        if len(self._moving_capture) >= 5:
+        if len(self._moving_capture) >= self._window_size:
             check_capture_flag = np.array(self._moving_capture).mean(axis=0)
             if np.all(check_capture_flag >= 0.98):
                 # self.cl_bound = min(6, self.cl_bound + 1)
@@ -941,11 +941,12 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         
         dist_reward_mask = (min_dist > self.catch_radius)
         distance_reward = - 1.0 * min_dist * dist_reward_mask
-        if self.use_distance_reward:
-            reward = speed_reward + 1.0 * catch_reward + 1.0 * distance_reward + 5 * coll_reward
+        
+        if self.cfg.task.use_distance_reward:
+            reward = speed_reward + 1.0 * catch_reward + 1.0 * distance_reward + self.cfg.task.collision_coef * coll_reward
         else:
-            reward = speed_reward + 1.0 * catch_reward + 5 * coll_reward
-
+            reward = speed_reward + 1.0 * catch_reward + self.cfg.task.collision_coef * coll_reward
+        
         self._tensordict["return"] += reward.unsqueeze(-1)
         self.returns = self._tensordict["return"].sum(1)
         self.stats["return"].set_(self.returns)
