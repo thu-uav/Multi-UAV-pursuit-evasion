@@ -24,7 +24,7 @@ capture_threshold: 0.98
 use_outer_cl: 1
 threshold_min: 1.0
 threshold_max: 1.5
-prob_random: 1.0
+prob_random: 0.3
 start_height: 0.5 # 0.1 ~ 0.5
 height_step: 0.05
 window_size: 20
@@ -32,7 +32,7 @@ load_task_buffer: False
 task_model_dir: null
 
 # use rejection sampling validation
-use_validation: 0
+use_validation: 1
 
 # evalution scenario
 evaluation_flag: null # '3_cylineder_line', '5_cylineder_line', '8_cylineder_ring', '7_cylineder_ring'
