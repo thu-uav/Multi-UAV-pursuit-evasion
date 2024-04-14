@@ -34,7 +34,7 @@ v_prey: 2.4
 use_collision: 1
 use_speed_penalty: 1
 catch_radius: 0.2
-collision_radius: 0.01
+collision_radius: 0.05
 use_dynamic: False
 
 cylinder:

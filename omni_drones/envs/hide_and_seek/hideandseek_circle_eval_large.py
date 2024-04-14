@@ -183,7 +183,9 @@ class HideAndSeek_circle_eval_large(IsaacEnv):
         # stats and infos
         stats_spec = CompositeSpec({
             "capture": UnboundedContinuousTensorSpec(1),
+            "collision": UnboundedContinuousTensorSpec(1),
             "capture_episode": UnboundedContinuousTensorSpec(1),
+            "collision_episode": UnboundedContinuousTensorSpec(1),
             "capture_per_step": UnboundedContinuousTensorSpec(1),
             "first_capture_step": UnboundedContinuousTensorSpec(1),
             # "cover_rate": UnboundedContinuousTensorSpec(1),
@@ -934,27 +936,40 @@ class HideAndSeek_circle_eval_large(IsaacEnv):
         coll_reward = torch.zeros(self.num_envs, self.num_agents, device=self.device)
         
         cylinders_pos, _ = self.cylinders.get_world_poses()
+        
         cylinders_pos, cylinders_height = refresh_cylinder_pos_height(max_cylinder_height=self.cylinder_height,
-                                                                          origin_cylinder_pos=cylinders_pos,
-                                                                          device=self.device)
+                                                                          origin_cylinder_pos=cylinders_pos,                                                               device=self.device)
         for i in range(self.num_cylinders):
             relative_pos = drone_pos[..., :2] - cylinders_pos[:, i, :2].unsqueeze(-2)
             norm_r = torch.norm(relative_pos, dim=-1)
-            if_coll = (norm_r < (self.collision_radius + self.cylinders_size[i])).type(torch.float32)
+            # if_coll = (norm_r < (self.collision_radius + self.cylinders_size[i])).type(torch.float32)
+            if_coll = ((drone_pos[..., 2] - cylinders_height[:, i].unsqueeze(-1) - self.collision_radius) < 0) \
+                            * (norm_r < (self.collision_radius + self.cylinders_size[i])).type(torch.float32)
             tmp_cylinder_mask = self.cylinders_mask[:, i].unsqueeze(-1).expand(-1, self.num_agents)
             coll_reward -= if_coll * tmp_cylinder_mask # sparse
+
+        self.stats['collision_episode'].add_((torch.sum(coll_reward, dim=1) < 0.0).unsqueeze(-1))
+        self.stats['collision'].set_(torch.from_numpy(self.stats['collision_episode'].to('cpu').numpy() > 0.0).type(torch.float32).to(self.device))
 
         # distance reward
         # min_dist = target_dist
         min_dist = (torch.min(target_dist, dim=-1)[0].unsqueeze(-1).expand_as(target_dist))
         current_min_dist = torch.min(target_dist, dim=-1).values.unsqueeze(-1)
+        
+        # update min_distance_task
+        for idx, flag in enumerate((current_min_dist < self.stats['min_distance'])):
+            if flag:
+                self.min_distance_task[idx] = copy.deepcopy(self.current_cl_tasks[idx])
+        
         self.stats['min_distance'].set_(torch.min(current_min_dist, self.stats['min_distance']))
+        
         dist_reward_mask = (min_dist > self.catch_radius)
         distance_reward = - 1.0 * min_dist * dist_reward_mask
-        if self.cfg.task.use_collision:
-            reward = speed_reward + 1.0 * catch_reward + 1.0 * distance_reward + 5 * coll_reward
+        
+        if self.cfg.task.use_distance_reward:
+            reward = speed_reward + 1.0 * catch_reward + 1.0 * distance_reward + self.cfg.task.collision_coef * coll_reward
         else:
-            reward = speed_reward + 1.0 * catch_reward + 1.0 * distance_reward
+            reward = speed_reward + 1.0 * catch_reward + self.cfg.task.collision_coef * coll_reward
         
         self._tensordict["return"] += reward.unsqueeze(-1)
         self.returns = self._tensordict["return"].sum(1)
@@ -969,6 +984,29 @@ class HideAndSeek_circle_eval_large(IsaacEnv):
         done  = (
             (self.progress_buf >= self.max_episode_length).unsqueeze(-1)
         )
+        
+        if torch.all(done):
+            # self.outer_curriculum_module.height_range[0] = (0.5 - self.height_bound) * self.max_height
+            # self.outer_curriculum_module.height_range[1] = (0.5 + self.height_bound) * self.max_height
+            for task in self.min_distance_task:
+                self.outer_curriculum_module.insert(task)
+            self.outer_curriculum_module.update_curriculum(min_dist_list=self.stats['min_distance'], num_cl=self.num_cl)
+            self.stats['cl_bound'].set_(torch.ones_like(self.stats['cl_bound'], device=self.device) * self.cl_bound)
+            self.stats['height_bound'].set_(torch.ones_like(self.stats['height_bound'], device=self.device) * self.height_bound)
+            
+            # cl evaluation
+            eval_num_cylinders = np.arange(self.min_active_cylinders, self.max_active_cylinders + 1)
+            capture_dict = dict()
+            for idx in range(len(eval_num_cylinders)):
+                num_cylinder = eval_num_cylinders[idx]
+                capture_dict.update({'capture_{}'.format(num_cylinder): self.stats['capture'][self.num_cl:][(self.cylinders_mask[self.num_cl:].sum(-1) == num_cylinder)].mean().cpu().numpy()})
+            self.update_base_cl(capture_dict=capture_dict)
+            
+            # info
+            self.stats['num_buffer_0'].set_(torch.ones_like(self.stats['num_buffer_0'], device=self.device) * (self.outer_curriculum_module._state_buffer[:, -5:].sum(-1) == 0.0).sum())
+            self.stats['num_buffer_1'].set_(torch.ones_like(self.stats['num_buffer_1'], device=self.device) * (self.outer_curriculum_module._state_buffer[:, -5:].sum(-1) == 1.0).sum())
+            self.stats['num_buffer_2'].set_(torch.ones_like(self.stats['num_buffer_2'], device=self.device) * (self.outer_curriculum_module._state_buffer[:, -5:].sum(-1) == 2.0).sum())
+            self.stats['num_buffer_3'].set_(torch.ones_like(self.stats['num_buffer_3'], device=self.device) * (self.outer_curriculum_module._state_buffer[:, -5:].sum(-1) == 3.0).sum())
         
         self.progress_std = torch.std(self.progress_buf)
 

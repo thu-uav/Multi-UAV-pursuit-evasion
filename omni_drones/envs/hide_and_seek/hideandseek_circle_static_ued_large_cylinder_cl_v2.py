@@ -225,7 +225,7 @@ class OuterCurriculum(object):
             num_random = int(num_samples * self.prob_random)
             num_cl = num_samples - num_random
             weights = self._weight_buffer / np.mean(self._weight_buffer)
-            probs = (weights / np.sum(weights)).squeeze()
+            probs = weights / np.sum(weights)
             sample_idx = np.random.choice(self._state_buffer.shape[0], num_cl, replace=True, p=probs)
             initial_states = [self._state_buffer[idx] for idx in sample_idx]
             initial_states += [None] * num_random
@@ -398,7 +398,9 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         # stats and infos
         stats_spec = CompositeSpec({
             "capture": UnboundedContinuousTensorSpec(1),
+            "collision": UnboundedContinuousTensorSpec(1),
             "capture_episode": UnboundedContinuousTensorSpec(1),
+            "collision_episode": UnboundedContinuousTensorSpec(1),
             "capture_per_step": UnboundedContinuousTensorSpec(1),
             "first_capture_step": UnboundedContinuousTensorSpec(1),
             # "cover_rate": UnboundedContinuousTensorSpec(1),
@@ -923,9 +925,14 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         for i in range(self.num_cylinders):
             relative_pos = drone_pos[..., :2] - cylinders_pos[:, i, :2].unsqueeze(-2)
             norm_r = torch.norm(relative_pos, dim=-1)
-            if_coll = (norm_r < (self.collision_radius + self.cylinders_size[i])).type(torch.float32)
+            # if_coll = (norm_r < (self.collision_radius + self.cylinders_size[i])).type(torch.float32)
+            if_coll = ((drone_pos[..., 2] - cylinders_height[:, i].unsqueeze(-1) - self.collision_radius) < 0) \
+                            * (norm_r < (self.collision_radius + self.cylinders_size[i])).type(torch.float32)
             tmp_cylinder_mask = self.cylinders_mask[:, i].unsqueeze(-1).expand(-1, self.num_agents)
             coll_reward -= if_coll * tmp_cylinder_mask # sparse
+
+        self.stats['collision_episode'].add_((torch.sum(coll_reward, dim=1) < 0.0).unsqueeze(-1))
+        self.stats['collision'].set_(torch.from_numpy(self.stats['collision_episode'].to('cpu').numpy() > 0.0).type(torch.float32).to(self.device))
 
         # distance reward
         # min_dist = target_dist
