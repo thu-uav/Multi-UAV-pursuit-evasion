@@ -234,6 +234,7 @@ class HideAndSeek_circle_eval_large(IsaacEnv):
         self.arena_size = self.cfg.task.arena_size
         size = self.arena_size
         self.max_height = self.cfg.task.max_height
+        self.height_bound = 0.5
         self.cylinder_height = self.max_height
         self.use_validation = self.cfg.task.use_validation
         self.evaluation_flag = self.cfg.task.evaluation_flag
@@ -355,6 +356,8 @@ class HideAndSeek_circle_eval_large(IsaacEnv):
                     num_active_cylinder = self.max_active_cylinders
                 drone_pos_one, target_pos_one, \
                     cylinder_pos_one, cylinder_mask_one = self.uniform_generate_envs(num_active_cylinder=num_active_cylinder)
+                # # TODO: for sim2real, set z = 0.0
+                # drone_pos_one[:, -1] = 0.5
                 drone_pos.append(drone_pos_one)
                 target_pos.append(target_pos_one)
                 cylinders_pos.append(cylinder_pos_one)
@@ -757,15 +760,15 @@ class HideAndSeek_circle_eval_large(IsaacEnv):
 
     def _compute_state_and_obs(self):
         self.drone_states = self.drone.get_state()
-        self.info["drone_state"][:] = self.drone_states[..., :13]
+        self.info["drone_state"] = self.drone_states[..., :13]
         drone_pos = self.drone_states[..., :3]
         drone_vel = self.drone.get_velocities()
         self.drone_rpos = vmap(cpos)(drone_pos, drone_pos)
         self.drone_rpos = vmap(off_diag)(self.drone_rpos)
         
         # draw drone trajectory and detection range
-        # if self._should_render(0):
-            # self._draw_traj()
+        if self._should_render(0):
+            self._draw_traj()
             # self._draw_detection()      
 
         drone_speed_norm = torch.norm(drone_vel[..., :3], dim=-1)
@@ -1001,23 +1004,58 @@ class HideAndSeek_circle_eval_large(IsaacEnv):
         prey_origin_dist = torch.norm(prey_env_pos[:, :2],dim=-1)
         force_r[..., 0] = - prey_env_pos[:,0] / ((self.arena_size - prey_origin_dist)**2 + 1e-5)
         force_r[..., 1] = - prey_env_pos[:,1] / ((self.arena_size - prey_origin_dist)**2 + 1e-5)
-        force_r[...,2] += 1 / (prey_env_pos[:,2] - 0 + 1e-5) - 1 / (self.max_height - prey_env_pos[:,2] + 1e-5)
+        force_r[...,2] += 1 / (prey_env_pos[:,2] - (0.5 * self.max_height - self.height_bound * self.max_height) + 1e-5) - 1 / ((0.5 * self.max_height + self.height_bound * self.max_height) - prey_env_pos[:,2] + 1e-5)
         force += force_r
         
+        # # cylinders
+        # cylinders_pos, _ = self.cylinders.get_world_poses()
+        # cylinders_pos, cylinders_height = refresh_cylinder_pos_height(max_cylinder_height=self.cylinder_height,
+        #                                                                   origin_cylinder_pos=cylinders_pos,
+        #                                                                   device=self.device)
+        # dist_pos = (torch.norm(prey_pos[..., :3] - cylinders_pos[..., :3],dim=-1) - self.cylinder_size).unsqueeze(-1).expand(-1, -1, 3) # expand to 3-D
+        # direction_c = (prey_pos[..., :3] - cylinders_pos[..., :3]) / (dist_pos + 1e-5)
+        # force_c = direction_c * (1 / (dist_pos + 1e-5))
+        # cylinder_force_mask = self.cylinders_mask.unsqueeze(-1).expand(-1, -1, 3)
+        # force_c = force_c * cylinder_force_mask
+        # force[..., :3] += torch.sum(force_c, dim=1)
+        
+        force += self.obs_repel(prey_env_pos.unsqueeze(-2)).reshape_as(force)
+
+        return force.type(torch.float32)
+
+    def obs_repel(self, pos):
+        # drone or prey
+        shape_pos = pos.shape
         # cylinders
-        cylinders_pos, _ = self.cylinders.get_world_poses()
+        cylinder_mask = self.cylinders_mask.reshape(self.num_envs, 1, -1, 1)
+        force = torch.zeros_like(pos)
+        cylinders_pos, _ = self.get_env_poses(self.cylinders.get_world_poses())
         cylinders_pos, cylinders_height = refresh_cylinder_pos_height(max_cylinder_height=self.cylinder_height,
                                                                           origin_cylinder_pos=cylinders_pos,
                                                                           device=self.device)
-        dist_pos = (torch.norm(prey_pos[..., :3] - cylinders_pos[..., :3],dim=-1) - self.cylinder_size).unsqueeze(-1).expand(-1, -1, 3) # expand to 3-D
-        direction_c = (prey_pos[..., :3] - cylinders_pos[..., :3]) / (dist_pos + 1e-5)
-        force_c = direction_c * (1 / (dist_pos + 1e-5))
-        cylinder_force_mask = self.cylinders_mask.unsqueeze(-1).expand(-1, -1, 3)
-        force_c = force_c * cylinder_force_mask
-        force[..., :3] += torch.sum(force_c, dim=1)
+        xy_dist = (torch.norm(vmap(cpos)(pos[..., :2], cylinders_pos[..., :2]), dim=-1) - self.cylinder_size).unsqueeze(-1)
+        z_dist = vmap(cpos)(pos[..., 2].unsqueeze(-1), cylinders_height.unsqueeze(-1))
+        xy_mask = (xy_dist > 0) * (z_dist < 0) * 1.0
+        z_mask = (xy_dist < 0) * (z_dist > 0) * 1.0
+        # xy
+        drone_to_cy = vmap(cpos)(pos[..., :2], cylinders_pos[..., :2])
+        dist_drone_cy = torch.norm(drone_to_cy, dim=-1, keepdim=True)
+        p_drone_cy = drone_to_cy / (dist_drone_cy + 1e-9)
+        force[..., :2] = torch.sum(p_drone_cy / (torch.relu(dist_drone_cy - self.cylinder_size - 0.05) + 1e-9) * xy_mask * cylinder_mask, dim=-2) # 0.05 also for ball
+        force[..., 2] = torch.sum(1 / (torch.relu(z_dist - 0.05) + 1e-9) * z_mask * cylinder_mask, dim=-2).squeeze(-1)
+        
+        # if xy_dist>0 and z_dist>0
+        p_circle = torch.zeros(self.num_envs, shape_pos[1], self.num_cylinders, 3, device=self.device)
+        p_circle[..., :2] = p_drone_cy * xy_dist
+        p_circle[..., 2] = z_dist[..., 0]
+        p_force = torch.sum(self._norm(p_circle, p=1) * (xy_dist > 0) * (z_dist > 0) * cylinder_mask, dim=-2)
+        force += p_force
 
-        # set force_z to 0
-        return force.type(torch.float32)
+        return force
+
+    def _norm(self, x, p=0):
+        y = x / ((torch.norm(x, dim=-1, keepdim=True)).expand_as(x) + 1e-9)**(p+1)
+        return y
     
     # visualize functions
     def _draw_court_circle(self, size, height):

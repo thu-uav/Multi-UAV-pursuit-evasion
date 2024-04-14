@@ -20,7 +20,7 @@ action_transform: rate
 use_validation: 1
 
 # evalution scenario
-evaluation_flag: 2_search # 'random', '2_search', '3_narrow', '3_surround', '5_narrow', '5_surround', '4_search'
+evaluation_flag: random # 'random', '2_search', '3_narrow', '3_surround', '5_narrow', '5_surround', '4_search'
 
 # exp
 num_agents: 4
@@ -40,6 +40,6 @@ use_dynamic: False
 cylinder:
   size: 0.3
   num: 5
-  max_active: 2
+  max_active: 3
   min_active: 0
   random_active: False # if False, only train max_active

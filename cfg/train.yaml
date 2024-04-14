@@ -1,9 +1,9 @@
 # model_dir: /home/chenjy/OmniDrones/scripts/outputs/random0to3_final/v2_0_catch0_2_height0_6_size0_9.pt
 # model_dir: /home/chenjy/OmniDrones/scripts/outputs/final_results/DR_wovalidation/seed0/v1_6_catch0_2_height1_2_size0_9.pt
 # model_dir: null
-model_dir: /home/chenjy/OmniDrones/scripts/outputs/cl_seed2.pt
+# model_dir: /home/chenjy/OmniDrones/scripts/outputs/final_results/DR_intrinsic/v2_4_catch0_15.pt
 # model_dir: /home/chenjy/OmniDrones/scripts/outputs/final_results/cl_final/v2_4_catch0_2_seed0.pt
-# model_dir: /home/chenjy/OmniDrones/scripts/outputs/final_results/cl_final/v2_4_catch0_2_seed1.pt
+model_dir: /home/chenjy/OmniDrones/scripts/outputs/final_results/cl_final/v2_4_catch0_2_seed1.pt
 # model_dir: /home/chenjy/OmniDrones/scripts/outputs/final_results/cl_final/v2_4_catch0_2_seed2.pt
 
 # hydra.job.chdir: false
@@ -17,42 +17,33 @@ total_frames: 100_000_000_000
 max_iters: -1
 eval_interval: 200
 save_interval: 200
-seed: 1
+seed: 0
 
 viewer:
   resolution: [960, 720]
-  # # up
-  # eye: [0.001, 0.0, 6.]
-  # lookat: [0., 0., 2.]
-  # # debug
-  # eye: [0., -4., 4.]
-  # lookat: [0., 0., 1.]
-  # front
-  eye: [3., 3., 3.5]
-  lookat: [0., 0., 0.7]
+  # up
+  eye: [0.001, 0.0, 6.]
+  lookat: [0., 0., 2.]
+  # # front
+  # eye: [3., 3., 3.5]
+  # lookat: [0., 0., 0.7]
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: cl_v2_4_catch0_2_seed0_load_threshold1to1_5
-  run_name: eval_2_search_ours
+  # run_name: DR_intrinsic_v2_4_catch0_12_seed0_load
+  # run_name: random3_newprey_catch02
+  run_name: debug
   job_type: train
   entity: chenjy
   project: PredatorPrey
-  mode: online
-  # mode: disabled # set to 'disabled' when debugging locally
+  # mode: online
+  mode: disabled # set to 'disabled' when debugging locally
   run_id: 
   monitor_gym: True
   tags: 
 
 defaults:
-  # - task: HideAndSeek_circle_static_UED_addeasy
-  # - task: HideAndSeek_circle_static_UED_cl
-  # - task: HideAndSeek_circle_static_UED_cl_v2
-  # - task: HideAndSeek_circle_static_UED
-  # - task: HideAndSeek_circle_static_UED_large_cylinder
-  # - task: HideAndSeek_circle_static_UED_large_cylinder_cl
   # - task: HideAndSeek_circle_static_UED_large_cylinder_cl_v2
-  # - task: HideAndSeek_circle_eval
   - task: HideAndSeek_circle_eval_large
   - algo: mappo
   - _self_

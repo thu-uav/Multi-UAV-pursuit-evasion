@@ -24,7 +24,7 @@ capture_threshold: 0.98
 use_outer_cl: 1
 threshold_min: 1.0
 threshold_max: 1.5
-prob_random: 0.3
+prob_random: 1.0
 start_height: 0.5 # 0.1 ~ 0.5
 height_step: 0.05
 window_size: 20
@@ -50,7 +50,7 @@ use_collision: 1
 collision_coef: 1.0
 use_speed_penalty: 1
 use_distance_reward: 1
-catch_radius: 0.2
+catch_radius: 0.12
 collision_radius: 0.01
 use_dynamic: False
 
