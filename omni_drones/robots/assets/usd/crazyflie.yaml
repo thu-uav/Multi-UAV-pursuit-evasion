@@ -1,4 +1,5 @@
 name: crazyflie
+target_clip: 1.0
 inertia:
   xx: 1.4e-5
   xy: 0.0

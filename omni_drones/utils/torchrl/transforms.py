@@ -343,6 +343,7 @@ class RateController(Transform):
         self.controller = controller
         self.action_key = action_key
         self.max_thrust = self.controller.max_thrusts.sum(-1)
+        self.target_clip = self.controller.target_clip
     
     def transform_input_spec(self, input_spec: TensorSpec) -> TensorSpec:
         action_spec = input_spec[("_action_spec", *self.action_key)]
@@ -357,7 +358,7 @@ class RateController(Transform):
         target_thrust = ((target_thrust + 1) / 2).clip(0.) * self.max_thrust
         cmds = self.controller(
             drone_state, 
-            target_rate=target_rate * torch.pi, 
+            target_rate=target_rate * torch.pi * self.target_clip, 
             target_thrust=target_thrust
         )
         torch.nan_to_num_(cmds, 0.)

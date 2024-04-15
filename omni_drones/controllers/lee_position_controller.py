@@ -324,7 +324,8 @@ class RateController(nn.Module):
             self.gain_angular_rate = nn.Parameter(
                 torch.tensor([0.52, 0.52, 0.025]) @ I[:3, :3].inverse()
             )
-
+        
+        self.target_clip = uav_params['target_clip']
     
     def forward(
         self, 
