@@ -205,6 +205,7 @@ class Track(IsaacEnv):
             "tracking_error": UnboundedContinuousTensorSpec(1),
             "tracking_error_ema": UnboundedContinuousTensorSpec(1),
             "action_smoothness": UnboundedContinuousTensorSpec(1),
+            "drone_state": UnboundedContinuousTensorSpec(13),
         }).expand(self.num_envs).to(self.device)
         info_spec = CompositeSpec({
             "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13)),
@@ -277,6 +278,7 @@ class Track(IsaacEnv):
             self.rpos.flatten(1).unsqueeze(1),
             self.root_state[..., 3:10], self.root_state[..., 13:19],
         ]
+        self.stats['drone_state'] = self.root_state[..., :13].squeeze(1).clone()
         if self.time_encoding:
             t = (self.progress_buf / self.max_episode_length).unsqueeze(-1)
             obs.append(t.expand(-1, self.time_encoding_dim).unsqueeze(1))

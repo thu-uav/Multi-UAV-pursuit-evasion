@@ -5,12 +5,12 @@ headless: true
 sim: ${task.sim}
 env: ${task.env}
 
-# model_dir: /home/chenjiayu/OmniDrones/scripts/outputs/Hover_crazyflie_origin_worandom_wolatency_little/12-07_16-38/wandb/run-20231207_163825-uvxd1nxx/files/checkpoint_final.pt
-model_dir: null
+model_dir: /home/chenjy/OmniDrones/scripts/outputs/Track_8_wosmooth_worandom_targetclip1/04-16_16-56/wandb/run-20240416_165635-gvx686zx/files/checkpoint_1573126144.pt
+# model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
 max_iters: -1
-eval_interval: 200
+eval_interval: 100
 save_interval: 100
 seed: 0
 
@@ -21,12 +21,13 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: Track_star_opt1_100Hz_worandom
+  # run_name: Track_8_wosmooth_worandom_targetclip1
   # run_name: Track_star_cf9opt_dynamics_controller_clip60_100HZ_Pcontroller_woeffort
-  # run_name: debug
+  run_name: Track_8_wosmooth_worandom_targetclip1
   job_type: train
   entity: chenjy
   project: Track
+  # mode: disabled
   mode: online # set to 'disabled' when debugging locally, online
   run_id: 
   monitor_gym: True
