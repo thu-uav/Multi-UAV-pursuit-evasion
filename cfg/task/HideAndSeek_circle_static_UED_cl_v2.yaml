@@ -21,7 +21,7 @@ use_outer_cl: 1
 threshold: 0.0
 
 # use rejection sampling validation
-use_validation: 1
+use_validation: 0
 
 # evalution scenario
 evaluation_flag: null # '3_cylineder_line', '5_cylineder_line', '8_cylineder_ring', '7_cylineder_ring'
@@ -32,11 +32,11 @@ detect_range: -1.0 # -1.0 means fully-observable
 
 arena_size: 1.0
 v_drone: 1.0
-v_prey: 1.5
+v_prey: 0.5
 
 use_collision: 1
 use_speed_penalty: 1
-catch_radius: 0.15
+catch_radius: 0.5
 collision_radius: 0.01
 use_dynamic: False
 

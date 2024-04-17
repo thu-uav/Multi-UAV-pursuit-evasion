@@ -4,8 +4,11 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 # 定义多项式拟合函数
+# def polynomial_func(t, a, b, c, d, e, f, g, h):
+#     return a + b * t + c * t ** 2 + d * t ** 3 + e * t ** 4 + f * t ** 5 + g * t ** 6 + h * t ** 7
 def polynomial_func(t, a, b, c, d, e, f, g, h):
-    return a * t ** 7 + b * t ** 6 + c * t ** 5 + d * t ** 4 + e * t ** 3 + f * t ** 2 + g * t + h
+    coeffs = [a, b, c, d, e, f, g, h]
+    return np.polyval(coeffs[::-1], t)
 
 # 按照持续时间划分轨迹为多个小段
 def split_trajectory(duration, x, y, z, segment_duration):
@@ -15,17 +18,19 @@ def split_trajectory(duration, x, y, z, segment_duration):
         start_time = i * segment_duration
         end_time = min((i + 1) * segment_duration, duration[-1])
         indices = np.where((duration >= start_time) & (duration <= end_time))[0]
-        segments.append((duration[indices], x[indices], y[indices], z[indices]))
+        segment_duration_list = np.linspace(0, segment_duration, indices.shape[0])
+        segments.append((segment_duration_list, x[indices], y[indices], z[indices]))
     return segments
 
 # 对每个小段进行多项式拟合
 def fit_segments(segments, segment_duration, idx=0):
     fitted_segments = []
-    data_list = [['duration','x^0','x^1','x^2','x^3','x^4','x^5',
+    columns = ['duration','x^0','x^1','x^2','x^3','x^4','x^5',
                   'x^6','x^7','y^0','y^1','y^2','y^3','y^4','y^5',
                   'y^6','y^7','z^0','z^1','z^2','z^3','z^4','z^5',
                   'z^6','z^7','yaw^0','yaw^1','yaw^2','yaw^3','yaw^4',
-                  'yaw^5','yaw^6','yaw^7',]]
+                  'yaw^5','yaw^6','yaw^7',]
+    data_list = []
     for segment in segments:
         duration, x, y, z = segment
         popt_x, _ = curve_fit(polynomial_func, duration, x)
@@ -40,21 +45,26 @@ def fit_segments(segments, segment_duration, idx=0):
         one_line = np.concatenate(one_line)
         data_list.append(one_line)
         fitted_segments.append((duration, polynomial_func(duration, *popt_x), polynomial_func(duration, *popt_y), polynomial_func(duration, *popt_z)))
-    df = pd.DataFrame(data_list)
-    df.to_csv('drone{}.csv'.format(idx), index=False)
+        # breakpoint()
+    df = pd.DataFrame(data_list, columns=columns)
+    df.to_csv('drone_{}.csv'.format(idx), index=False)
     return fitted_segments
 
 # 绘制原始轨迹和拟合曲线
 def plot_trajectory_with_fitted_segments(duration, x, y, z, fitted_segments, idx=0):
-    plt.figure(figsize=(10, 6))
-    # plt.plot(duration, x, 'r.', label='Original x data')
-    # plt.plot(duration, y, 'b.', label='Original y data')
-    # plt.plot(duration, z, 'g.', label='Original z data')
+    fig = plt.figure(figsize=(10, 6))
+    ax1 = fig.add_subplot(211)
+    ax2 = fig.add_subplot(212)
+    ax1.plot(duration, x, 'r.', label='Original x data')
+    ax1.plot(duration, y, 'b.', label='Original y data')
+    ax1.plot(duration, z, 'g.', label='Original z data')
+    last_duration = 0 
     for segment in fitted_segments:
-        plt.plot(segment[0], segment[1], 'r-', alpha=0.5)
-        plt.plot(segment[0], segment[2], 'b-', alpha=0.5)
-        plt.plot(segment[0], segment[3], 'g-', alpha=0.5)
-    plt.legend()
+        ax2.plot(segment[0] + last_duration, segment[1], 'r-', alpha=0.5)
+        ax2.plot(segment[0] + last_duration, segment[2], 'b-', alpha=0.5)
+        ax2.plot(segment[0] + last_duration, segment[3], 'g-', alpha=0.5)
+        last_duration += segment[0][-1] 
+    # plt.legend()
     plt.xlabel('Duration')
     plt.ylabel('Position')
     plt.title('Polynomial Fitting for Trajectory Data')
@@ -64,77 +74,53 @@ def plot_trajectory_with_fitted_segments(duration, x, y, z, fitted_segments, idx
 # 绘制原始轨迹和拟合曲线
 def plot_trajectory_3d(duration, x, y, z, fitted_segments, idx=0):
     fig = plt.figure(figsize=(10, 6))
-    ax = fig.add_subplot(111, projection='3d')
-    # ax.scatter(x, y, z, c='r', marker='.', label='Original data')
+    ax1 = fig.add_subplot(121, projection='3d')
+    ax2 = fig.add_subplot(122, projection='3d')
+    ax1.scatter(x, y, z, c='r', marker='.', label='Original data')
     for segment in fitted_segments:
-        ax.plot(segment[1], segment[2], segment[3], 'b-', alpha=0.5)
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-    ax.set_title('Polynomial Fitting for Trajectory Data')
-    plt.legend()
+        ax2.plot(segment[1], segment[2], segment[3], 'b-', alpha=0.5)
+    ax1.set_xlabel('X')
+    ax1.set_ylabel('Y')
+    ax1.set_zlabel('Z')
+    ax2.set_xlabel('X')
+    ax2.set_ylabel('Y')
+    ax2.set_zlabel('Z')
+    # plt.legend()
     plt.grid(True)
     plt.savefig('traj_3d_{}.png'.format(idx))
 
-# 示例轨迹数据
+# transfer x-y-z to 3D traj and axis-t
 t = np.linspace(0, 800 * 0.016, 800)
-# x = 2 * t + 3 * t ** 2 + np.random.normal(0, 1, 100)  # 示例x轨迹
-# y = t + 4 * t ** 2 + np.random.normal(0, 1, 100)      # 示例y轨迹
-# z = 3 * t + 2 * t ** 2 + np.random.normal(0, 1, 100)  # 示例z轨迹
 data = np.load('/home/chenjy/OmniDrones/scripts/predatorprey.npy')
-x0 = data[:, 0, 0, 0]
-y0 = data[:, 0, 0, 1]
-z0 = data[:, 0, 0, 2]
-x1 = data[:, 1, 0, 0]
-y1 = data[:, 1, 0, 1]
-z1 = data[:, 1, 0, 2]
-x2 = data[:, 2, 0, 0]
-y2 = data[:, 2, 0, 1]
-z2 = data[:, 2, 0, 2]
-x3 = data[:, 3, 0, 0]
-y3 = data[:, 3, 0, 1]
-z3 = data[:, 3, 0, 2]
+num_drones = 4
+for idx in range(num_drones):
+    x_origin = data[:, idx, 0, 0]
+    y_origin = data[:, idx, 0, 1]
+    z_origin = data[:, idx, 0, 2]
 
-# 按照持续时间划分轨迹为多个小段
-segment_duration = 1.0  # 每个小段的持续时间
-segments = split_trajectory(t, x0, y0, z0, segment_duration)
+    # 按照持续时间划分轨迹为多个小段
+    segment_duration = 1.0  # 每个小段的持续时间
+    segments = split_trajectory(t, x_origin, y_origin, z_origin, segment_duration)
 
-# 对每个小段进行多项式拟合
-fitted_segments = fit_segments(segments, segment_duration, idx=0)
+    # 对每个小段进行多项式拟合
+    fitted_segments = fit_segments(segments, segment_duration, idx=idx)
 
-# 绘制原始轨迹和拟合曲线
-plot_trajectory_with_fitted_segments(t, x0, y0, z0, fitted_segments, idx=0)
-plot_trajectory_3d(t, x0, y0, z0, fitted_segments, idx=0)
+    # 绘制原始轨迹和拟合曲线
+    plot_trajectory_with_fitted_segments(t, x_origin, y_origin, z_origin, fitted_segments, idx=idx)
+    plot_trajectory_3d(t, x_origin, y_origin, z_origin, fitted_segments, idx=idx)
 
-# agent1
-# 按照持续时间划分轨迹为多个小段
-segments = split_trajectory(t, x1, y1, z1, segment_duration)
-
-# 对每个小段进行多项式拟合
-fitted_segments = fit_segments(segments, segment_duration, idx=1)
-
-# 绘制原始轨迹和拟合曲线
-plot_trajectory_with_fitted_segments(t, x1, y1, z1, fitted_segments, idx=1)
-plot_trajectory_3d(t, x1, y1, z1, fitted_segments, idx=1)
-
-# agent2
-# 按照持续时间划分轨迹为多个小段
-segments = split_trajectory(t, x2, y2, z2, segment_duration)
-
-# 对每个小段进行多项式拟合
-fitted_segments = fit_segments(segments, segment_duration, idx=2)
-
-# 绘制原始轨迹和拟合曲线
-plot_trajectory_with_fitted_segments(t, x2, y2, z2, fitted_segments, idx=2)
-plot_trajectory_3d(t, x2, y2, z2, fitted_segments, idx=2)
-
-# agent3
-# 按照持续时间划分轨迹为多个小段
-segments = split_trajectory(t, x3, y3, z3, segment_duration)
-
-# 对每个小段进行多项式拟合
-fitted_segments = fit_segments(segments, segment_duration, idx=3)
-
-# 绘制原始轨迹和拟合曲线
-plot_trajectory_with_fitted_segments(t, x3, y3, z3, fitted_segments, idx=3)
-plot_trajectory_3d(t, x3, y3, z3, fitted_segments, idx=3)
+    fitted_x = []
+    fitted_y = []
+    fitted_z = []
+    for segment in fitted_segments:
+        duration, x, y, z = segment
+        fitted_x.append(x)
+        fitted_y.append(y)
+        fitted_z.append(z)
+    fitted_x = np.concatenate(fitted_x)
+    fitted_y = np.concatenate(fitted_y)
+    fitted_z = np.concatenate(fitted_z)
+    origin = np.array([x_origin, y_origin, z_origin])
+    fitted = np.array([fitted_x, fitted_y, fitted_z])
+    error = np.sum((fitted - origin)**2, axis=0).mean()
+    print('fitted error of agent {}: '.format(idx), error)
