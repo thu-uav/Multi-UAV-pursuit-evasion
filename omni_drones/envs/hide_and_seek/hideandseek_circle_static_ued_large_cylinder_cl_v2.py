@@ -917,8 +917,8 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
 
         # speed penalty
         if self.cfg.task.use_inside_penalty:
-            drone_env_pos = self.drone.get_state()[:, :3]
-            inside_reward = - 100 * ((drone_env_pos[:, -1] > self.max_height) or ((drone_env_pos[:, 0]**2 + drone_env_pos[:, 1]**2) > self.arena_size**2)).type(torch.float32)
+            drone_env_pos = self.drone.get_state()[..., :3]
+            inside_reward = - 100 * ((drone_env_pos[..., -1] > self.max_height).type(torch.float32) + ((drone_env_pos[..., 0]**2 + drone_env_pos[..., 1]**2) > self.arena_size**2).type(torch.float32))
         else:
             inside_reward = 0.0
 
