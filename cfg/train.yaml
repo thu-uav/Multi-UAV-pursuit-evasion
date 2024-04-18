@@ -28,7 +28,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: cl_wodistance_collisionradius0_1_v2_4_catch0_5
+  run_name: cl_wodistance_collisionradius0_1_insidepenalty_v2_4_catch0_5
   # run_name: debug
   # run_name: eval_3_narrow
   job_type: train

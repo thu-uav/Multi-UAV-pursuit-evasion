@@ -49,6 +49,7 @@ v_prey: 2.4
 use_collision: 1
 collision_coef: 1.0
 use_speed_penalty: 1
+use_inside_penalty: 1
 use_distance_reward: 0
 catch_radius: 0.5
 collision_radius: 0.1

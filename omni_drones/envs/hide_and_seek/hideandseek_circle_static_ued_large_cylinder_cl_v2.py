@@ -915,6 +915,13 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         else:
             speed_reward = 0.0
 
+        # speed penalty
+        if self.cfg.task.use_inside_penalty:
+            drone_env_pos = self.drone.get_state()[:, :3]
+            inside_reward = - 100 * ((drone_env_pos[:, -1] > self.max_height) or ((drone_env_pos[:, 0]**2 + drone_env_pos[:, 1]**2) > self.arena_size**2))
+        else:
+            inside_reward = 0.0
+
         # collison with cylinders
         coll_reward = torch.zeros(self.num_envs, self.num_agents, device=self.device)
         
@@ -950,9 +957,9 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         distance_reward = - 1.0 * min_dist * dist_reward_mask
         
         if self.cfg.task.use_distance_reward:
-            reward = speed_reward + 1.0 * catch_reward + 1.0 * distance_reward + self.cfg.task.collision_coef * coll_reward
+            reward = speed_reward + inside_reward + 1.0 * catch_reward + 1.0 * distance_reward + self.cfg.task.collision_coef * coll_reward
         else:
-            reward = speed_reward + 1.0 * catch_reward + self.cfg.task.collision_coef * coll_reward
+            reward = speed_reward + inside_reward + 1.0 * catch_reward + self.cfg.task.collision_coef * coll_reward
         
         self._tensordict["return"] += reward.unsqueeze(-1)
         self.returns = self._tensordict["return"].sum(1)
