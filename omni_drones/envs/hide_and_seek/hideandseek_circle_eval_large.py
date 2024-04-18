@@ -381,7 +381,19 @@ class HideAndSeek_circle_eval_large(IsaacEnv):
                 drone_pos_one, target_pos_one, \
                     cylinder_pos_one, cylinder_mask_one = self.uniform_generate_envs(num_active_cylinder=num_active_cylinder)
                 # # TODO: for sim2real, set z = 0.0
+                drone_pos_one[0, 0] = 0.5
+                drone_pos_one[0, 1] = 0.5
+                drone_pos_one[1, 0] = 0.5
+                drone_pos_one[1, 1] = - 0.5
+                drone_pos_one[2, 0] = - 0.5
+                drone_pos_one[2, 1] = - 0.5
+                drone_pos_one[3, 0] = - 0.5
+                drone_pos_one[3, 1] = 0.5
                 drone_pos_one[:, -1] = 0.05
+                # 1 cylinder
+                cylinder_pos_one[0, 0] = 0.0
+                cylinder_pos_one[0, 1] = 0.0
+                cylinder_pos_one[0, 2] = self.max_height / 2
                 drone_pos.append(drone_pos_one)
                 target_pos.append(target_pos_one)
                 cylinders_pos.append(cylinder_pos_one)
@@ -940,9 +952,9 @@ class HideAndSeek_circle_eval_large(IsaacEnv):
         self.drone_rpos = vmap(off_diag)(self.drone_rpos)
         
         # draw drone trajectory and detection range
-        if self._should_render(0):
-            self._draw_traj()
-            # self._draw_detection()      
+        # if self._should_render(0):
+        #     self._draw_traj()
+        #     self._draw_detection()      
 
         drone_speed_norm = torch.norm(drone_vel[..., :3], dim=-1)
         self.drone_sum_speed += drone_speed_norm
@@ -1277,7 +1289,7 @@ class HideAndSeek_circle_eval_large(IsaacEnv):
             xaxis=drone_xaxis[self.central_env_idx, 0, :],
             yaxis=drone_yaxis[self.central_env_idx, 0, :],
             zaxis=drone_zaxis[self.central_env_idx, 0, :],
-            drange=0.2,
+            drange=0.05,
         )
         point_list = [
             _carb_float3_add(p, self.central_env_pos) for p in point_list

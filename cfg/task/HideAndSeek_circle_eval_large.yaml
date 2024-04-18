@@ -6,7 +6,7 @@ defaults:
   - /base/sim_base@_here_
 
 env:
-  num_envs: 1
+  num_envs: 1000
   max_episode_length: 800
 
 drone_model: Crazyflie
@@ -20,7 +20,7 @@ action_transform: rate
 use_validation: 1
 
 # evalution scenario
-evaluation_flag: 3_narrow_sim2real # 'random', '2_search', '3_narrow', '3_surround', '5_narrow', '5_surround', '4_search'
+evaluation_flag: 3_narrow # 'random', '2_search', '3_narrow', '3_surround', '5_narrow', '5_surround', '4_search'
 
 # exp
 num_agents: 4
@@ -34,7 +34,7 @@ v_prey: 2.4
 use_collision: 1
 use_speed_penalty: 1
 collision_coef: 5.0
-catch_radius: 0.15
+catch_radius: 0.12
 collision_radius: 0.05
 use_dynamic: False
 

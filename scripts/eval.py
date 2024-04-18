@@ -253,7 +253,7 @@ def main(cfg):
             return_contiguous=False
         ).clone()
         # save traj for sim2real
-        np.save('predatorprey.npy', trajs[0]['agents']['observation']['state_self'][:,:,:,-23: -23 + 13].to('cpu').numpy())
+        # np.save('cylinder1.npy', trajs[0]['agents']['observation']['state_self'][:,:,:,-23: -23 + 13].to('cpu').numpy())
 
         # after rollout, set rendering mode to not headless and reset env
         base_env.enable_render(not cfg.headless)

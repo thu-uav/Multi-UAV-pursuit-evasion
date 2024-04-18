@@ -1,8 +1,8 @@
 # model_dir: /home/chenjy/OmniDrones/scripts/outputs/random0to3_final/v2_0_catch0_2_height0_6_size0_9.pt
 # model_dir: /home/chenjy/OmniDrones/scripts/outputs/final_results/DR_wovalidation/seed0/v1_6_catch0_2_height1_2_size0_9.pt
 # model_dir: null
-model_dir: /home/chenjy/OmniDrones/scripts/outputs/final_results/cl_new_reward/v2_4_catch0_15.pt
-# model_dir: /home/chenjy/OmniDrones/scripts/outputs/final_results/DR_intrinsic_new_reward/v2_4_catch0_2.pt
+# model_dir: /home/chenjy/OmniDrones/scripts/outputs/final_results/cl_new_reward/v2_4_catch0_15.pt
+model_dir: /home/chenjy/OmniDrones/scripts/outputs/final_results/cl_new_reward/v2_4_catch0_5.pt
 
 # hydra.job.chdir: false
 
@@ -23,14 +23,14 @@ viewer:
   eye: [0.0, 0.0, 6.]
   lookat: [0.01, 0., 2.]
   # # front
-  # eye: [-3., -3., 3.5]
+  # eye: [2.5, 2.5, 4.0]
   # lookat: [0., 0., 0.7]
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: DR_intrisinc_new_reward_v2_4_catch0_15
+  run_name: cl_wodistance_collisionradius0_1_v2_4_catch0_5
   # run_name: debug
-  run_name: sim2real_v2_4_catch0_15
+  # run_name: eval_3_narrow
   job_type: train
   entity: chenjy
   project: PredatorPrey
@@ -41,7 +41,7 @@ wandb:
   tags: 
 
 defaults:
-  # - task: HideAndSeek_circle_static_UED_large_cylinder_cl_v2
-  - task: HideAndSeek_circle_eval_large
+  - task: HideAndSeek_circle_static_UED_large_cylinder_cl_v2
+  # - task: HideAndSeek_circle_eval_large
   - algo: mappo
   - _self_

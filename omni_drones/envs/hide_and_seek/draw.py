@@ -207,7 +207,7 @@ def draw_catch(
 
 def draw_detection(
     pos, xaxis, yaxis, zaxis, drange: float,
-    color: _COLOR_T = _COLOR_ACCENT[0], size_range: float = 20.0, num_range: int = 20,
+    color: _COLOR_T = (1.0, 1.0, 1.0, 0.1), size_range: float = 20.0, num_range: int = 20,
     size_axis: float = 5.0, num_axis: int = 20
 ):
     return _draw_points_args_merger(

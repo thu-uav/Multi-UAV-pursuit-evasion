@@ -91,7 +91,7 @@ def plot_trajectory_3d(duration, x, y, z, fitted_segments, idx=0):
 
 # transfer x-y-z to 3D traj and axis-t
 t = np.linspace(0, 800 * 0.016, 800)
-data = np.load('/home/chenjy/OmniDrones/scripts/predatorprey.npy')
+data = np.load('/home/chenjy/OmniDrones/scripts/cylinder1.npy')
 num_drones = 4
 for idx in range(num_drones):
     x_origin = data[:, idx, 0, 0]
