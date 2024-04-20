@@ -39,5 +39,5 @@ y2_mean_values_list = [[200.0, 200.0, 200.0, 200.0, 200.0], [200.0, 400.0, 800.0
 y2_std_values_list = [[0.0, 0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0, 0.0]]
 labels = ["HCMP", "MAPPO"]
 
-plot_multi_mean_std_graph(x_values_list, y_mean_values_list, y_std_values_list, "Evader Speed", "Capture Rate", labels, 'Speed_rate')
-plot_multi_mean_std_graph(x_values_list, y2_mean_values_list, y2_std_values_list, "Evader Speed", "Capture Timestep", labels, 'Speed_time')
+plot_multi_mean_std_graph(x_values_list, y_mean_values_list, y_std_values_list, "Speed of evader", "Capture Rate", labels, 'Speed_rate')
+plot_multi_mean_std_graph(x_values_list, y2_mean_values_list, y2_std_values_list, "Speed of evader", "Capture Timestep", labels, 'Speed_time')

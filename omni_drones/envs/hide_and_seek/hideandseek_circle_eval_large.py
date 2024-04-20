@@ -381,6 +381,9 @@ class HideAndSeek_circle_eval_large(IsaacEnv):
                 drone_pos_one, target_pos_one, \
                     cylinder_pos_one, cylinder_mask_one = self.uniform_generate_envs(num_active_cylinder=num_active_cylinder)
                 # # TODO: for sim2real, set z = 0.0
+                target_pos_one[0] = 0.3
+                target_pos_one[1] = 0.3
+                target_pos_one[2] = 0.3
                 drone_pos_one[0, 0] = 0.5
                 drone_pos_one[0, 1] = 0.5
                 drone_pos_one[1, 0] = 0.5
@@ -390,10 +393,10 @@ class HideAndSeek_circle_eval_large(IsaacEnv):
                 drone_pos_one[3, 0] = - 0.5
                 drone_pos_one[3, 1] = 0.5
                 drone_pos_one[:, -1] = 0.05
-                # 1 cylinder
-                cylinder_pos_one[0, 0] = 0.0
-                cylinder_pos_one[0, 1] = 0.0
-                cylinder_pos_one[0, 2] = self.max_height / 2
+                # # 1 cylinder
+                # cylinder_pos_one[0, 0] = 0.0
+                # cylinder_pos_one[0, 1] = 0.0
+                # cylinder_pos_one[0, 2] = self.max_height / 2
                 drone_pos.append(drone_pos_one)
                 target_pos.append(target_pos_one)
                 cylinders_pos.append(cylinder_pos_one)

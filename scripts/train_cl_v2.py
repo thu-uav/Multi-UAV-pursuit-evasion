@@ -89,9 +89,6 @@ class EpisodeStats:
     def __len__(self):
         return len(self._stats)
 
-import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '1'
-
 # import config file
 @hydra.main(version_base=None, config_path=CONFIG_PATH, config_name="train")
 def main(cfg):
