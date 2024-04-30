@@ -5,25 +5,24 @@ headless: true
 sim: ${task.sim}
 env: ${task.env}
 
-model_dir: /home/chenjy/OmniDrones/scripts/outputs/Track_8_wosmooth_worandom_targetclip1/04-16_16-56/wandb/run-20240416_165635-gvx686zx/files/checkpoint_1573126144.pt
-# model_dir: null
+# model_dir: /home/chenjy/OmniDrones/scripts/outputs/Track_8_wosmooth_worandom_targetclip1/04-16_16-56/wandb/run-20240416_165635-gvx686zx/files/checkpoint_1573126144.pt
+model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
 max_iters: -1
-eval_interval: 100
+eval_interval: 200
 save_interval: 100
 seed: 0
 
 viewer:
   resolution: [960, 720]
-  eye: [4., 0., 4.]
+  eye: [-4., 0., 4.]
   lookat: [0., 0., 1.]
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: Track_8_wosmooth_worandom_targetclip1
-  # run_name: Track_star_cf9opt_dynamics_controller_clip60_100HZ_Pcontroller_woeffort
-  run_name: Track_8_wosmooth_worandom_targetclip1
+  run_name: Turn_v_0_5to3_threshold_0tomax_c_0to0_8
+  # run_name: debug
   job_type: train
   entity: chenjy
   project: Track
@@ -35,6 +34,6 @@ wandb:
 
 defaults:
   # - task: Hover
-  - task: Track
+  - task: Turn
   - algo: mappo
   - _self_

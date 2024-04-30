@@ -36,7 +36,7 @@ from tensordict.tensordict import TensorDict, TensorDictBase
 from torchrl.data import UnboundedContinuousTensorSpec, CompositeSpec
 from omni.isaac.debug_draw import _debug_draw
 
-from ..utils import lemniscate, pentagram, scale_time
+from ..utils import lemniscate, pentagram, scale_time, line_segments
 import collections
 
 class Turn(IsaacEnv):
@@ -123,31 +123,43 @@ class Turn(IsaacEnv):
         
         self.init_rpy_dist = D.Uniform(
             torch.tensor([-.2, -.2, 0.], device=self.device) * torch.pi,
-            torch.tensor([0.2, 0.2, 2.], device=self.device) * torch.pi
+            torch.tensor([0.2, 0.2, .2], device=self.device) * torch.pi
         )
-        self.traj_rpy_dist = D.Uniform(
-            torch.tensor([0., 0., 0.], device=self.device) * torch.pi,
-            torch.tensor([0., 0., 2.], device=self.device) * torch.pi
+        
+        self.v_scale_dist = D.Uniform(
+            torch.tensor(0.5, device=self.device) * torch.pi,
+            torch.tensor(3.0, device=self.device) * torch.pi
         )
-        self.traj_c_dist = D.Uniform(
-            torch.tensor(-0.6, device=self.device),
-            torch.tensor(0.6, device=self.device)
+        
+        self.threshold_scale_dist = D.Uniform(
+            torch.tensor(0.0, device=self.device) * torch.pi,
+            torch.tensor(self.max_episode_length * self.dt, device=self.device) * torch.pi
         )
-        self.traj_scale_dist = D.Uniform(
-            torch.tensor([1.8, 1.8, 1.], device=self.device),
-            torch.tensor([3.2, 3.2, 1.5], device=self.device)
+        
+        self.c_scale_dist = D.Uniform(
+            torch.tensor(0.0, device=self.device) * torch.pi,
+            torch.tensor(0.8, device=self.device) * torch.pi
         )
-        self.traj_w_dist = D.Uniform(
-            torch.tensor(0.8, device=self.device),
-            torch.tensor(1.1, device=self.device)
-        )
+
+        # self.traj_c_dist = D.Uniform(
+        #     torch.tensor(-0.6, device=self.device),
+        #     torch.tensor(0.6, device=self.device)
+        # )
+        # self.traj_scale_dist = D.Uniform(
+        #     torch.tensor([1.8, 1.8, 1.], device=self.device),
+        #     torch.tensor([3.2, 3.2, 1.5], device=self.device)
+        # )
+        # self.traj_w_dist = D.Uniform(
+        #     torch.tensor(0.8, device=self.device),
+        #     torch.tensor(1.1, device=self.device)
+        # )
         self.origin = torch.tensor([0., 0., 1.], device=self.device)
 
-        self.traj_t0 = torch.pi / 2
-        self.traj_c = torch.zeros(self.num_envs, device=self.device)
-        self.traj_scale = torch.zeros(self.num_envs, 3, device=self.device)
-        self.traj_rot = torch.zeros(self.num_envs, 4, device=self.device)
-        self.traj_w = torch.ones(self.num_envs, device=self.device)
+        self.traj_t0 = 0.0
+        # self.traj_c = torch.zeros(self.num_envs, device=self.device)
+        self.v_scale = torch.zeros(self.num_envs, device=self.device)
+        self.threshold_scale = torch.zeros(self.num_envs, device=self.device)
+        self.c_scale = torch.zeros(self.num_envs, device=self.device)
 
         self.target_pos = torch.zeros(self.num_envs, self.future_traj_steps, 3, device=self.device)
 
@@ -221,14 +233,17 @@ class Turn(IsaacEnv):
 
     def _reset_idx(self, env_ids: torch.Tensor):
         self.drone._reset_idx(env_ids)
-        self.traj_c[env_ids] = self.traj_c_dist.sample(env_ids.shape)
-        self.traj_rot[env_ids] = euler_to_quaternion(self.traj_rpy_dist.sample(env_ids.shape))
-        self.traj_scale[env_ids] = self.traj_scale_dist.sample(env_ids.shape) / 4 # for crazyflie, traj should be smaller
-        traj_w = self.traj_w_dist.sample(env_ids.shape)
-        self.traj_w[env_ids] = torch.randn_like(traj_w).sign() * traj_w
+        # self.traj_c[env_ids] = self.traj_c_dist.sample(env_ids.shape)
+        # self.traj_scale[env_ids] = self.traj_scale_dist.sample(env_ids.shape) / 4 # for crazyflie, traj should be smaller
+        # traj_w = self.traj_w_dist.sample(env_ids.shape)
+        # self.traj_w[env_ids] = torch.randn_like(traj_w).sign() * traj_w
+        
+        self.v_scale[env_ids] = self.v_scale_dist.sample(env_ids.shape)
+        self.threshold_scale[env_ids] = self.threshold_scale_dist.sample(env_ids.shape)
+        self.c_scale[env_ids] = self.c_scale_dist.sample(env_ids.shape)
 
         t0 = torch.zeros(len(env_ids), device=self.device)
-        pos = lemniscate(t0 + self.traj_t0, self.traj_c[env_ids]) + self.origin
+        pos = self.origin
         rot = euler_to_quaternion(self.init_rpy_dist.sample(env_ids.shape))
         vel = torch.zeros(len(env_ids), 1, 6, device=self.device)
         self.drone.set_world_poses(
@@ -357,12 +372,13 @@ class Turn(IsaacEnv):
         if env_ids is None:
             env_ids = ...
         t = self.progress_buf[env_ids].unsqueeze(1) + step_size * torch.arange(steps, device=self.device)
-        t = self.traj_t0 + scale_time(self.traj_w[env_ids].unsqueeze(1) * t * self.dt)
-        traj_rot = self.traj_rot[env_ids].unsqueeze(1).expand(-1, t.shape[1], 4)
+        t = self.traj_t0 + scale_time(torch.ones((self.num_envs, 1), device=self.device)[env_ids] * t * self.dt)
+        # t = self.traj_t0 + torch.ones((self.num_envs, 1), device=self.device) * t * self.dt
+        # traj_rot = self.traj_rot[env_ids].unsqueeze(1).expand(-1, t.shape[1], 4)
         
         # target_pos = vmap(lemniscate)(t, self.traj_c[env_ids])
-        target_pos = vmap(pentagram)(t, self.traj_c[env_ids])
-        target_pos = vmap(torch_utils.quat_rotate)(traj_rot, target_pos) * self.traj_scale[env_ids].unsqueeze(1)
+        target_pos = vmap(line_segments)(t, self.v_scale[env_ids], self.threshold_scale[env_ids], torch.pi * self.c_scale[env_ids])
+        # target_pos = vmap(torch_utils.quat_rotate)(traj_rot, target_pos) * self.traj_scale[env_ids].unsqueeze(1)
 
         return self.origin + target_pos
 

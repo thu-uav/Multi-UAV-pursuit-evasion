@@ -150,6 +150,16 @@ def lemniscate(t, c):
 
     return x
 
+def line_segments(t, v, threshold, c):
+    # v = torch.tensor(v)
+    # threshold = torch.tensor(threshold)
+    # c = torch.tensor(c)
+    x = torch.where(t <= threshold, v * t, v * threshold + v * (t - threshold) * torch.cos(c))
+    y = torch.where(t <= threshold, torch.zeros_like(t), v * (t - threshold) * torch.sin(c))
+    z = torch.zeros_like(t)
+
+    return torch.stack([x, y, z], dim=-1)
+
 def pentagram(t, c):
     # TODO: use c
     a = 1.5
