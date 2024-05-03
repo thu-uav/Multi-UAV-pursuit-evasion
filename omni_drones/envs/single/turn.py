@@ -127,18 +127,18 @@ class Turn(IsaacEnv):
         )
         
         self.v_scale_dist = D.Uniform(
-            torch.tensor(0.5, device=self.device) * torch.pi,
-            torch.tensor(3.0, device=self.device) * torch.pi
+            torch.tensor(0.5, device=self.device),
+            torch.tensor(3.0, device=self.device)
         )
         
         self.threshold_scale_dist = D.Uniform(
-            torch.tensor(0.0, device=self.device) * torch.pi,
-            torch.tensor(self.max_episode_length * self.dt, device=self.device) * torch.pi
+            torch.tensor(0.0, device=self.device),
+            torch.tensor(scale_time(torch.tensor(self.max_episode_length * self.dt)), device=self.device)
         )
         
         self.c_scale_dist = D.Uniform(
-            torch.tensor(0.0, device=self.device) * torch.pi,
-            torch.tensor(0.8, device=self.device) * torch.pi
+            torch.tensor(0.0, device=self.device),
+            torch.tensor(0.8, device=self.device)
         )
 
         # self.traj_c_dist = D.Uniform(
@@ -216,8 +216,21 @@ class Turn(IsaacEnv):
             "episode_len": UnboundedContinuousTensorSpec(1),
             "tracking_error": UnboundedContinuousTensorSpec(1),
             "tracking_error_ema": UnboundedContinuousTensorSpec(1),
-            "action_smoothness": UnboundedContinuousTensorSpec(1),
+            "action_smoothness_max": UnboundedContinuousTensorSpec(1),
+            "action_smoothness_mean": UnboundedContinuousTensorSpec(1),
             "drone_state": UnboundedContinuousTensorSpec(13),
+            "linear_v_max": UnboundedContinuousTensorSpec(1),
+            "angular_v_max": UnboundedContinuousTensorSpec(1),
+            "linear_a_max": UnboundedContinuousTensorSpec(1),
+            "angular_a_max": UnboundedContinuousTensorSpec(1),
+            "linear_jerk_max": UnboundedContinuousTensorSpec(1),
+            "angular_jerk_max": UnboundedContinuousTensorSpec(1),
+            "linear_v_mean": UnboundedContinuousTensorSpec(1),
+            "angular_v_mean": UnboundedContinuousTensorSpec(1),
+            "linear_a_mean": UnboundedContinuousTensorSpec(1),
+            "angular_a_mean": UnboundedContinuousTensorSpec(1),
+            "linear_jerk_mean": UnboundedContinuousTensorSpec(1),
+            "angular_jerk_mean": UnboundedContinuousTensorSpec(1),
         }).expand(self.num_envs).to(self.device)
         info_spec = CompositeSpec({
             "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13)),
@@ -233,10 +246,6 @@ class Turn(IsaacEnv):
 
     def _reset_idx(self, env_ids: torch.Tensor):
         self.drone._reset_idx(env_ids)
-        # self.traj_c[env_ids] = self.traj_c_dist.sample(env_ids.shape)
-        # self.traj_scale[env_ids] = self.traj_scale_dist.sample(env_ids.shape) / 4 # for crazyflie, traj should be smaller
-        # traj_w = self.traj_w_dist.sample(env_ids.shape)
-        # self.traj_w[env_ids] = torch.randn_like(traj_w).sign() * traj_w
         
         self.v_scale[env_ids] = self.v_scale_dist.sample(env_ids.shape)
         self.threshold_scale[env_ids] = self.threshold_scale_dist.sample(env_ids.shape)
@@ -250,8 +259,24 @@ class Turn(IsaacEnv):
             pos + self.envs_positions[env_ids], rot, env_ids
         )
         self.drone.set_velocities(vel, env_ids)
+        
+        # set last values
+        self.last_linear_v = torch.norm(vel[..., :3], dim=-1)
+        self.last_angular_v = torch.norm(vel[..., 3:], dim=-1)
+        self.last_linear_a = torch.zeros_like(self.last_linear_v)
+        self.last_angular_a = torch.zeros_like(self.last_angular_v)
+        self.last_linear_jerk = torch.zeros_like(self.last_linear_a)
+        self.last_angular_jerk = torch.zeros_like(self.last_angular_a)
 
         self.stats[env_ids] = 0.
+        
+        self.action_smoothness_episode = torch.zeros_like(self.stats["action_smoothness_mean"])
+        self.linear_v_episode = torch.zeros_like(self.stats["linear_v_mean"])
+        self.angular_v_episode = torch.zeros_like(self.stats["angular_v_mean"])
+        self.linear_a_episode = torch.zeros_like(self.stats["linear_a_mean"])
+        self.angular_a_episode = torch.zeros_like(self.stats["angular_a_mean"])
+        self.linear_jerk_episode = torch.zeros_like(self.stats["linear_jerk_mean"])
+        self.angular_jerk_episode = torch.zeros_like(self.stats["angular_jerk_mean"])
 
         # self.info[env_ids] = self.drone.info[env_ids]
 
@@ -302,7 +327,45 @@ class Turn(IsaacEnv):
 
         obs = torch.cat(obs, dim=-1)
 
-        self.stats["action_smoothness"].lerp_(-self.drone.throttle_difference, (1-self.alpha))
+        # set smoothness entities
+        self.stats["action_smoothness_max"].set_(torch.max(self.stats["action_smoothness_max"], torch.abs(self.drone.throttle_difference)))
+        self.action_smoothness_episode.add_(torch.abs(self.drone.throttle_difference))
+        self.stats["action_smoothness_mean"].set_(self.action_smoothness_episode / (self.progress_buf + 1.0).unsqueeze(1))
+        # linear_v, angular_v
+        self.linear_v = torch.norm(self.root_state[..., 7:10], dim=-1)
+        self.angular_v = torch.norm(self.root_state[..., 10:13], dim=-1)
+        self.stats["linear_v_max"].set_(torch.max(self.stats["linear_v_max"], torch.abs(self.linear_v)))
+        self.linear_v_episode.add_(torch.abs(self.linear_v))
+        self.stats["linear_v_mean"].set_(self.linear_v_episode / (self.progress_buf + 1.0).unsqueeze(1))
+        self.stats["angular_v_max"].set_(torch.max(self.stats["angular_v_max"], torch.abs(self.angular_v)))
+        self.angular_v_episode.add_(torch.abs(self.angular_v))
+        self.stats["angular_v_mean"].set_(self.angular_v_episode / (self.progress_buf + 1.0).unsqueeze(1))
+        # linear_a, angular_a
+        self.linear_a = (self.linear_v - self.last_linear_v) / self.dt
+        self.angular_a = (self.angular_v - self.last_angular_v) / self.dt
+        self.stats["linear_a_max"].set_(torch.max(self.stats["linear_a_max"], torch.abs(self.linear_a)))
+        self.linear_a_episode.add_(torch.abs(self.linear_a))
+        self.stats["linear_a_mean"].set_(self.linear_a_episode / (self.progress_buf + 1.0).unsqueeze(1))
+        self.stats["angular_a_max"].set_(torch.max(self.stats["angular_a_max"], torch.abs(self.angular_a)))
+        self.angular_a_episode.add_(torch.abs(self.angular_a))
+        self.stats["angular_a_mean"].set_(self.angular_a_episode / (self.progress_buf + 1.0).unsqueeze(1))
+        # linear_jerk, angular_jerk
+        self.linear_jerk = (self.linear_a - self.last_linear_a) / self.dt
+        self.angular_jerk = (self.angular_a - self.last_angular_a) / self.dt
+        self.stats["linear_jerk_max"].set_(torch.max(self.stats["linear_jerk_max"], torch.abs(self.linear_jerk)))
+        self.linear_jerk_episode.add_(torch.abs(self.linear_jerk))
+        self.stats["linear_jerk_mean"].set_(self.linear_jerk_episode / (self.progress_buf + 1.0).unsqueeze(1))
+        self.stats["angular_jerk_max"].set_(torch.max(self.stats["angular_jerk_max"], torch.abs(self.angular_jerk)))
+        self.angular_jerk_episode.add_(torch.abs(self.angular_jerk))
+        self.stats["angular_jerk_mean"].set_(self.angular_jerk_episode / (self.progress_buf + 1.0).unsqueeze(1))
+        
+        # set last
+        self.last_linear_v = self.linear_v.clone()
+        self.last_angular_v = self.angular_v.clone()
+        self.last_linear_a = self.linear_a.clone()
+        self.last_angular_a = self.angular_a.clone()
+        self.last_linear_jerk = self.linear_jerk.clone()
+        self.last_angular_jerk = self.angular_jerk.clone()
         
         if self.latency:
             self.obs_buffer.append(obs)

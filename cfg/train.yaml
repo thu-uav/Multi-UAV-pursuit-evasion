@@ -5,8 +5,8 @@ headless: true
 sim: ${task.sim}
 env: ${task.env}
 
-# model_dir: /home/chenjy/OmniDrones/scripts/outputs/Track_8_wosmooth_worandom_targetclip1/04-16_16-56/wandb/run-20240416_165635-gvx686zx/files/checkpoint_1573126144.pt
-model_dir: null
+model_dir: /home/chenjy/OmniDrones/scripts/outputs/Turn_v_0_5to3_threshold_0tomax_c_0to0_8/04-30_20-57/wandb/run-20240430_205705-yea3308x/files/checkpoint_final.pt
+# model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
 max_iters: -1
@@ -16,7 +16,7 @@ seed: 0
 
 viewer:
   resolution: [960, 720]
-  eye: [-4., 0., 4.]
+  eye: [-8., 0., 8.]
   lookat: [0., 0., 1.]
 
 wandb:
