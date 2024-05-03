@@ -93,6 +93,11 @@ class Turn(IsaacEnv):
         self.reward_effort_weight = cfg.task.reward_effort_weight
         self.reward_action_smoothness_weight = cfg.task.reward_action_smoothness_weight
         self.reward_distance_scale = cfg.task.reward_distance_scale
+        self.reward_acc_weight = cfg.task.reward_acc_weight
+        self.reward_jerk_weight = cfg.task.reward_jerk_weight
+        self.angular_acc_max = cfg.task.angular_acc_max
+        self.linear_acc_max = cfg.task.linear_acc_max
+        self.use_acc_jerk = cfg.task.use_acc_jerk
         self.time_encoding = cfg.task.time_encoding
         self.future_traj_steps = int(cfg.task.future_traj_steps)
         assert self.future_traj_steps > 0
@@ -127,18 +132,18 @@ class Turn(IsaacEnv):
         )
         
         self.v_scale_dist = D.Uniform(
-            torch.tensor(0.5, device=self.device),
-            torch.tensor(3.0, device=self.device)
+            torch.tensor(5.0, device=self.device),
+            torch.tensor(5.1, device=self.device)
         )
         
         self.threshold_scale_dist = D.Uniform(
-            torch.tensor(0.0, device=self.device),
-            torch.tensor(scale_time(torch.tensor(self.max_episode_length * self.dt)), device=self.device)
+            torch.tensor(0.49 * scale_time(torch.tensor(self.max_episode_length * self.dt)), device=self.device),
+            torch.tensor(0.51 * scale_time(torch.tensor(self.max_episode_length * self.dt)), device=self.device)
         )
         
         self.c_scale_dist = D.Uniform(
-            torch.tensor(0.0, device=self.device),
-            torch.tensor(0.8, device=self.device)
+            torch.tensor(0.8, device=self.device),
+            torch.tensor(0.9, device=self.device)
         )
 
         # self.traj_c_dist = D.Uniform(
@@ -191,6 +196,8 @@ class Turn(IsaacEnv):
     def _set_specs(self):
         drone_state_dim = 3 + 3 + 4 + 3 + 3 # position, velocity, quaternion, heading, up
         obs_dim = drone_state_dim + 3 * (self.future_traj_steps-1)
+        if self.use_acc_jerk:
+            obs_dim += 4
         if self.time_encoding:
             self.time_encoding_dim = 4
             obs_dim += self.time_encoding_dim
@@ -238,6 +245,11 @@ class Turn(IsaacEnv):
             "angular_a_mean": UnboundedContinuousTensorSpec(1),
             "linear_jerk_mean": UnboundedContinuousTensorSpec(1),
             "angular_jerk_mean": UnboundedContinuousTensorSpec(1),
+            "reward_pos": UnboundedContinuousTensorSpec(1),
+            "reward_up": UnboundedContinuousTensorSpec(1),
+            "reward_acc": UnboundedContinuousTensorSpec(1),
+            "reward_smooth": UnboundedContinuousTensorSpec(1),
+            "reward_jerk": UnboundedContinuousTensorSpec(1),
         }).expand(self.num_envs).to(self.device)
         info_spec = CompositeSpec({
             "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13)),
@@ -332,8 +344,6 @@ class Turn(IsaacEnv):
         if self.intrinsics:
             obs.append(self.drone.get_info())
 
-        obs = torch.cat(obs, dim=-1)
-
         # set smoothness entities
         self.stats["action_smoothness_max"].set_(torch.max(self.stats["action_smoothness_max"], torch.abs(self.drone.throttle_difference)))
         self.action_smoothness_episode.add_(torch.abs(self.drone.throttle_difference))
@@ -374,6 +384,15 @@ class Turn(IsaacEnv):
         self.last_linear_jerk = self.linear_jerk.clone()
         self.last_angular_jerk = self.angular_jerk.clone()
         
+        # add acc and jerk
+        if self.use_acc_jerk:
+            obs.append(self.linear_a.unsqueeze(1))
+            obs.append(self.angular_a.unsqueeze(1))
+            obs.append(self.linear_jerk.unsqueeze(1))
+            obs.append(self.angular_jerk.unsqueeze(1))
+        
+        obs = torch.cat(obs, dim=-1)
+        
         if self.latency:
             self.obs_buffer.append(obs)
             obs = self.obs_buffer[0]
@@ -408,12 +427,24 @@ class Turn(IsaacEnv):
         reward_spin = 0.5 / (1.0 + torch.square(spin))
         # not_spin_bonus = torch.abs(torch.square(self.drone.vel[..., -1])) < 1e-5
 
+        # reward acc and jerk
+        reward_acc = - self.reward_acc_weight * ((self.angular_a > self.angular_acc_max).float() + (self.linear_a > self.linear_acc_max).float())
+        reward_jerk = - self.reward_jerk_weight * (self.linear_jerk + self.angular_jerk)
+
         reward = (
             reward_pose 
             + reward_pose * (reward_up + reward_spin)
             + reward_effort
             + reward_action_smoothness
+            + reward_acc
+            + reward_jerk
         )
+        
+        self.stats["reward_pos"].set_(reward_pose)
+        self.stats["reward_up"].set_(reward_pose * (reward_up + reward_spin))
+        self.stats["reward_smooth"].set_(reward_action_smoothness)
+        self.stats["reward_acc"].set_(reward_acc)
+        self.stats["reward_jerk"].set_(reward_jerk)
 
         done = (
             (self.progress_buf >= self.max_episode_length).unsqueeze(-1)

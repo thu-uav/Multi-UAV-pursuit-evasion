@@ -21,7 +21,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: Turn_v_0_5to3_threshold_0tomax_c_0to0_8
+  run_name: Turn_woanysim2real
   # run_name: debug
   job_type: train
   entity: chenjy
