@@ -5,8 +5,8 @@ headless: true
 sim: ${task.sim}
 env: ${task.env}
 
-model_dir: /home/chenjy/OmniDrones/scripts/outputs/Turn_v_0_5to3_threshold_0tomax_c_0to0_8/04-30_20-57/wandb/run-20240430_205705-yea3308x/files/checkpoint_final.pt
-# model_dir: null
+# model_dir: /home/chenjy/OmniDrones/scripts/outputs/Turn_v_0_5to3_threshold_0tomax_c_0to0_8/04-30_20-57/wandb/run-20240430_205705-yea3308x/files/checkpoint_final.pt
+model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
 max_iters: -1

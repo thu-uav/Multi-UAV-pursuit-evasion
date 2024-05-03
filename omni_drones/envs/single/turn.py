@@ -161,6 +161,13 @@ class Turn(IsaacEnv):
         self.threshold_scale = torch.zeros(self.num_envs, device=self.device)
         self.c_scale = torch.zeros(self.num_envs, device=self.device)
 
+        self.last_linear_v = torch.zeros(self.num_envs, 1, device=self.device)
+        self.last_angular_v = torch.zeros(self.num_envs, 1, device=self.device)
+        self.last_linear_a = torch.zeros(self.num_envs, 1, device=self.device)
+        self.last_angular_a = torch.zeros(self.num_envs, 1, device=self.device)
+        self.last_linear_jerk = torch.zeros(self.num_envs, 1, device=self.device)
+        self.last_angular_jerk = torch.zeros(self.num_envs, 1, device=self.device)
+
         self.target_pos = torch.zeros(self.num_envs, self.future_traj_steps, 3, device=self.device)
 
         self.alpha = 0.8
@@ -261,12 +268,12 @@ class Turn(IsaacEnv):
         self.drone.set_velocities(vel, env_ids)
         
         # set last values
-        self.last_linear_v = torch.norm(vel[..., :3], dim=-1)
-        self.last_angular_v = torch.norm(vel[..., 3:], dim=-1)
-        self.last_linear_a = torch.zeros_like(self.last_linear_v)
-        self.last_angular_a = torch.zeros_like(self.last_angular_v)
-        self.last_linear_jerk = torch.zeros_like(self.last_linear_a)
-        self.last_angular_jerk = torch.zeros_like(self.last_angular_a)
+        self.last_linear_v[env_ids] = torch.norm(vel[..., :3], dim=-1)
+        self.last_angular_v[env_ids] = torch.norm(vel[..., 3:], dim=-1)
+        self.last_linear_a[env_ids] = torch.zeros_like(self.last_linear_v[env_ids])
+        self.last_angular_a[env_ids] = torch.zeros_like(self.last_angular_v[env_ids])
+        self.last_linear_jerk[env_ids] = torch.zeros_like(self.last_linear_a[env_ids])
+        self.last_angular_jerk[env_ids] = torch.zeros_like(self.last_angular_a[env_ids])
 
         self.stats[env_ids] = 0.
         
