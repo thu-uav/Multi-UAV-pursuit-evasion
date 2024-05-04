@@ -97,7 +97,8 @@ class Turn(IsaacEnv):
         self.reward_jerk_weight = cfg.task.reward_jerk_weight
         self.angular_acc_max = cfg.task.angular_acc_max
         self.linear_acc_max = cfg.task.linear_acc_max
-        self.use_acc_jerk = cfg.task.use_acc_jerk
+        self.use_acc = cfg.task.use_acc
+        self.use_jerk = cfg.task.use_jerk
         self.time_encoding = cfg.task.time_encoding
         self.future_traj_steps = int(cfg.task.future_traj_steps)
         assert self.future_traj_steps > 0
@@ -196,8 +197,10 @@ class Turn(IsaacEnv):
     def _set_specs(self):
         drone_state_dim = 3 + 3 + 4 + 3 + 3 # position, velocity, quaternion, heading, up
         obs_dim = drone_state_dim + 3 * (self.future_traj_steps-1)
-        if self.use_acc_jerk:
-            obs_dim += 4
+        if self.use_acc:
+            obs_dim += 2
+        if self.use_jerk:
+            obs_dim += 2
         if self.time_encoding:
             self.time_encoding_dim = 4
             obs_dim += self.time_encoding_dim
@@ -385,9 +388,10 @@ class Turn(IsaacEnv):
         self.last_angular_jerk = self.angular_jerk.clone()
         
         # add acc and jerk
-        if self.use_acc_jerk:
+        if self.use_acc:
             obs.append(self.linear_a.unsqueeze(1))
             obs.append(self.angular_a.unsqueeze(1))
+        if self.use_jerk:
             obs.append(self.linear_jerk.unsqueeze(1))
             obs.append(self.angular_jerk.unsqueeze(1))
         
