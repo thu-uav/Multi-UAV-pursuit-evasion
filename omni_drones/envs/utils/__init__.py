@@ -160,6 +160,17 @@ def line_segments(t, v, threshold, c):
 
     return torch.stack([x, y, z], dim=-1)
 
+def line_segments_acc(t, a, threshold, c):
+    # v = torch.tensor(v)
+    # threshold = torch.tensor(threshold)
+    # c = torch.tensor(c)
+    v_turn = a * threshold
+    x = torch.where(t <= threshold, 0.5 * a * t**2, 0.5 * a * threshold**2 + v_turn * (t - threshold) * torch.cos(c))
+    y = torch.where(t <= threshold, torch.zeros_like(t), v_turn * (t - threshold) * torch.sin(c))
+    z = torch.zeros_like(t)
+
+    return torch.stack([x, y, z], dim=-1)
+
 def pentagram(t, c):
     # TODO: use c
     a = 1.5

@@ -36,7 +36,7 @@ from tensordict.tensordict import TensorDict, TensorDictBase
 from torchrl.data import UnboundedContinuousTensorSpec, CompositeSpec
 from omni.isaac.debug_draw import _debug_draw
 
-from ..utils import lemniscate, pentagram, scale_time, line_segments
+from ..utils import lemniscate, pentagram, scale_time, line_segments, line_segments_acc
 import collections
 
 class Turn(IsaacEnv):
@@ -132,19 +132,23 @@ class Turn(IsaacEnv):
             torch.tensor([0.2, 0.2, .2], device=self.device) * torch.pi
         )
         
-        self.v_scale_dist = D.Uniform(
-            torch.tensor(5.0, device=self.device),
-            torch.tensor(5.1, device=self.device)
+        # self.v_scale_dist = D.Uniform(
+        #     torch.tensor(5.0, device=self.device),
+        #     torch.tensor(5.1, device=self.device)
+        # )
+        self.a_scale_dist = D.Uniform(
+            torch.tensor(3.0, device=self.device),
+            torch.tensor(3.01, device=self.device)
         )
         
         self.threshold_scale_dist = D.Uniform(
-            torch.tensor(0.49 * scale_time(torch.tensor(self.max_episode_length * self.dt)), device=self.device),
-            torch.tensor(0.51 * scale_time(torch.tensor(self.max_episode_length * self.dt)), device=self.device)
+            torch.tensor(0.5 * scale_time(torch.tensor(self.max_episode_length * self.dt)), device=self.device),
+            torch.tensor(0.501 * scale_time(torch.tensor(self.max_episode_length * self.dt)), device=self.device)
         )
         
         self.c_scale_dist = D.Uniform(
-            torch.tensor(0.8, device=self.device),
-            torch.tensor(0.9, device=self.device)
+            torch.tensor(0.9, device=self.device),
+            torch.tensor(0.901, device=self.device)
         )
 
         # self.traj_c_dist = D.Uniform(
@@ -162,8 +166,8 @@ class Turn(IsaacEnv):
         self.origin = torch.tensor([0., 0., 1.], device=self.device)
 
         self.traj_t0 = 0.0
-        # self.traj_c = torch.zeros(self.num_envs, device=self.device)
-        self.v_scale = torch.zeros(self.num_envs, device=self.device)
+        # self.v_scale = torch.zeros(self.num_envs, device=self.device)
+        self.a_scale = torch.zeros(self.num_envs, device=self.device)
         self.threshold_scale = torch.zeros(self.num_envs, device=self.device)
         self.c_scale = torch.zeros(self.num_envs, device=self.device)
 
@@ -269,7 +273,8 @@ class Turn(IsaacEnv):
     def _reset_idx(self, env_ids: torch.Tensor):
         self.drone._reset_idx(env_ids)
         
-        self.v_scale[env_ids] = self.v_scale_dist.sample(env_ids.shape)
+        # self.v_scale[env_ids] = self.v_scale_dist.sample(env_ids.shape)
+        self.a_scale[env_ids] = self.a_scale_dist.sample(env_ids.shape)
         self.threshold_scale[env_ids] = self.threshold_scale_dist.sample(env_ids.shape)
         self.c_scale[env_ids] = self.c_scale_dist.sample(env_ids.shape)
 
@@ -482,7 +487,8 @@ class Turn(IsaacEnv):
         # traj_rot = self.traj_rot[env_ids].unsqueeze(1).expand(-1, t.shape[1], 4)
         
         # target_pos = vmap(lemniscate)(t, self.traj_c[env_ids])
-        target_pos = vmap(line_segments)(t, self.v_scale[env_ids], self.threshold_scale[env_ids], torch.pi * self.c_scale[env_ids])
+        # target_pos = vmap(line_segments)(t, self.v_scale[env_ids], self.threshold_scale[env_ids], torch.pi * self.c_scale[env_ids])
+        target_pos = vmap(line_segments_acc)(t, self.a_scale[env_ids], self.threshold_scale[env_ids], torch.pi * self.c_scale[env_ids])
         # target_pos = vmap(torch_utils.quat_rotate)(traj_rot, target_pos) * self.traj_scale[env_ids].unsqueeze(1)
 
         return self.origin + target_pos
