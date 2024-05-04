@@ -27,7 +27,7 @@ reward_jerk_weight: 0. # 0.01
 angular_acc_max: 50.0
 linear_acc_max: 10.0
 use_acc: 1
-use_jerk: 0
+use_jerk: 1
 
 action_transform: rate
 # action_transform: PIDrate

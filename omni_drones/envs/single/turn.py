@@ -389,11 +389,11 @@ class Turn(IsaacEnv):
         
         # add acc and jerk
         if self.use_acc:
-            obs.append(self.linear_a.unsqueeze(1))
-            obs.append(self.angular_a.unsqueeze(1))
+            obs.append(self.linear_a.unsqueeze(1) / 10.0)
+            obs.append(self.angular_a.unsqueeze(1) / 100.0)
         if self.use_jerk:
-            obs.append(self.linear_jerk.unsqueeze(1))
-            obs.append(self.angular_jerk.unsqueeze(1))
+            obs.append(self.linear_jerk.unsqueeze(1) / 1000.0)
+            obs.append(self.angular_jerk.unsqueeze(1) / 10000.0)
         
         obs = torch.cat(obs, dim=-1)
         
