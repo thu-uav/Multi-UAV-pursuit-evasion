@@ -94,7 +94,8 @@ class Turn(IsaacEnv):
         self.reward_action_smoothness_weight = cfg.task.reward_action_smoothness_weight
         self.reward_distance_scale = cfg.task.reward_distance_scale
         self.reward_acc_weight = cfg.task.reward_acc_weight
-        self.reward_jerk_weight = cfg.task.reward_jerk_weight
+        self.reward_linear_jerk_weight = cfg.task.reward_linear_jerk_weight
+        self.reward_angular_jerk_weight = cfg.task.reward_angular_jerk_weight
         self.angular_acc_max = cfg.task.angular_acc_max
         self.linear_acc_max = cfg.task.linear_acc_max
         self.use_acc = cfg.task.use_acc
@@ -366,8 +367,8 @@ class Turn(IsaacEnv):
         self.angular_v_episode.add_(torch.abs(self.angular_v))
         self.stats["angular_v_mean"].set_(self.angular_v_episode / (self.progress_buf + 1.0).unsqueeze(1))
         # linear_a, angular_a
-        self.linear_a = (self.linear_v - self.last_linear_v) / self.dt
-        self.angular_a = (self.angular_v - self.last_angular_v) / self.dt
+        self.linear_a = torch.abs(self.linear_v - self.last_linear_v) / self.dt
+        self.angular_a = torch.abs(self.angular_v - self.last_angular_v) / self.dt
         self.stats["linear_a_max"].set_(torch.max(self.stats["linear_a_max"], torch.abs(self.linear_a)))
         self.linear_a_episode.add_(torch.abs(self.linear_a))
         self.stats["linear_a_mean"].set_(self.linear_a_episode / (self.progress_buf + 1.0).unsqueeze(1))
@@ -375,8 +376,8 @@ class Turn(IsaacEnv):
         self.angular_a_episode.add_(torch.abs(self.angular_a))
         self.stats["angular_a_mean"].set_(self.angular_a_episode / (self.progress_buf + 1.0).unsqueeze(1))
         # linear_jerk, angular_jerk
-        self.linear_jerk = (self.linear_a - self.last_linear_a) / self.dt
-        self.angular_jerk = (self.angular_a - self.last_angular_a) / self.dt
+        self.linear_jerk = torch.abs(self.linear_a - self.last_linear_a) / self.dt
+        self.angular_jerk = torch.abs(self.angular_a - self.last_angular_a) / self.dt
         self.stats["linear_jerk_max"].set_(torch.max(self.stats["linear_jerk_max"], torch.abs(self.linear_jerk)))
         self.linear_jerk_episode.add_(torch.abs(self.linear_jerk))
         self.stats["linear_jerk_mean"].set_(self.linear_jerk_episode / (self.progress_buf + 1.0).unsqueeze(1))
@@ -438,7 +439,7 @@ class Turn(IsaacEnv):
 
         # reward acc and jerk
         reward_acc = - self.reward_acc_weight * ((self.angular_a > self.angular_acc_max).float() + (self.linear_a > self.linear_acc_max).float())
-        reward_jerk = - self.reward_jerk_weight * (self.linear_jerk + self.angular_jerk)
+        reward_jerk = - self.reward_linear_jerk_weight * self.linear_jerk - self.reward_angular_jerk_weight * self.angular_jerk
 
         reward = (
             reward_pose 

@@ -21,7 +21,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: Turn_wosim2real
+  run_name: Turn_linearjerk0001_angularjerk00001
   # run_name: debug
   job_type: train
   entity: chenjy
