@@ -24,9 +24,9 @@ reward_action_smoothness_weight: 0.0
 reward_distance_scale: 1.6
 reward_acc_weight: 0.
 angular_acc_max: 100.0
-linear_acc_max: 5.0
-reward_linear_jerk_weight: 0.001 # 0.001
-reward_angular_jerk_weight: 0.0001 # 0.01
+linear_acc_max: 10.0
+reward_linear_jerk_weight: 0.0 # 0.001
+reward_angular_jerk_weight: 0.0 # 0.0001
 use_acc: 1
 use_jerk: 1
 

@@ -5,7 +5,7 @@ headless: true
 sim: ${task.sim}
 env: ${task.env}
 
-# model_dir: /home/chenjy/OmniDrones/scripts/outputs/Turn_v_0_5to3_threshold_0tomax_c_0to0_8/04-30_20-57/wandb/run-20240430_205705-yea3308x/files/checkpoint_final.pt
+# model_dir: /home/chenjy/OmniDrones/scripts/outputs/Turn_wosim2real.pt
 model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
@@ -21,13 +21,13 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: Turn_linearjerk0001_angularjerk00001
-  # run_name: debug
+  # run_name: Turn_wosim2real_clipctbr30
+  run_name: debug
   job_type: train
   entity: chenjy
   project: Track
-  # mode: disabled
-  mode: online # set to 'disabled' when debugging locally, online
+  mode: disabled
+  # mode: online # set to 'disabled' when debugging locally, online
   run_id: 
   monitor_gym: True
   tags: 

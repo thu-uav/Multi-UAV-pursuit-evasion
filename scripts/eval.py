@@ -235,7 +235,8 @@ def main(cfg):
             break_when_any_done=False,
             return_contiguous=False
         ).clone()
-        # np.save('track.npy', trajs[0]['stats']['drone_state'].to('cpu').numpy())
+        np.save('track.npy', trajs[0]['stats']['drone_state'].to('cpu').numpy())
+        breakpoint()
 
         base_env.enable_render(not cfg.headless)
         env.reset()
