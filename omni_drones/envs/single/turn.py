@@ -139,17 +139,17 @@ class Turn(IsaacEnv):
         # )
         self.a_scale_dist = D.Uniform(
             torch.tensor(3.0, device=self.device),
-            torch.tensor(3.01, device=self.device)
+            torch.tensor(3.0, device=self.device)
         )
         
         self.threshold_scale_dist = D.Uniform(
             torch.tensor(0.5 * scale_time(torch.tensor(self.max_episode_length * self.dt)), device=self.device),
-            torch.tensor(0.501 * scale_time(torch.tensor(self.max_episode_length * self.dt)), device=self.device)
+            torch.tensor(0.5 * scale_time(torch.tensor(self.max_episode_length * self.dt)), device=self.device)
         )
         
         self.c_scale_dist = D.Uniform(
-            torch.tensor(0.9, device=self.device),
-            torch.tensor(0.901, device=self.device)
+            torch.tensor(0.95, device=self.device),
+            torch.tensor(0.95, device=self.device)
         )
 
         # self.traj_c_dist = D.Uniform(

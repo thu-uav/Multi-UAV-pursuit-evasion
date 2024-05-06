@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
 # 从CSV文件中读取数据
-data = pd.read_csv('/home/chenjy/OmniDrones/scripts/outputs/drone_0.csv')
+data = pd.read_csv('/home/jiayu/OmniDrones/scripts/drone.csv')
 
 # 提取持续时间和系数数据
 durations = data['duration']
