@@ -231,6 +231,7 @@ class Hover(IsaacEnv):
             "return": UnboundedContinuousTensorSpec(1),
             "pos_bonus": UnboundedContinuousTensorSpec(1),
             "head_bonus": UnboundedContinuousTensorSpec(1),
+            "reward_pos": UnboundedContinuousTensorSpec(1),
             "reward_up": UnboundedContinuousTensorSpec(1),
             "reward_vel": UnboundedContinuousTensorSpec(1),
             "reward_acc": UnboundedContinuousTensorSpec(1),
@@ -252,11 +253,6 @@ class Hover(IsaacEnv):
             "angular_a_mean": UnboundedContinuousTensorSpec(1),
             "linear_jerk_mean": UnboundedContinuousTensorSpec(1),
             "angular_jerk_mean": UnboundedContinuousTensorSpec(1),
-            "reward_pos": UnboundedContinuousTensorSpec(1),
-            "reward_up": UnboundedContinuousTensorSpec(1),
-            "reward_acc": UnboundedContinuousTensorSpec(1),
-            "reward_smooth": UnboundedContinuousTensorSpec(1),
-            "reward_jerk": UnboundedContinuousTensorSpec(1),
         }).expand(self.num_envs).to(self.device)
         info_spec = CompositeSpec({
             "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13), device=self.device),
@@ -469,6 +465,7 @@ class Hover(IsaacEnv):
         self.stats["action_smoothness"].lerp_(-self.drone.throttle_difference, (1-self.alpha))
         self.stats["return"] += reward
         # bonus
+        self.stats["reward_pos"] = reward_pos
         self.stats["pos_bonus"] = reward_pos_bonus
         self.stats["head_bonus"] = reward_head_bonus
         self.stats["reward_up"] = reward_up
