@@ -123,8 +123,8 @@ class Hover(IsaacEnv):
         #     torch.tensor([2.5, 2.5, 2.], device=self.device)
         # )
         self.init_pos_dist = D.Uniform(
-            torch.tensor([-0.5, -0.5, 0.], device=self.device),
-            torch.tensor([0.5, 0.5, 2.0], device=self.device)
+            torch.tensor([-1.0, -1.0, 0.], device=self.device),
+            torch.tensor([1.0, 1.0, 2.0], device=self.device)
         )
         self.init_rpy_dist = D.Uniform(
             torch.tensor([-.2, -.2, 0.], device=self.device) * torch.pi,
