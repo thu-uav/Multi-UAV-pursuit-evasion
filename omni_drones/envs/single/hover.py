@@ -74,10 +74,17 @@ class Hover(IsaacEnv):
 
     """
     def __init__(self, cfg, headless):
-        self.reward_effort_weight = cfg.task.reward_effort_weight
         self.reward_action_smoothness_weight = cfg.task.reward_action_smoothness_weight
         self.reward_distance_scale = cfg.task.reward_distance_scale
+        self.reward_v_scale = cfg.task.reward_v_scale
+        self.reward_acc_scale = cfg.task.reward_acc_scale
+        self.reward_jerk_scale = cfg.task.reward_jerk_scale
+        self.linear_vel_max = cfg.task.linear_vel_max
+        self.linear_acc_max = cfg.task.linear_acc_max
         self.time_encoding = cfg.task.time_encoding
+        self.use_acc = cfg.task.use_acc
+        self.use_jerk = cfg.task.use_jerk
+        
         self.randomization = cfg.task.get("randomization", {})
         self.has_payload = "payload" in self.randomization.keys()
 
@@ -132,6 +139,13 @@ class Hover(IsaacEnv):
         self.target_heading = torch.zeros(self.num_envs, 1, 3, device=self.device)
         self.alpha = 0.8
 
+        self.last_linear_v = torch.zeros(self.num_envs, 1, device=self.device)
+        self.last_angular_v = torch.zeros(self.num_envs, 1, device=self.device)
+        self.last_linear_a = torch.zeros(self.num_envs, 1, device=self.device)
+        self.last_angular_a = torch.zeros(self.num_envs, 1, device=self.device)
+        self.last_linear_jerk = torch.zeros(self.num_envs, 1, device=self.device)
+        self.last_angular_jerk = torch.zeros(self.num_envs, 1, device=self.device)
+
     def _design_scene(self):
         import omni_drones.utils.kit as kit_utils
         import omni.isaac.core.utils.prims as prim_utils
@@ -169,6 +183,11 @@ class Hover(IsaacEnv):
     def _set_specs(self):
         # drone_state_dim = self.drone.state_spec.shape[-1]
         observation_dim = 3 + 3 + 4 + 3 + 3 # position, velocity, quaternion, heading, up
+
+        if self.use_acc:
+            observation_dim += 2
+        if self.use_jerk:
+            observation_dim += 2
 
         if self.cfg.task.omega:
             observation_dim += 3
@@ -213,11 +232,31 @@ class Hover(IsaacEnv):
             "pos_bonus": UnboundedContinuousTensorSpec(1),
             "head_bonus": UnboundedContinuousTensorSpec(1),
             "reward_up": UnboundedContinuousTensorSpec(1),
+            "reward_vel": UnboundedContinuousTensorSpec(1),
+            "reward_acc": UnboundedContinuousTensorSpec(1),
+            "reward_jerk": UnboundedContinuousTensorSpec(1),
             "episode_len": UnboundedContinuousTensorSpec(1),
             "pos_error": UnboundedContinuousTensorSpec(1),
             "heading_alignment": UnboundedContinuousTensorSpec(1),
             "uprightness": UnboundedContinuousTensorSpec(1),
             "action_smoothness": UnboundedContinuousTensorSpec(1),
+            "linear_v_max": UnboundedContinuousTensorSpec(1),
+            "angular_v_max": UnboundedContinuousTensorSpec(1),
+            "linear_a_max": UnboundedContinuousTensorSpec(1),
+            "angular_a_max": UnboundedContinuousTensorSpec(1),
+            "linear_jerk_max": UnboundedContinuousTensorSpec(1),
+            "angular_jerk_max": UnboundedContinuousTensorSpec(1),
+            "linear_v_mean": UnboundedContinuousTensorSpec(1),
+            "angular_v_mean": UnboundedContinuousTensorSpec(1),
+            "linear_a_mean": UnboundedContinuousTensorSpec(1),
+            "angular_a_mean": UnboundedContinuousTensorSpec(1),
+            "linear_jerk_mean": UnboundedContinuousTensorSpec(1),
+            "angular_jerk_mean": UnboundedContinuousTensorSpec(1),
+            "reward_pos": UnboundedContinuousTensorSpec(1),
+            "reward_up": UnboundedContinuousTensorSpec(1),
+            "reward_acc": UnboundedContinuousTensorSpec(1),
+            "reward_smooth": UnboundedContinuousTensorSpec(1),
+            "reward_jerk": UnboundedContinuousTensorSpec(1),
         }).expand(self.num_envs).to(self.device)
         info_spec = CompositeSpec({
             "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13), device=self.device),
@@ -259,7 +298,22 @@ class Hover(IsaacEnv):
         self.target_heading[env_ids] = quat_axis(target_rot.squeeze(1), 0).unsqueeze(1)
         self.target_vis.set_world_poses(orientations=target_rot, env_indices=env_ids)
 
+        # set last values
+        self.last_linear_v[env_ids] = torch.norm(self.init_vels[..., :3], dim=-1)
+        self.last_angular_v[env_ids] = torch.norm(self.init_vels[..., 3:], dim=-1)
+        self.last_linear_a[env_ids] = torch.zeros_like(self.last_linear_v[env_ids])
+        self.last_angular_a[env_ids] = torch.zeros_like(self.last_angular_v[env_ids])
+        self.last_linear_jerk[env_ids] = torch.zeros_like(self.last_linear_a[env_ids])
+        self.last_angular_jerk[env_ids] = torch.zeros_like(self.last_angular_a[env_ids])
+
         self.stats[env_ids] = 0.
+        
+        self.linear_v_episode = torch.zeros_like(self.stats["linear_v_mean"])
+        self.angular_v_episode = torch.zeros_like(self.stats["angular_v_mean"])
+        self.linear_a_episode = torch.zeros_like(self.stats["linear_a_mean"])
+        self.angular_a_episode = torch.zeros_like(self.stats["angular_a_mean"])
+        self.linear_jerk_episode = torch.zeros_like(self.stats["linear_jerk_mean"])
+        self.angular_jerk_episode = torch.zeros_like(self.stats["angular_jerk_mean"])
 
     def _pre_sim_step(self, tensordict: TensorDictBase):
         actions = tensordict[("agents", "action")]
@@ -284,6 +338,51 @@ class Hover(IsaacEnv):
             t = (self.progress_buf / self.max_episode_length).unsqueeze(-1)
             # t = torch.zeros_like(self.progress_buf).unsqueeze(-1)
             obs.append(t.expand(-1, self.time_encoding_dim).unsqueeze(1))
+        
+        # linear_v, angular_v
+        self.linear_v = torch.norm(self.root_state[..., 7:10], dim=-1)
+        self.angular_v = torch.norm(self.root_state[..., 10:13], dim=-1)
+        self.stats["linear_v_max"].set_(torch.max(self.stats["linear_v_max"], torch.abs(self.linear_v)))
+        self.linear_v_episode.add_(torch.abs(self.linear_v))
+        self.stats["linear_v_mean"].set_(self.linear_v_episode / (self.progress_buf + 1.0).unsqueeze(1))
+        self.stats["angular_v_max"].set_(torch.max(self.stats["angular_v_max"], torch.abs(self.angular_v)))
+        self.angular_v_episode.add_(torch.abs(self.angular_v))
+        self.stats["angular_v_mean"].set_(self.angular_v_episode / (self.progress_buf + 1.0).unsqueeze(1))
+        # linear_a, angular_a
+        self.linear_a = torch.abs(self.linear_v - self.last_linear_v) / self.dt
+        self.angular_a = torch.abs(self.angular_v - self.last_angular_v) / self.dt
+        self.stats["linear_a_max"].set_(torch.max(self.stats["linear_a_max"], torch.abs(self.linear_a)))
+        self.linear_a_episode.add_(torch.abs(self.linear_a))
+        self.stats["linear_a_mean"].set_(self.linear_a_episode / (self.progress_buf + 1.0).unsqueeze(1))
+        self.stats["angular_a_max"].set_(torch.max(self.stats["angular_a_max"], torch.abs(self.angular_a)))
+        self.angular_a_episode.add_(torch.abs(self.angular_a))
+        self.stats["angular_a_mean"].set_(self.angular_a_episode / (self.progress_buf + 1.0).unsqueeze(1))
+        # linear_jerk, angular_jerk
+        self.linear_jerk = torch.abs(self.linear_a - self.last_linear_a) / self.dt
+        self.angular_jerk = torch.abs(self.angular_a - self.last_angular_a) / self.dt
+        self.stats["linear_jerk_max"].set_(torch.max(self.stats["linear_jerk_max"], torch.abs(self.linear_jerk)))
+        self.linear_jerk_episode.add_(torch.abs(self.linear_jerk))
+        self.stats["linear_jerk_mean"].set_(self.linear_jerk_episode / (self.progress_buf + 1.0).unsqueeze(1))
+        self.stats["angular_jerk_max"].set_(torch.max(self.stats["angular_jerk_max"], torch.abs(self.angular_jerk)))
+        self.angular_jerk_episode.add_(torch.abs(self.angular_jerk))
+        self.stats["angular_jerk_mean"].set_(self.angular_jerk_episode / (self.progress_buf + 1.0).unsqueeze(1))
+        
+        # set last
+        self.last_linear_v = self.linear_v.clone()
+        self.last_angular_v = self.angular_v.clone()
+        self.last_linear_a = self.linear_a.clone()
+        self.last_angular_a = self.angular_a.clone()
+        self.last_linear_jerk = self.linear_jerk.clone()
+        self.last_angular_jerk = self.angular_jerk.clone()
+        
+        # add acc and jerk
+        if self.use_acc:
+            obs.append(self.linear_a.unsqueeze(1) / 10.0)
+            obs.append(self.angular_a.unsqueeze(1) / 100.0)
+        if self.use_jerk:
+            obs.append(self.linear_jerk.unsqueeze(1) / 1000.0)
+            obs.append(self.angular_jerk.unsqueeze(1) / 10000.0)
+        
         obs = torch.cat(obs, dim=-1)
 
         if self.cfg.task.add_noise:
@@ -320,6 +419,11 @@ class Hover(IsaacEnv):
 
         # uprightness
         reward_up = torch.square((self.drone.up[..., 2] + 1) / 2)
+        
+        # v, acc, jerk
+        reward_v = self.reward_v_scale * (reward_pos_bonus > 0) * (self.linear_v < self.linear_vel_max)
+        reward_acc = self.reward_acc_scale * (reward_pos_bonus > 0) * (self.linear_a < self.linear_acc_max)
+        reward_jerk = self.reward_jerk_scale * (reward_pos_bonus > 0) * (- self.linear_jerk)
 
         reward = (
             reward_pos
@@ -327,6 +431,9 @@ class Hover(IsaacEnv):
             + reward_head 
             + reward_head_bonus
             + reward_up
+            + reward_v
+            + reward_acc
+            + reward_jerk
         )
 
         # reward_pose = 1.0 / (1.0 + torch.square(self.reward_distance_scale * distance))
@@ -365,6 +472,9 @@ class Hover(IsaacEnv):
         self.stats["pos_bonus"] = reward_pos_bonus
         self.stats["head_bonus"] = reward_head_bonus
         self.stats["reward_up"] = reward_up
+        self.stats["reward_vel"] = reward_v
+        self.stats["reward_acc"] = reward_acc
+        self.stats["reward_jerk"] = reward_jerk
         self.stats["episode_len"][:] = self.progress_buf.unsqueeze(1)
 
         return TensorDict(

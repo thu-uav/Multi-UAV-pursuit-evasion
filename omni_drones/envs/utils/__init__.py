@@ -150,6 +150,13 @@ def lemniscate(t, c):
 
     return x
 
+def line_acc(t, a):
+    x = 0.5 * a * t**2
+    y = torch.zeros_like(t)
+    z = torch.zeros_like(t)
+
+    return torch.stack([x, y, z], dim=-1)
+
 def line_segments(t, v, threshold, c):
     # v = torch.tensor(v)
     # threshold = torch.tensor(threshold)

@@ -21,7 +21,7 @@
 # SOFTWARE.
 
 
-from .single import Hover, Track, TrackV1, Turn
+from .single import Hover, Track, TrackV1, Turn, Line
 from .platform import PlatformHover, PlatformFlyThrough
 from .inv_pendulum import InvPendulumHover, InvPendulumFlyThrough
 from .transport import TransportHover, TransportFlyThrough, TransportTrack
