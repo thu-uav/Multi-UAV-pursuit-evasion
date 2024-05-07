@@ -367,7 +367,6 @@ class RateController(Transform):
         )
         torch.nan_to_num_(cmds, 0.)
         tensordict.set(self.action_key, cmds)
-        tensordict.set(("info", "ctbr"), torch.concat([target_rate, target_thrust / self.max_thrust], dim=-1))
         return tensordict
 
 

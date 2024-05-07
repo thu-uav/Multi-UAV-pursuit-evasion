@@ -124,15 +124,15 @@ class Hover(IsaacEnv):
         # )
         self.init_pos_dist = D.Uniform(
             torch.tensor([-0.5, -0.5, 0.], device=self.device),
-            torch.tensor([0.5, 0.5, 2.], device=self.device)
+            torch.tensor([0.5, 0.5, 2.0], device=self.device)
         )
         self.init_rpy_dist = D.Uniform(
             torch.tensor([-.2, -.2, 0.], device=self.device) * torch.pi,
-            torch.tensor([0.2, 0.2, 2.], device=self.device) * torch.pi
+            torch.tensor([0.2, 0.2, 0.], device=self.device) * torch.pi
         )
         self.target_rpy_dist = D.Uniform(
             torch.tensor([0., 0., 0.], device=self.device) * torch.pi,
-            torch.tensor([0., 0., 2.], device=self.device) * torch.pi
+            torch.tensor([0., 0., 0.], device=self.device) * torch.pi
         )
 
         self.target_pos = torch.tensor([[0.0, 0.0, 1.]], device=self.device)
@@ -256,7 +256,6 @@ class Hover(IsaacEnv):
         }).expand(self.num_envs).to(self.device)
         info_spec = CompositeSpec({
             "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13), device=self.device),
-            "ctbr": UnboundedContinuousTensorSpec((self.drone.n, 4), device=self.device),
             "prev_action": torch.stack([self.drone.action_spec] * self.drone.n, 0).to(self.device),
         }).expand(self.num_envs).to(self.device)
         self.observation_spec["stats"] = stats_spec
@@ -414,8 +413,8 @@ class Hover(IsaacEnv):
         reward_head = - head_error * (reward_pos_bonus > 0)
         reward_head_bonus = ((head_error <= 0.02) * 10 * (reward_pos_bonus > 0)).float()
 
-        # uprightness
-        reward_up = torch.square((self.drone.up[..., 2] + 1) / 2)
+        # # uprightness
+        # reward_up = torch.square((self.drone.up[..., 2] + 1) / 2)
         
         # v, acc, jerk
         reward_v = self.reward_v_scale * (reward_pos_bonus > 0) * (self.linear_v < self.linear_vel_max)
@@ -427,7 +426,7 @@ class Hover(IsaacEnv):
             + reward_pos_bonus
             + reward_head 
             + reward_head_bonus
-            + reward_up
+            # + reward_up
             + reward_v
             + reward_acc
             + reward_jerk
@@ -469,7 +468,7 @@ class Hover(IsaacEnv):
         self.stats["reward_pos"] = reward_pos
         self.stats["pos_bonus"] = reward_pos_bonus
         self.stats["head_bonus"] = reward_head_bonus
-        self.stats["reward_up"] = reward_up
+        # self.stats["reward_up"] = reward_up
         self.stats["reward_vel"] = reward_v
         self.stats["reward_acc"] = reward_acc
         self.stats["reward_jerk"] = reward_jerk

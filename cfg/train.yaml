@@ -5,7 +5,7 @@ headless: true
 sim: ${task.sim}
 env: ${task.env}
 
-model_dir: /home/jiayu/OmniDrones/scripts/outputs/Hover_clip60.pt
+model_dir: /home/jiayu/OmniDrones/scripts/outputs/Hover_raw.pt
 # model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
@@ -16,18 +16,18 @@ seed: 0
 
 viewer:
   resolution: [960, 720]
-  eye: [-8., 0., 8.]
+  eye: [-2., 0., 2.]
   lookat: [0., 0., 1.]
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: Hover_clip30_load60
-  run_name: debug
+  run_name: Hover_woupreward
+  # run_name: debug
   job_type: train
   entity: chenjy
   project: Track
-  mode: disabled
-  # mode: online # set to 'disabled' when debugging locally, online
+  # mode: disabled
+  mode: online # set to 'disabled' when debugging locally, online
   run_id: 
   monitor_gym: True
   tags: 

@@ -235,10 +235,15 @@ def main(cfg):
             break_when_any_done=False,
             return_contiguous=False
         ).clone()
+        
         # save trajectory
         # np.save('track.npy', trajs[0]['stats']['drone_state'].to('cpu').numpy())
         # save ctbr
-        # np.save('ctbr.npy', trajs[0]['info']['ctbr'].to('cpu').numpy())
+        # action = torch.tanh(trajs[0]['agents']['action'])
+        # target_rate, target_thrust = action.split([3, 1], -1)
+        # target_thrust = ((target_thrust + 1) / 2).clip(0.)
+        # np.save('ctbr.npy', torch.concat([target_rate, target_thrust], dim=-1).to('cpu').numpy())
+        # breakpoint()
 
         base_env.enable_render(not cfg.headless)
         env.reset()
