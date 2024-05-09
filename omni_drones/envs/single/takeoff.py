@@ -34,8 +34,7 @@ def attach_payload(parent_path):
     joint.GetAttribute("drive:linear:physics:damping").Set(10.)
     joint.GetAttribute("drive:linear:physics:stiffness").Set(10000.)
 
-
-class Hover(IsaacEnv):
+class Takeoff(IsaacEnv):
     r"""
     A basic control task. The goal for the agent is to maintain a stable
     position and heading in mid-air without drifting. 
@@ -117,7 +116,7 @@ class Hover(IsaacEnv):
         #     torch.tensor([0.0, 0.0, 0.1], device=self.device)
         # )
         self.init_pos_dist = D.Uniform(
-            torch.tensor([-1.0, -1.0, 0.], device=self.device),
+            torch.tensor([-1.0, -1.0, 0.05], device=self.device),
             torch.tensor([1.0, 1.0, 2.0], device=self.device)
         )
         self.init_rpy_dist = D.Uniform(
@@ -129,7 +128,12 @@ class Hover(IsaacEnv):
             torch.tensor([0., 0., 2.], device=self.device) * torch.pi
         )
 
-        self.target_pos = torch.tensor([[0.0, 0.0, 1.]], device=self.device)
+        self.target_pos_z = D.Uniform(
+            torch.tensor(1.0, device=self.device),
+            torch.tensor(1.0, device=self.device)
+        )
+
+        # self.target_pos = torch.tensor([[0.0, 0.0, 1.]], device=self.device)
         self.target_heading = torch.zeros(self.num_envs, 1, 3, device=self.device)
         self.alpha = 0.8
 
@@ -259,6 +263,10 @@ class Hover(IsaacEnv):
         target_rot = euler_to_quaternion(target_rpy)
         self.target_heading[env_ids] = quat_axis(target_rot.squeeze(1), 0).unsqueeze(1)
         self.target_vis.set_world_poses(orientations=target_rot, env_indices=env_ids)
+
+        target_z = self.target_pos_z.sample((*env_ids.shape, 1))
+        self.target_pos = pos.clone()
+        self.target_pos[..., 2] = target_z
 
         self.stats[env_ids] = 0.
 

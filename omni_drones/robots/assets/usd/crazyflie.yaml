@@ -1,7 +1,8 @@
 # origin
 update_sim: True
 name: crazyflie
-target_clip: 0.1667
+target_clip: 1.0
+max_thrust_ratio: 0.9
 inertia:
   xx: 1.4e-5
   xy: 0.0

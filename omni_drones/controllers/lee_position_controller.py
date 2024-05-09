@@ -321,6 +321,7 @@ class RateController(nn.Module):
             torch.tensor(gain) @ I[:3, :3].inverse()
         )
         self.target_clip = uav_params['target_clip']
+        self.max_thrust_ratio = uav_params['max_thrust_ratio']
 
     def set_byTunablePara(
         self,

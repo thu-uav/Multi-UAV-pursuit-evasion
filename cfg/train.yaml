@@ -5,7 +5,7 @@ headless: true
 sim: ${task.sim}
 env: ${task.env}
 
-# model_dir: /home/chenjy/OmniDrones/scripts/outputs/Turn_wosim2real.pt
+# model_dir: /home/jiayu/OmniDrones/scripts/outputs/Hover/05-08_14-53/wandb/run-20240508_145318-tatzbpxh/files/checkpoint_616169472.pt
 model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
@@ -16,24 +16,24 @@ seed: 0
 
 viewer:
   resolution: [960, 720]
-  eye: [-8., 0., 8.]
+  eye: [-3., 0., 3.]
   lookat: [0., 0., 1.]
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: Turn_wosim2real_clipctbr30
-  run_name: debug
+  # run_name: eval_ours
+  run_name: takeoff
   job_type: train
   entity: chenjy
   project: Track
-  mode: disabled
-  # mode: online # set to 'disabled' when debugging locally, online
+  # mode: disabled
+  mode: online # set to 'disabled' when debugging locally, online
   run_id: 
   monitor_gym: True
   tags: 
 
 defaults:
-  # - task: Hover
-  - task: Turn
+  - task: Takeoff
+  # - task: Turn
   - algo: mappo
   - _self_
