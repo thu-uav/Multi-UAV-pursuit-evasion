@@ -332,7 +332,6 @@ class VelController(Transform):
         tensordict.set(self.action_key, cmds)
         return tensordict
 
-
 class RateController(Transform):
     def __init__(
         self,

@@ -23,7 +23,7 @@ def split_trajectory(duration, x, y, z, segment_duration):
     return segments
 
 # 对每个小段进行多项式拟合
-def fit_segments(segments, segment_duration, idx=0):
+def fit_segments(segments, segment_duration):
     fitted_segments = []
     columns = ['duration','x^0','x^1','x^2','x^3','x^4','x^5',
                   'x^6','x^7','y^0','y^1','y^2','y^3','y^4','y^5',
@@ -47,11 +47,11 @@ def fit_segments(segments, segment_duration, idx=0):
         fitted_segments.append((duration, polynomial_func(duration, *popt_x), polynomial_func(duration, *popt_y), polynomial_func(duration, *popt_z)))
         # breakpoint()
     df = pd.DataFrame(data_list, columns=columns)
-    df.to_csv('drone_{}.csv'.format(idx), index=False)
+    df.to_csv('drone.csv', index=False)
     return fitted_segments
 
 # 绘制原始轨迹和拟合曲线
-def plot_trajectory_with_fitted_segments(duration, x, y, z, fitted_segments, idx=0):
+def plot_trajectory_with_fitted_segments(duration, x, y, z, fitted_segments):
     fig = plt.figure(figsize=(10, 6))
     ax1 = fig.add_subplot(211)
     ax2 = fig.add_subplot(212)
@@ -69,10 +69,10 @@ def plot_trajectory_with_fitted_segments(duration, x, y, z, fitted_segments, idx
     plt.ylabel('Position')
     plt.title('Polynomial Fitting for Trajectory Data')
     plt.grid(True)
-    plt.savefig('traj_{}.png'.format(idx))
+    plt.savefig('traj.png')
 
 # 绘制原始轨迹和拟合曲线
-def plot_trajectory_3d(duration, x, y, z, fitted_segments, idx=0):
+def plot_trajectory_3d(duration, x, y, z, fitted_segments):
     fig = plt.figure(figsize=(10, 6))
     ax1 = fig.add_subplot(121, projection='3d')
     ax2 = fig.add_subplot(122, projection='3d')
@@ -87,40 +87,60 @@ def plot_trajectory_3d(duration, x, y, z, fitted_segments, idx=0):
     ax2.set_zlabel('Z')
     # plt.legend()
     plt.grid(True)
-    plt.savefig('traj_3d_{}.png'.format(idx))
+    plt.savefig('traj_3d.png')
+
+def plot_vel(duration, x, y, z):
+    fig = plt.figure(figsize=(10, 6))
+    ax1 = fig.add_subplot(211)
+    ax1.plot(duration, x, 'r.', label='vel x')
+    ax1.plot(duration, y, 'b.', label='vel y')
+    ax1.plot(duration, z, 'g.', label='vel z')
+    # plt.legend()
+    plt.xlabel('Duration')
+    plt.ylabel('Vel')
+    plt.title('Velocity')
+    ax1.legend()
+    plt.grid(True)
+    plt.savefig('vel.png')
 
 # transfer x-y-z to 3D traj and axis-t
-t = np.linspace(0, 800 * 0.016, 800)
-data = np.load('/home/chenjy/OmniDrones/scripts/outputs/Angenali.npy')
-num_drones = 4
-for idx in range(num_drones):
-    x_origin = data[:, idx, 0, 0]
-    y_origin = data[:, idx, 0, 1]
-    z_origin = data[:, idx, 0, 2]
+max_length = 350
+t = np.linspace(0, max_length * 0.01, max_length)
+data = np.load('/home/jiayu/OmniDrones/scripts/track.npy')
+x_origin = data[:max_length, 0]
+y_origin = data[:max_length, 1]
+z_origin = data[:max_length, 2]
 
-    # 按照持续时间划分轨迹为多个小段
-    segment_duration = 1.0  # 每个小段的持续时间
-    segments = split_trajectory(t, x_origin, y_origin, z_origin, segment_duration)
+# 按照持续时间划分轨迹为多个小段
+segment_duration = 1.0  # 每个小段的持续时间
+segments = split_trajectory(t, x_origin, y_origin, z_origin, segment_duration)
 
-    # 对每个小段进行多项式拟合
-    fitted_segments = fit_segments(segments, segment_duration, idx=idx)
+# 对每个小段进行多项式拟合
+fitted_segments = fit_segments(segments, segment_duration)
 
-    # 绘制原始轨迹和拟合曲线
-    plot_trajectory_with_fitted_segments(t, x_origin, y_origin, z_origin, fitted_segments, idx=idx)
-    plot_trajectory_3d(t, x_origin, y_origin, z_origin, fitted_segments, idx=idx)
+# 绘制原始轨迹和拟合曲线
+plot_trajectory_with_fitted_segments(t, x_origin, y_origin, z_origin, fitted_segments)
+plot_trajectory_3d(t, x_origin, y_origin, z_origin, fitted_segments)
 
-    fitted_x = []
-    fitted_y = []
-    fitted_z = []
-    for segment in fitted_segments:
-        duration, x, y, z = segment
-        fitted_x.append(x)
-        fitted_y.append(y)
-        fitted_z.append(z)
-    fitted_x = np.concatenate(fitted_x)
-    fitted_y = np.concatenate(fitted_y)
-    fitted_z = np.concatenate(fitted_z)
-    origin = np.array([x_origin, y_origin, z_origin])
-    fitted = np.array([fitted_x, fitted_y, fitted_z])
-    error = np.sum((fitted - origin)**2, axis=0).mean()
-    print('fitted error of agent {}: '.format(idx), error)
+# vel
+velx_origin = data[:max_length, 7]
+vely_origin = data[:max_length, 8]
+velz_origin = data[:max_length, 9]
+
+plot_vel(t, velx_origin, vely_origin, velz_origin)
+
+fitted_x = []
+fitted_y = []
+fitted_z = []
+for segment in fitted_segments:
+    duration, x, y, z = segment
+    fitted_x.append(x)
+    fitted_y.append(y)
+    fitted_z.append(z)
+fitted_x = np.concatenate(fitted_x)
+fitted_y = np.concatenate(fitted_y)
+fitted_z = np.concatenate(fitted_z)
+origin = np.array([x_origin, y_origin, z_origin])
+fitted = np.array([fitted_x, fitted_y, fitted_z])
+error = np.sum((fitted - origin)**2, axis=0).mean()
+print('fitted error of agent: ', error)

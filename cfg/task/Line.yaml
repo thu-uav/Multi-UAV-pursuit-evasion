@@ -1,4 +1,4 @@
-name: Turn
+name: Line
 
 defaults:
   # see https://hydra.cc/docs/advanced/overriding_packages/
@@ -6,8 +6,8 @@ defaults:
   - /base/sim_base@_here_
 
 env:
-  num_envs: 1
-  max_episode_length: 400
+  num_envs: 2048
+  max_episode_length: 200
 
 drone_model: Crazyflie
 force_sensor: false

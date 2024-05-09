@@ -36,10 +36,10 @@ from tensordict.tensordict import TensorDict, TensorDictBase
 from torchrl.data import UnboundedContinuousTensorSpec, CompositeSpec
 from omni.isaac.debug_draw import _debug_draw
 
-from ..utils import lemniscate, pentagram, scale_time, line_segments, line_segments_acc
+from ..utils import lemniscate, pentagram, scale_time, line_segments, line_segments_acc, line_acc
 import collections
 
-class Turn(IsaacEnv):
+class Line(IsaacEnv):
     r"""
     A basic control task. The goal for the agent is to track a reference 
     lemniscate trajectory in the 3D space.
@@ -489,7 +489,7 @@ class Turn(IsaacEnv):
         
         # target_pos = vmap(lemniscate)(t, self.traj_c[env_ids])
         # target_pos = vmap(line_segments)(t, self.v_scale[env_ids], self.threshold_scale[env_ids], torch.pi * self.c_scale[env_ids])
-        target_pos = vmap(line_segments_acc)(t, self.a_scale[env_ids], self.threshold_scale[env_ids], torch.pi * self.c_scale[env_ids])
+        target_pos = vmap(line_acc)(t, self.a_scale[env_ids])
         # target_pos = vmap(torch_utils.quat_rotate)(traj_rot, target_pos) * self.traj_scale[env_ids].unsqueeze(1)
 
         return self.origin + target_pos
