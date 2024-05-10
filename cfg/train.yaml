@@ -5,12 +5,12 @@ headless: true
 sim: ${task.sim}
 env: ${task.env}
 
-model_dir: /home/jiayu/OmniDrones/scripts/outputs/takeoff_bodyrate1_0_thrust0_9/05-09_21-42/wandb/run-20240509_214214-ztb340s6/files/checkpoint_final.pt
-# model_dir: null
+# model_dir: /home/jiayu/OmniDrones/scripts/outputs/takeoff_bodyrate1_0_thrust0_9/05-09_21-42/wandb/run-20240509_214214-ztb340s6/files/checkpoint_final.pt
+model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
 max_iters: -1
-eval_interval: 100
+eval_interval: -1
 save_interval: 100
 seed: 0
 
