@@ -367,6 +367,32 @@ class RateController(nn.Module):
 
         pos, rot, linvel, angvel = root_state.split([3, 4, 3, 3], dim=1)
         body_rate = quat_rotate_inverse(rot, angvel)
+        
+        # # visual ctbr
+        # import numpy as np
+        # import os
+        # model_path = '/home/jiayu/OmniDrones/scripts'
+        # real_path = model_path + '/real.npy'
+        # target_path = model_path + '/target.npy'
+        # thrust_path = model_path + '/thrust.npy'
+        # if not os.path.exists(real_path):
+        #     np.save(real_path, body_rate.to('cpu').numpy())
+        # else:
+        #     existing_data = np.load(real_path)
+        #     updated_data = np.concatenate([existing_data, body_rate.to('cpu').numpy()])
+        #     np.save(real_path, updated_data)
+        # if not os.path.exists(target_path):
+        #     np.save(target_path, target_rate.to('cpu').numpy())
+        # else:
+        #     existing_data = np.load(target_path)
+        #     updated_data = np.concatenate([existing_data, target_rate.to('cpu').numpy()])
+        #     np.save(target_path, updated_data)
+        # if not os.path.exists(thrust_path):
+        #     np.save(thrust_path, (target_thrust / self.max_thrusts.sum(-1)).to('cpu').numpy())
+        # else:
+        #     existing_data = np.load(thrust_path)
+        #     updated_data = np.concatenate([existing_data, (target_thrust / self.max_thrusts.sum(-1)).to('cpu').numpy()])
+        #     np.save(thrust_path, updated_data)
 
         rate_error = body_rate - target_rate
         acc_des = (

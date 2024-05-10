@@ -31,7 +31,7 @@ def main(cfg):
         backend="torch",
         device=cfg.sim.device,
     )
-    n = 4
+    n = 1
 
     drone: MultirotorBase = MultirotorBase.REGISTRY[cfg.drone_model]()
 
@@ -57,7 +57,7 @@ def main(cfg):
     init_pos, init_rot = drone.get_world_poses(True)
     init_vels = torch.zeros(n, 6, device=sim.device)
     target_rate = torch.zeros(n, 3, device=sim.device)
-    target_rate[:, 2] = torch.pi
+    target_rate[:, 2] = 0.0
     target_height = 1.5 + 0.5 * torch.arange(n, device=sim.device).float()
 
     controller = RateController(9.8, uav_params=drone.params).to(sim.device)

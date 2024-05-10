@@ -5,14 +5,14 @@ headless: true
 sim: ${task.sim}
 env: ${task.env}
 
-# model_dir: /home/jiayu/OmniDrones/scripts/outputs/takeoff_bodyrate1_0_thrust0_9/05-09_21-42/wandb/run-20240509_214214-ztb340s6/files/checkpoint_final.pt
+# model_dir: /home/jiayu/OmniDrones/scripts/outputs/Hover_yaw0_bodyrate04_thrust09.pt
 model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
 max_iters: -1
 eval_interval: -1
 save_interval: 100
-seed: 0
+seed: 1
 
 viewer:
   resolution: [960, 720]
@@ -22,7 +22,7 @@ viewer:
 wandb:
   group: ${oc.select:..task.name}
   # run_name: eval_ours
-  run_name: Hover_yaw0_bodyrate1_thrust09
+  run_name: Hover_bodyrate04_random_mass08to12
   job_type: train
   entity: chenjy
   project: Track

@@ -235,7 +235,7 @@ def main(cfg):
             break_when_any_done=False,
             return_contiguous=False
         ).clone()
-        
+        breakpoint()
         # save trajectory
         # np.save('track.npy', trajs[0]['stats']['drone_state'].to('cpu').numpy())
         # save ctbr
