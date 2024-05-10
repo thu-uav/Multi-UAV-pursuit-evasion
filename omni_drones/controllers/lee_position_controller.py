@@ -322,6 +322,7 @@ class RateController(nn.Module):
         )
         self.target_clip = uav_params['target_clip']
         self.max_thrust_ratio = uav_params['max_thrust_ratio']
+        self.fixed_yaw = uav_params['fixed_yaw']
 
     def set_byTunablePara(
         self,

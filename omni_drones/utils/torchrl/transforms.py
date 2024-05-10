@@ -344,6 +344,7 @@ class RateController(Transform):
         self.max_thrust = self.controller.max_thrusts.sum(-1)
         self.target_clip = self.controller.target_clip
         self.max_thrust_ratio = self.controller.max_thrust_ratio
+        self.fixed_yaw = self.controller.fixed_yaw
         # self.tanh = TanhTransform()
     
     def transform_input_spec(self, input_spec: TensorSpec) -> TensorSpec:
@@ -357,6 +358,8 @@ class RateController(Transform):
         action = tensordict[self.action_key]
         action = torch.tanh(action)
         target_rate, target_thrust = action.split([3, 1], -1)
+        if self.fixed_yaw:
+            target_rate[..., 2] = 0.0
         target_thrust = torch.clamp((target_thrust + 1) / 2, min = 0.0, max = self.max_thrust_ratio) * self.max_thrust
         # target_thrust = ((target_thrust + 1) / 2).clip(0.) * self.max_thrust
         cmds = self.controller(
@@ -370,7 +373,6 @@ class RateController(Transform):
         torch.nan_to_num_(cmds, 0.)
         tensordict.set(self.action_key, cmds)
         return tensordict
-
 
 class AttitudeController(Transform):
     def __init__(

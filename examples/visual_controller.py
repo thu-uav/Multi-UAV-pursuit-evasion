@@ -4,18 +4,19 @@ import numpy as np
 
 df = pd.read_csv('/home/jiayu/OmniDrones/examples/real_data/hover.csv')
 
-clip_idx = 1300
-timestamps = (np.array(df['pos.time']) - np.array(df['pos.time'])[0])[:clip_idx] / 10**9
+start_idx = 550
+clip_idx = 1200
+timestamps = (np.array(df['pos.time']) - np.array(df['pos.time'])[0])[start_idx:clip_idx] / 10**9
 
-real_rate_r = np.array(df['real_rate.r'])[:clip_idx] * 180.0 / np.pi
-real_rate_p = np.array(df['real_rate.p'])[:clip_idx] * 180.0 / np.pi
-real_rate_y = np.array(df['real_rate.y'])[:clip_idx] * 180.0 / np.pi
-real_thrust = np.array(df['real_rate.thrust'])[:clip_idx] / 2**16
+real_rate_r = np.array(df['real_rate.r'])[start_idx:clip_idx] * 180.0 / np.pi
+real_rate_p = np.array(df['real_rate.p'])[start_idx:clip_idx] * 180.0 / np.pi
+real_rate_y = np.array(df['real_rate.y'])[start_idx:clip_idx] * 180.0 / np.pi
+real_thrust = np.array(df['real_rate.thrust'])[start_idx:clip_idx] / 2**16
 
-target_rate_r = np.array(df['target_rate.r'])[:clip_idx]
-target_rate_p = np.array(df['target_rate.p'])[:clip_idx]
-target_rate_y = np.array(df['target_rate.y'])[:clip_idx]
-target_thrust = np.array(df['target_rate.thrust'])[:clip_idx] / 2**16
+target_rate_r = np.array(df['target_rate.r'])[start_idx:clip_idx]
+target_rate_p = np.array(df['target_rate.p'])[start_idx:clip_idx]
+target_rate_y = np.array(df['target_rate.y'])[start_idx:clip_idx]
+target_thrust = np.array(df['target_rate.thrust'])[start_idx:clip_idx] / 2**16
 
 fig, axs = plt.subplots(4, 1, figsize=(10, 12), sharex=True)
 

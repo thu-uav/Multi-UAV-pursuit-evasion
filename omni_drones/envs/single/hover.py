@@ -129,8 +129,8 @@ class Hover(IsaacEnv):
             torch.tensor([1.0, 1.0, 2.0], device=self.device)
         )
         self.init_rpy_dist = D.Uniform(
-            torch.tensor([-.2, -.2, 0.], device=self.device) * torch.pi,
-            torch.tensor([0.2, 0.2, 0.], device=self.device) * torch.pi
+            torch.tensor([-.0, -.0, 0.], device=self.device) * torch.pi,
+            torch.tensor([0.0, 0.0, 0.], device=self.device) * torch.pi
         )
         self.target_rpy_dist = D.Uniform(
             torch.tensor([0., 0., 0.], device=self.device) * torch.pi,
@@ -426,8 +426,8 @@ class Hover(IsaacEnv):
         reward = (
             reward_pos
             + reward_pos_bonus
-            + reward_head 
-            + reward_head_bonus
+            # + reward_head 
+            # + reward_head_bonus
             # + reward_up
             + reward_v
             + reward_acc
