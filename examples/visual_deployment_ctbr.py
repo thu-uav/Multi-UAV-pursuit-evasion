@@ -2,10 +2,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 
-df = pd.read_csv('/home/jiayu/OmniDrones/examples/real_data/rl_hover_br04.csv')
+df = pd.read_csv('/home/jiayu/OmniDrones/examples/real_data/trad_figure8.csv')
 
-start_idx = 600
-clip_idx = 3000
+start_idx = 650
+clip_idx = -1
 timestamps = (np.array(df['pos.time']) - np.array(df['pos.time'])[0])[start_idx:clip_idx] / 10**9
 
 real_rate_r = np.array(df['real_rate.r'])[start_idx:clip_idx] * 180.0 / np.pi
@@ -40,4 +40,4 @@ axs[3].plot(timestamps, target_thrust, label='target_thrust', color='red')
 axs[3].legend()
 axs[3].grid(True)
 
-plt.savefig('real_controller_hover_br04.png')
+plt.savefig('real_trad_figure8.png')

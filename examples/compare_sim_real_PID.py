@@ -22,9 +22,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 rosbags = [
-    # '/home/jiayu/OmniDrones/realdata/crazyflie/train_figure8.csv',
+    '/home/jiayu/OmniDrones/examples/real_data/rl_hover_60.csv',
     # '/home/jiayu/OmniDrones/realdata/crazyflie/cf1_figure8.csv',
-    '/home/jingjie/Downloads/OmniDrones-sim2real_final/realdata/crazyflie/cf9_figure8.csv',
+    # '/home/jingjie/Downloads/OmniDrones-sim2real_final/realdata/crazyflie/cf9_figure8.csv',
     # '/home/jiayu/OmniDrones/realdata/crazyflie/cf9_figure8.csv',
 ]
 
@@ -35,7 +35,7 @@ def quat_diff(quat_last, quat, dt):
     if quat_last is not None:
         quat_err = quat_last.inverse() * quat
         if quat_err.w >= 0:
-            scale =  2.0
+            scale = 2.0
         else:
             scale = -2.0
         omega_x = scale * quat_err.x / dt
@@ -63,8 +63,8 @@ def main(cfg):
         preprocess_df = np.array(preprocess_df)
     else:
         preprocess_df = df
-    # episode_len = preprocess_df.shape[0] # contains land
-    episode_len = 1400 # TODO, apply to all trajectories
+    episode_len = preprocess_df.shape[0] # contains land
+    # episode_len = -1 # TODO, apply to all trajectories
     real_data = []
     # T = 20
     # skip = 5
@@ -85,11 +85,12 @@ def main(cfg):
     from omni_drones.utils.torch import euler_to_quaternion, quaternion_to_euler
     from omni_drones.sensors.camera import Camera, PinholeCameraCfg
 
-    average_dt = 0.01
+    dt = 0.01
+    g = 9.81
     sim = SimulationContext(
         stage_units_in_meters=1.0,
-        physics_dt=average_dt,
-        rendering_dt=average_dt,
+        physics_dt=dt,
+        rendering_dt=dt,
         sim_params=cfg.sim,
         backend="torch",
         device=cfg.sim.device,
@@ -116,7 +117,7 @@ def main(cfg):
         2.88e-8, 2315, 7.24e-10, 0.2, 0.43,
         # controller
         250.0, 250.0, 120.0, # kp
-        2.5, 2.5, # kd
+        2.5, 2.5, 2.5, # kd
         500.0, 500.0, 16.7, # ki
         33.3, 33.3, 166.7 # ilimit
     ]
@@ -143,7 +144,7 @@ def main(cfg):
     sim.reset()
     drone.initialize_byTunablePara(tunable_parameters=tunable_parameters)
     # controller = RateController(9.81, drone.params).to(sim.device)
-    controller = PIDRateController(9.81, drone.params).to(sim.device)
+    controller = PIDRateController(dt, g, drone.params).to(sim.device)
     controller.set_byTunablePara(tunable_parameters=tunable_parameters)
     controller = controller.to(sim.device)
     
@@ -163,15 +164,15 @@ def main(cfg):
     
     '''
     df:
-    Index(['pos.time', 'pos.x', 'pos.y', 'pos.z', (1:4)
-        'quat.time', 'quat.w', 'quat.x','quat.y', 'quat.z', (5:9)
-        'vel.time', 'vel.x', 'vel.y', 'vel.z', (10:13)
-        'omega.time','omega.r', 'omega.p', 'omega.y', (14:17)
+    Index(['pos.time', 'pos.x', 'pos.y', 'pos.z', [1:4]
+        'quat.time', 'quat.w', 'quat.x','quat.y', 'quat.z', [5:9]
+        'vel.time', 'vel.x', 'vel.y', 'vel.z', [10:13]
+        'omega.time','omega.r', 'omega.p', 'omega.y', [14:17]
         'real_rate.time', 'real_rate.r', 'real_rate.p', 'real_rate.y', 
-        'real_rate.thrust', (18:22)
+        'real_rate.thrust', [18:22]
         'target_rate.time','target_rate.r', 'target_rate.p', 'target_rate.y', 
-        'target_rate.thrust',(23:27)
-        'motor.time', 'motor.m1', 'motor.m2', 'motor.m3', 'motor.m4'],(28:32)
+        'target_rate.thrust',[23:27]
+        'motor.time', 'motor.m1', 'motor.m2', 'motor.m3', 'motor.m4'],[28:32]
         dtype='object')
     '''
     sim_pos_list = []
@@ -192,7 +193,7 @@ def main(cfg):
     sim_motor = []
     real_motor = []
 
-    use_real_action = False
+    use_real_action = True
     trajectory_len = real_data.shape[0] - 1
 
     quat_last = None
@@ -202,13 +203,16 @@ def main(cfg):
         real_pos = torch.tensor(real_data[i, :, 1:4])
         real_quat = torch.tensor(real_data[i, :, 5:9])
         real_vel = torch.tensor(real_data[i, :, 10:13])
+        real_omega = torch.tensor(real_data[i, :, 14:17])
         real_rate = torch.tensor(real_data[i, :, 18:21])
-        real_next_rate = torch.tensor(real_data[i + 1, :, 18:21])
+        real_target_rate = torch.tensor(real_data[i, :, 23:27])
+        # real_next_rate = torch.tensor(real_data[i + 1, :, 18:21])
         real_motor_thrust = torch.tensor(real_data[i + 1, :, 28:32])
-        real_rate[:, 1] = -real_rate[:, 1]
-        real_next_rate[:, 1] = -real_next_rate[:, 1]
+        # real_rate[:, 1] = -real_rate[:, 1]
+        # real_next_rate[:, 1] = -real_next_rate[:, 1]
         # get angvel
         real_ang_vel = quat_rotate(real_quat, real_rate)
+        breakpoint()
         set_drone_state(real_pos, real_quat, real_vel, real_ang_vel)
         # if i == 0:
             # set_drone_state(real_pos, real_quat, real_vel, real_ang_vel)
@@ -249,8 +253,8 @@ def main(cfg):
         current_rate[:, 1] = current_rate[:, 1]
         action = controller.sim_step(
             current_rate=current_rate,
-            target_rate=target_rate / 180 * torch.pi,
-            target_thrust=target_thrust.unsqueeze(1) / 2**16
+            target_rate=target_rate,
+            target_thrust=target_thrust.unsqueeze(1)
         )
         
         sim_motor.append(action.detach().to('cpu').numpy())

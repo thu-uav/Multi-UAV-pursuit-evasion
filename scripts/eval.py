@@ -246,7 +246,6 @@ def main(cfg):
         # breakpoint()
 
         base_env.enable_render(not cfg.headless)
-        env.reset()
 
         done = trajs.get(("next", "done"))
         first_done = torch.argmax(done.long(), dim=1).cpu()
