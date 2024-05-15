@@ -498,8 +498,9 @@ class PIDRateController(nn.Module):
     ):
         assert root_state.shape[:-1] == target_rate.shape[:-1]
         
-        # target_rate: [0, 180] degree/s
+        # target_rate: degree/s
         # target_thrust: [0, 2**16]
+        # body_rate: use degree
 
         batch_shape = root_state.shape[:-1]
         root_state = root_state.reshape(-1, 13)
@@ -512,7 +513,7 @@ class PIDRateController(nn.Module):
         self.count += 1
 
         pos, rot, linvel, angvel = root_state.split([3, 4, 3, 3], dim=1)
-        body_rate = quat_rotate_inverse(rot, angvel)
+        body_rate = quat_rotate_inverse(rot, angvel) * 180.0 / torch.pi
 
         rate_error = target_rate - body_rate
         
@@ -549,37 +550,39 @@ class PIDRateController(nn.Module):
         
         return cmd
 
-    def sim_step(
+    def debug_step(
         self, 
-        current_rate: torch.Tensor, 
+        real_body_rate: torch.Tensor, 
         target_rate: torch.Tensor,
         target_thrust: torch.Tensor,
     ):
-        # current_rate : rad / s
-        # target_rate : rad / s
-        # target_thrust : 0 ~ 1
-        current_rate = current_rate * 180.0 / torch.pi
-        target_rate = target_rate * 180.0 / torch.pi
-        target_thrust = target_thrust * 2**16
+        # assert root_state.shape[:-1] == target_rate.shape[:-1]
+        
+        # real_body_rate: radian/s
+        # target_rate: degree/s
+        # target_thrust: [0, 2**16]
 
-        batch_shape = current_rate.shape[:-1]
+        batch_shape = real_body_rate.shape[:-1]
         # root_state = root_state.reshape(-1, 13)
-        current_rate = current_rate.reshape(-1, 3)
         target_rate = target_rate.reshape(-1, 3)
         target_thrust = target_thrust.reshape(-1, 1)
-        device = current_rate.device
+        device = real_body_rate.device
         if self.count == 0:
             self.last_body_rate = torch.zeros(size=(batch_shape[0], 3)).to(device)
             self.integ = torch.zeros(size=(batch_shape[0], 3)).to(device)
         self.count += 1
 
-        rate_error = target_rate - current_rate
+        # pos, rot, linvel, angvel = root_state.split([3, 4, 3, 3], dim=1)
+        # body_rate = quat_rotate_inverse(rot, angvel)
+        
+        body_rate = real_body_rate * 180 / torch.pi
+
+        rate_error = target_rate - body_rate
         
         # P
         outputP = rate_error * self.pid_kp.view(1, -1)
         # D
-        deriv = -(current_rate - self.last_body_rate) / self.dt
-        # TODO, w.o.lpf2pApply filter to deriv
+        deriv = -(body_rate - self.last_body_rate) / self.dt
         deriv[torch.isnan(deriv)] = 0.0
         outputD = deriv * self.pid_kd.view(1, -1)
         # I
@@ -587,23 +590,25 @@ class PIDRateController(nn.Module):
         self.integ = torch.clip(self.integ, -self.iLimit, self.iLimit)
         outputI = self.integ * self.pid_ki.view(1, -1)
         # kff
-        outputFF = current_rate * self.kff.view(1, -1)
+        outputFF = target_rate * self.kff.view(1, -1)
         
-        output = (outputP + outputD + outputI + outputFF).float()
-        # TODO, w.o.lpf2pApply filter to output
+        output = outputP + outputD + outputI + outputFF
         output[torch.isnan(output)] = 0.0
 
+        # set last error
+        self.last_body_rate = body_rate.clone()
+        
+        # deploy body rate to four rotors
         # output: r, p, y
         r = output[:, 0] / 2.0
         p = output[:, 1] / 2.0
-        y = output[:, 2]
+        y = - output[:, 2]
         m1 = target_thrust - r + p + y
         m2 = target_thrust - r - p - y
         m3 = target_thrust + r - p + y
         m4 = target_thrust + r + p - y
 
         cmd = torch.concat([m1,m2,m3,m4], dim=1) / 2**16 * 2 - 1
+        # cmd = torch.concat([m1,m2,m3,m4], dim=1)
         
-        # set last error
-        self.last_body_rate = current_rate.clone()
-        return cmd
+        return cmd, (r, p, y, target_thrust)

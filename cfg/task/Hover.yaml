@@ -12,10 +12,9 @@ env:
 drone_model: crazyflie
 force_sensor: false
 
-use_acc: 0
-use_jerk: 0
+use_acc: 0 # obs add acc
+use_jerk: 0 # obs add jerk
 reward_action_smoothness_weight: 0.0
-reward_motion_smoothness_weight: 0.0
 reward_distance_scale: 1.2
 reward_v_scale: 0.0
 reward_acc_scale: 0.0
@@ -27,6 +26,8 @@ linear_acc_max: 10.0
 omega: false
 motor: false
 time_encoding: true
+
+action_transform: PIDrate
 
 # sim2real options
 add_noise: false
@@ -46,5 +47,3 @@ action_noise: false
   # payload:
   #   z: [-0.1, 0.1]
   #   mass: [0.01, 0.1]
-
-action_transform: rate

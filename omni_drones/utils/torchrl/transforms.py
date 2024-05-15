@@ -374,6 +374,44 @@ class RateController(Transform):
         tensordict.set(self.action_key, cmds)
         return tensordict
 
+class PIDRateController(Transform):
+    def __init__(
+        self,
+        controller,
+        action_key: str = ("agents", "action"),
+    ):
+        super().__init__([], in_keys_inv=[("info", "drone_state")])
+        self.controller = controller
+        self.action_key = action_key
+        self.max_thrust = self.controller.max_thrusts.sum(-1)
+        self.target_clip = self.controller.target_clip
+        self.max_thrust_ratio = self.controller.max_thrust_ratio
+        self.fixed_yaw = self.controller.fixed_yaw
+        # self.tanh = TanhTransform()
+    
+    def transform_input_spec(self, input_spec: TensorSpec) -> TensorSpec:
+        action_spec = input_spec[("_action_spec", *self.action_key)]
+        spec = UnboundedContinuousTensorSpec(action_spec.shape[:-1]+(4,), device=action_spec.device)
+        input_spec[("_action_spec", *self.action_key)] = spec
+        return input_spec
+    
+    def _inv_call(self, tensordict: TensorDictBase) -> TensorDictBase:
+        drone_state = tensordict[("info", "drone_state")][..., :13]
+        action = tensordict[self.action_key]
+        action = torch.tanh(action)
+        target_rate, target_thrust = action.split([3, 1], -1)
+        target_thrust = torch.clamp((target_thrust + 1) / 2, min = 0.0, max = self.max_thrust_ratio) * self.max_thrust
+        # target_thrust = ((target_thrust + 1) / 2).clip(0.) * self.max_thrust
+        cmds = self.controller(
+            drone_state, 
+            # target_rate=target_rate * torch.pi,
+            target_rate=target_rate * 180.0 * self.target_clip,
+            target_thrust=target_thrust
+        )
+        torch.nan_to_num_(cmds, 0.)
+        tensordict.set(self.action_key, cmds)
+        return tensordict
+
 class AttitudeController(Transform):
     def __init__(
         self,
@@ -405,7 +443,6 @@ class AttitudeController(Transform):
         torch.nan_to_num_(cmds, 0.)
         tensordict.set(self.action_key, cmds)
         return tensordict
-
 
 class History(Transform):
     def __init__(
