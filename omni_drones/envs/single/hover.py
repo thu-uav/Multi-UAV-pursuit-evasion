@@ -125,8 +125,8 @@ class Hover(IsaacEnv):
         #     torch.tensor([0.0, 0.0, 0.05], device=self.device)
         # )
         self.init_pos_dist = D.Uniform(
-            torch.tensor([-1.0, -1.0, 0.], device=self.device),
-            torch.tensor([1.0, 1.0, 2.0], device=self.device)
+            torch.tensor([-.5, -.5, 0.], device=self.device),
+            torch.tensor([.5, .5, 2.0], device=self.device)
         )
         self.init_rpy_dist = D.Uniform(
             torch.tensor([-0.2, -0.2, -0.2], device=self.device) * torch.pi,
@@ -297,8 +297,8 @@ class Hover(IsaacEnv):
         self.target_vis.set_world_poses(orientations=target_rot, env_indices=env_ids)
 
         # set last values
-        self.last_linear_v[env_ids] = torch.norm(self.init_vels[..., :3], dim=-1)
-        self.last_angular_v[env_ids] = torch.norm(self.init_vels[..., 3:], dim=-1)
+        self.last_linear_v[env_ids] = torch.norm(self.init_vels[env_ids][..., :3], dim=-1)
+        self.last_angular_v[env_ids] = torch.norm(self.init_vels[env_ids][..., 3:], dim=-1)
         self.last_linear_a[env_ids] = torch.zeros_like(self.last_linear_v[env_ids])
         self.last_angular_a[env_ids] = torch.zeros_like(self.last_angular_v[env_ids])
         self.last_linear_jerk[env_ids] = torch.zeros_like(self.last_linear_a[env_ids])
@@ -407,16 +407,16 @@ class Hover(IsaacEnv):
         heading_alignment = torch.sum(self.drone.heading * self.target_heading, dim=-1)
         
         # check done
-        distance = torch.norm(torch.cat([self.rpos, self.rheading], dim=-1), dim=-1)
+        distance = torch.norm(torch.cat([self.rpos], dim=-1), dim=-1)
 
-        reward_pos = - pos_error
+        reward_pos = - pos_error * self.reward_distance_scale
         reward_pos_bonus = ((pos_error <= 0.02) * 10).float()
         
         reward_head = - head_error * (reward_pos_bonus > 0)
         reward_head_bonus = ((head_error <= 0.02) * 10 * (reward_pos_bonus > 0)).float()
 
         # # uprightness
-        # reward_up = torch.square((self.drone.up[..., 2] + 1) / 2)
+        reward_up = torch.square((self.drone.up[..., 2] + 1) / 2)
         
         # v, acc, jerk
         reward_v = self.reward_v_scale * (reward_pos_bonus > 0) * (self.linear_v < self.linear_vel_max)
@@ -426,9 +426,9 @@ class Hover(IsaacEnv):
         reward = (
             reward_pos
             + reward_pos_bonus
-            # + reward_head 
-            # + reward_head_bonus
-            # + reward_up
+            + reward_head 
+            + reward_head_bonus
+            + reward_up
             + reward_v
             + reward_acc
             + reward_jerk
@@ -453,12 +453,11 @@ class Hover(IsaacEnv):
         #     + reward_action_smoothness
         # )
         
-        # import pdb; pdb.set_trace()
-        # done_misbehave = (self.drone.pos[..., 2] < 0.2) | (distance > 4)
+        done_misbehave = (distance > 2)
 
         done = (
             (self.progress_buf >= self.max_episode_length).unsqueeze(-1)
-            # | done_misbehave
+            | done_misbehave
         )
 
         self.stats["pos_error"].lerp_(pos_error, (1-self.alpha))

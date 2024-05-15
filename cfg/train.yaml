@@ -21,13 +21,13 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: eval_ours
-  # run_name: Hover_bodyrate04_random_mass08to12
+  # run_name: eval_ours
+  run_name: Hover_reward
   job_type: train
   entity: chenjy
   project: Track
-  mode: disabled
-  # mode: online # set to 'disabled' when debugging locally, online
+  # mode: disabled
+  mode: online # set to 'disabled' when debugging locally, online
   run_id: 
   monitor_gym: True
   tags: 

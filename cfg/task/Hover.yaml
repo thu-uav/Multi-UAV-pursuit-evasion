@@ -6,7 +6,7 @@ defaults:
   - /base/sim_base@_here_
 
 env:
-  num_envs: 100
+  num_envs: 4096
   max_episode_length: 500
 
 drone_model: crazyflie
@@ -15,7 +15,7 @@ force_sensor: false
 use_acc: 0 # obs add acc
 use_jerk: 0 # obs add jerk
 reward_action_smoothness_weight: 0.0
-reward_distance_scale: 1.2
+reward_distance_scale: 10.0
 reward_v_scale: 0.0
 reward_acc_scale: 0.0
 reward_jerk_scale: 0.0
