@@ -452,6 +452,10 @@ class PIDRateController(nn.Module):
         self.count = 0 # if = 0, integ, last_body_rate = 0.0
         self.iLimit = nn.Parameter(torch.tensor([33.3, 33.3, 166.7]))
         self.outputLimit = 0.0
+        
+        self.target_clip = uav_params['target_clip']
+        self.max_thrust_ratio = uav_params['max_thrust_ratio']
+        self.fixed_yaw = uav_params['fixed_yaw']
 
     def set_byTunablePara(
         self,
@@ -538,15 +542,17 @@ class PIDRateController(nn.Module):
         
         # deploy body rate to four rotors
         # output: r, p, y
-        r = output[:, 0] / 2.0
-        p = output[:, 1] / 2.0
-        y = - output[:, 2]
+        r = (output[:, 0] / 2.0).unsqueeze(1)
+        p = (output[:, 1] / 2.0).unsqueeze(1)
+        y = - output[:, 2].unsqueeze(1)
         m1 = target_thrust - r + p + y
         m2 = target_thrust - r - p - y
         m3 = target_thrust + r - p + y
         m4 = target_thrust + r + p - y
 
         cmd = torch.concat([m1,m2,m3,m4], dim=1) / 2**16 * 2 - 1
+        
+        cmd = cmd.reshape(*batch_shape, -1)
         
         return cmd
 
