@@ -255,6 +255,10 @@ class Hover(IsaacEnv):
             "angular_a_mean": UnboundedContinuousTensorSpec(1),
             "linear_jerk_mean": UnboundedContinuousTensorSpec(1),
             "angular_jerk_mean": UnboundedContinuousTensorSpec(1),
+            "motor1": UnboundedContinuousTensorSpec(1),
+            "motor2": UnboundedContinuousTensorSpec(1),
+            "motor3": UnboundedContinuousTensorSpec(1),
+            "motor4": UnboundedContinuousTensorSpec(1),
         }).expand(self.num_envs).to(self.device)
         info_spec = CompositeSpec({
             "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13), device=self.device),
@@ -317,6 +321,10 @@ class Hover(IsaacEnv):
         actions = tensordict[("agents", "action")]
         if self.cfg.task.action_noise:
             actions *= torch.randn(actions.shape, device=self.device) * 0.1 + 1
+        self.stats['motor1'].set_(actions[..., 0])
+        self.stats['motor2'].set_(actions[..., 1])
+        self.stats['motor3'].set_(actions[..., 2])
+        self.stats['motor4'].set_(actions[..., 3])
         self.effort = self.drone.apply_action(actions)
 
     def _compute_state_and_obs(self):
@@ -457,7 +465,7 @@ class Hover(IsaacEnv):
 
         done = (
             (self.progress_buf >= self.max_episode_length).unsqueeze(-1)
-            | done_misbehave
+            # | done_misbehave
         )
 
         self.stats["pos_error"].lerp_(pos_error, (1-self.alpha))
