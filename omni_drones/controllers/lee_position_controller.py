@@ -451,7 +451,7 @@ class PIDRateController(nn.Module):
         self.kff = nn.Parameter(torch.tensor([0.0, 0.0, 0.0]))
         self.count = 0 # if = 0, integ, last_body_rate = 0.0
         self.iLimit = nn.Parameter(torch.tensor([33.3, 33.3, 166.7]))
-        self.outputLimit = 0.0
+        self.outLimit = nn.Parameter(torch.tensor((2.0)**16))
         
         self.target_clip = uav_params['target_clip']
         self.max_thrust_ratio = uav_params['max_thrust_ratio']
@@ -492,7 +492,7 @@ class PIDRateController(nn.Module):
         self.kff = nn.Parameter(torch.tensor([0.0, 0.0, 0.0]))
         self.count = 0 # if = 0, integ, last_body_rate = 0.0
         self.iLimit = nn.Parameter(torch.tensor(tunable_parameters['iLimit']))
-        self.outputLimit = 0.0
+        self.outLimit = nn.Parameter(torch.tensor((2.0)**16))
     
     def forward(
         self, 
@@ -536,6 +536,9 @@ class PIDRateController(nn.Module):
         
         output = outputP + outputD + outputI + outputFF
         output[torch.isnan(output)] = 0.0
+        
+        # clip
+        output = torch.clip(output, - self.outLimit, self.outLimit)
 
         # set last error
         self.last_body_rate = body_rate.clone()
