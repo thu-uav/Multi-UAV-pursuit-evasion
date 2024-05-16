@@ -451,11 +451,13 @@ class PIDRateController(nn.Module):
         self.kff = nn.Parameter(torch.tensor([0.0, 0.0, 0.0]))
         self.count = 0 # if = 0, integ, last_body_rate = 0.0
         self.iLimit = nn.Parameter(torch.tensor([33.3, 33.3, 166.7]))
-        self.outLimit = nn.Parameter(torch.tensor((2.0)**16))
+        self.outLimit = nn.Parameter(torch.tensor((2.0)**15 - 1.0))
         
         self.target_clip = uav_params['target_clip']
         self.max_thrust_ratio = uav_params['max_thrust_ratio']
         self.fixed_yaw = uav_params['fixed_yaw']
+        
+        self.init_flag = True # init last_body_rate and inte
 
     def set_byTunablePara(
         self,
@@ -499,6 +501,7 @@ class PIDRateController(nn.Module):
         root_state: torch.Tensor, 
         target_rate: torch.Tensor,
         target_thrust: torch.Tensor,
+        reset_pid: torch.Tensor,
     ):
         assert root_state.shape[:-1] == target_rate.shape[:-1]
         
@@ -511,10 +514,14 @@ class PIDRateController(nn.Module):
         target_rate = target_rate.reshape(-1, 3)
         target_thrust = target_thrust.reshape(-1, 1)
         device = root_state.device
-        if self.count == 0:
+        
+        # pid reset
+        if self.init_flag:
             self.last_body_rate = torch.zeros(size=(batch_shape[0], 3)).to(device)
             self.integ = torch.zeros(size=(batch_shape[0], 3)).to(device)
-        self.count += 1
+            self.init_flag = False
+        self.last_body_rate[reset_pid] = torch.zeros(size=(batch_shape[0], 3)).to(device)[reset_pid]
+        self.integ[reset_pid] = torch.zeros(size=(batch_shape[0], 3)).to(device)[reset_pid]
 
         pos, rot, linvel, angvel = root_state.split([3, 4, 3, 3], dim=1)
         body_rate = quat_rotate_inverse(rot, angvel) * 180.0 / torch.pi
@@ -552,12 +559,14 @@ class PIDRateController(nn.Module):
         m2 = target_thrust - r - p - y
         m3 = target_thrust + r - p + y
         m4 = target_thrust + r + p - y
+        
+        ctbr = torch.concat([r, p, y, target_thrust], dim=1).reshape(*batch_shape, -1)
 
         cmd = torch.concat([m1,m2,m3,m4], dim=1) / 2**16 * 2 - 1
         
         cmd = cmd.reshape(*batch_shape, -1)
         
-        return cmd
+        return cmd, ctbr
 
     def debug_step(
         self, 
@@ -580,6 +589,7 @@ class PIDRateController(nn.Module):
             self.last_body_rate = torch.zeros(size=(batch_shape[0], 3)).to(device)
             self.integ = torch.zeros(size=(batch_shape[0], 3)).to(device)
         self.count += 1
+        print('count', self.count)
 
         # pos, rot, linvel, angvel = root_state.split([3, 4, 3, 3], dim=1)
         # body_rate = quat_rotate_inverse(rot, angvel)

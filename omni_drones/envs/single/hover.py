@@ -259,6 +259,10 @@ class Hover(IsaacEnv):
             "motor2": UnboundedContinuousTensorSpec(1),
             "motor3": UnboundedContinuousTensorSpec(1),
             "motor4": UnboundedContinuousTensorSpec(1),
+            "cmd_r": UnboundedContinuousTensorSpec(1),
+            "cmd_p": UnboundedContinuousTensorSpec(1),
+            "cmd_y": UnboundedContinuousTensorSpec(1),
+            "cmd_thrust": UnboundedContinuousTensorSpec(1),
         }).expand(self.num_envs).to(self.device)
         info_spec = CompositeSpec({
             "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13), device=self.device),
@@ -326,6 +330,13 @@ class Hover(IsaacEnv):
         self.stats['motor3'].set_(actions[..., 2])
         self.stats['motor4'].set_(actions[..., 3])
         self.effort = self.drone.apply_action(actions)
+        
+        # log ctbr
+        ctbr = tensordict['ctbr']
+        self.stats['cmd_r'].set_(ctbr[..., 0])
+        self.stats['cmd_p'].set_(ctbr[..., 1])
+        self.stats['cmd_y'].set_(ctbr[..., 2])
+        self.stats['cmd_thrust'].set_(ctbr[..., 3])
 
     def _compute_state_and_obs(self):
         self.root_state = self.drone.get_state()

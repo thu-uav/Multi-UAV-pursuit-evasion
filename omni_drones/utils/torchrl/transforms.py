@@ -402,14 +402,15 @@ class PIDRateController(Transform):
         target_rate, target_thrust = action.split([3, 1], -1)
         target_thrust = torch.clamp((target_thrust + 1) / 2, min = 0.0, max = self.max_thrust_ratio) * 2**16
         # target_thrust = ((target_thrust + 1) / 2).clip(0.) * self.max_thrust
-        cmds = self.controller(
+        cmds, ctbr = self.controller(
             drone_state, 
-            # target_rate=target_rate * torch.pi,
             target_rate=target_rate * 180.0 * self.target_clip,
-            target_thrust=target_thrust
+            target_thrust=target_thrust,
+            reset_pid=tensordict['done'][..., 0]
         )
         torch.nan_to_num_(cmds, 0.)
         tensordict.set(self.action_key, cmds)
+        tensordict.set('ctbr', ctbr)
         return tensordict
 
 class AttitudeController(Transform):
