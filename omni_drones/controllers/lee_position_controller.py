@@ -589,7 +589,6 @@ class PIDRateController(nn.Module):
             self.last_body_rate = torch.zeros(size=(batch_shape[0], 3)).to(device)
             self.integ = torch.zeros(size=(batch_shape[0], 3)).to(device)
         self.count += 1
-        print('count', self.count)
 
         # pos, rot, linvel, angvel = root_state.split([3, 4, 3, 3], dim=1)
         # body_rate = quat_rotate_inverse(rot, angvel)

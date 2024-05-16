@@ -411,6 +411,7 @@ class PIDRateController(Transform):
         torch.nan_to_num_(cmds, 0.)
         tensordict.set(self.action_key, cmds)
         tensordict.set('ctbr', ctbr)
+        tensordict.set('target_rate', target_rate * 180.0 * self.target_clip)
         return tensordict
 
 class AttitudeController(Transform):

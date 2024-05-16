@@ -3,11 +3,13 @@ import torch
 import torch.distributions as D
 
 import omni.isaac.core.utils.prims as prim_utils
+import omni.isaac.core.objects as objects
+import numpy as np
 
 from omni_drones.envs.isaac_env import AgentSpec, IsaacEnv
 from omni_drones.robots.drone import MultirotorBase
 from omni_drones.views import ArticulationView, RigidPrimView
-from omni_drones.utils.torch import euler_to_quaternion, quat_axis
+from omni_drones.utils.torch import euler_to_quaternion, quat_axis, quat_rotate_inverse
 
 from tensordict.tensordict import TensorDict, TensorDictBase
 from torchrl.data import UnboundedContinuousTensorSpec, CompositeSpec
@@ -120,18 +122,22 @@ class Hover(IsaacEnv):
         self.init_vels = torch.zeros_like(self.drone.get_velocities())
 
         # eval
-        # self.init_pos_dist = D.Uniform(
-        #     torch.tensor([0.0, 0.0, 0.05], device=self.device),
-        #     torch.tensor([0.0, 0.0, 0.05], device=self.device)
-        # )
         self.init_pos_dist = D.Uniform(
-            torch.tensor([-.5, -.5, 0.], device=self.device),
-            torch.tensor([.5, .5, 2.0], device=self.device)
+            torch.tensor([0.0, 0.0, 0.9], device=self.device),
+            torch.tensor([0.0, 0.0, 1.1], device=self.device)
         )
+        # self.init_pos_dist = D.Uniform(
+        #     torch.tensor([-.5, -.5, 0.05], device=self.device),
+        #     torch.tensor([.5, .5, 0.05], device=self.device)
+        # )
         self.init_rpy_dist = D.Uniform(
-            torch.tensor([-0.2, -0.2, -0.2], device=self.device) * torch.pi,
-            torch.tensor([0.2, 0.2, 0.2], device=self.device) * torch.pi
+            torch.tensor([0.0, 0.0, 0.0], device=self.device) * torch.pi,
+            torch.tensor([0.0, 0.0, 0.0], device=self.device) * torch.pi
         )
+        # self.init_rpy_dist = D.Uniform(
+        #     torch.tensor([-0.2, -0.2, -0.2], device=self.device) * torch.pi,
+        #     torch.tensor([0.2, 0.2, 0.2], device=self.device) * torch.pi
+        # )
         self.target_rpy_dist = D.Uniform(
             torch.tensor([0., 0., 0.], device=self.device) * torch.pi,
             torch.tensor([0., 0., 0.], device=self.device) * torch.pi
@@ -155,6 +161,9 @@ class Hover(IsaacEnv):
         drone_model = MultirotorBase.REGISTRY[self.cfg.task.drone_model]
         cfg = drone_model.cfg_cls(force_sensor=self.cfg.task.force_sensor)
         self.drone: MultirotorBase = drone_model(cfg=cfg)
+        drone_prim = self.drone.spawn(translations=[(0.0, 0.0, 0.05)])[0]
+        if self.has_payload:
+            attach_payload(drone_prim.GetPath().pathString)
 
         target_vis_prim = prim_utils.create_prim(
             prim_path="/World/envs/env_0/target",
@@ -177,9 +186,7 @@ class Hover(IsaacEnv):
             dynamic_friction=1.0,
             restitution=0.0,
         )
-        drone_prim = self.drone.spawn(translations=[(0.0, 0.0, 2.)])[0]
-        if self.has_payload:
-            attach_payload(drone_prim.GetPath().pathString)
+
         return ["/World/defaultGroundPlane"]
 
     def _set_specs(self):
@@ -263,6 +270,12 @@ class Hover(IsaacEnv):
             "cmd_p": UnboundedContinuousTensorSpec(1),
             "cmd_y": UnboundedContinuousTensorSpec(1),
             "cmd_thrust": UnboundedContinuousTensorSpec(1),
+            "target_r_rate": UnboundedContinuousTensorSpec(1),
+            "target_p_rate": UnboundedContinuousTensorSpec(1),
+            "target_y_rate": UnboundedContinuousTensorSpec(1),
+            "real_r_rate": UnboundedContinuousTensorSpec(1),
+            "real_p_rate": UnboundedContinuousTensorSpec(1),
+            "real_y_rate": UnboundedContinuousTensorSpec(1),
         }).expand(self.num_envs).to(self.device)
         info_spec = CompositeSpec({
             "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13), device=self.device),
@@ -337,10 +350,22 @@ class Hover(IsaacEnv):
         self.stats['cmd_p'].set_(ctbr[..., 1])
         self.stats['cmd_y'].set_(ctbr[..., 2])
         self.stats['cmd_thrust'].set_(ctbr[..., 3])
+        
+        # log target
+        target_rate = tensordict['target_rate']
+        self.stats['target_r_rate'].set_(target_rate[..., 0])
+        self.stats['target_p_rate'].set_(target_rate[..., 1])
+        self.stats['target_y_rate'].set_(target_rate[..., 2])
 
     def _compute_state_and_obs(self):
         self.root_state = self.drone.get_state()
         self.info["drone_state"][:] = self.root_state[..., :13]
+
+        _, log_rot, _, log_angvel = self.root_state[..., :13].reshape(-1, 13).split([3, 4, 3, 3], dim=1)
+        body_rate = quat_rotate_inverse(log_rot, log_angvel).unsqueeze(1) * 180.0 / torch.pi
+        self.stats['real_r_rate'].set_(body_rate[..., 0])
+        self.stats['real_p_rate'].set_(body_rate[..., 1])
+        self.stats['real_y_rate'].set_(body_rate[..., 2])
 
         # relative position and heading
         self.rpos = self.target_pos - self.root_state[..., :3]
@@ -472,7 +497,7 @@ class Hover(IsaacEnv):
         #     + reward_action_smoothness
         # )
         
-        done_misbehave = (distance > 2)
+        # done_misbehave = (distance > 0.5)
 
         done = (
             (self.progress_buf >= self.max_episode_length).unsqueeze(-1)
