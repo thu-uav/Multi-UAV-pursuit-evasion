@@ -10,7 +10,7 @@ model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
 max_iters: -1
-eval_interval: 100
+eval_interval: -1
 save_interval: 100
 seed: 0
 
@@ -21,8 +21,8 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: debug
-  # run_name: Hover_PID_wodone
+  # run_name: debug
+  run_name: Hover_PID
   job_type: train
   entity: chenjy
   project: Track

@@ -401,7 +401,6 @@ class PIDRateController(Transform):
         action = torch.tanh(action)
         target_rate, target_thrust = action.split([3, 1], -1)
         target_thrust = torch.clamp((target_thrust + 1) / 2, min = 0.0, max = self.max_thrust_ratio) * 2**16
-        # target_thrust = ((target_thrust + 1) / 2).clip(0.) * self.max_thrust
         cmds, ctbr = self.controller(
             drone_state, 
             target_rate=target_rate * 180.0 * self.target_clip,

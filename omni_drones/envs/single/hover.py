@@ -122,22 +122,22 @@ class Hover(IsaacEnv):
         self.init_vels = torch.zeros_like(self.drone.get_velocities())
 
         # eval
-        self.init_pos_dist = D.Uniform(
-            torch.tensor([0.0, 0.0, 0.9], device=self.device),
-            torch.tensor([0.0, 0.0, 1.1], device=self.device)
-        )
         # self.init_pos_dist = D.Uniform(
-        #     torch.tensor([-.5, -.5, 0.05], device=self.device),
-        #     torch.tensor([.5, .5, 0.05], device=self.device)
+        #     torch.tensor([0.0, 0.0, 1.0], device=self.device),
+        #     torch.tensor([0.0, 0.0, 1.0], device=self.device)
         # )
-        self.init_rpy_dist = D.Uniform(
-            torch.tensor([0.0, 0.0, 0.0], device=self.device) * torch.pi,
-            torch.tensor([0.0, 0.0, 0.0], device=self.device) * torch.pi
+        self.init_pos_dist = D.Uniform(
+            torch.tensor([-1., -1., 0.05], device=self.device),
+            torch.tensor([1., 1., 2.0], device=self.device)
         )
         # self.init_rpy_dist = D.Uniform(
-        #     torch.tensor([-0.2, -0.2, -0.2], device=self.device) * torch.pi,
-        #     torch.tensor([0.2, 0.2, 0.2], device=self.device) * torch.pi
+        #     torch.tensor([0.0, 0.0, 0.0], device=self.device) * torch.pi,
+        #     torch.tensor([0.0, 0.0, 0.0], device=self.device) * torch.pi
         # )
+        self.init_rpy_dist = D.Uniform(
+            torch.tensor([-0.2, -0.2, 0.0], device=self.device) * torch.pi,
+            torch.tensor([0.2, 0.2, 0.5], device=self.device) * torch.pi
+        )
         self.target_rpy_dist = D.Uniform(
             torch.tensor([0., 0., 0.], device=self.device) * torch.pi,
             torch.tensor([0., 0., 0.], device=self.device) * torch.pi

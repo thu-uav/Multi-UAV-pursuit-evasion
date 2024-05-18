@@ -208,8 +208,7 @@ def main(cfg):
     real_cmd_y_list = []
     real_cmd_thrust_list = []
 
-    use_real_action = False
-    use_real_body_rate = False
+    use_real_action = True # sim和real_action的主要差别是有没有电池补偿
     trajectory_len = real_data.shape[0] - 1
     
     for i in range(trajectory_len):
@@ -223,9 +222,9 @@ def main(cfg):
         real_rate = torch.tensor(real_data[i, :, 23:26])
         real_motor_thrust = torch.tensor(real_data[i, :, 33:37])
         real_ang_vel = quat_rotate(real_quat, real_rate)
-        # set_drone_state(real_pos, real_quat, real_vel, real_ang_vel)
-        if i == 0:
-            set_drone_state(real_pos, real_quat, real_vel, real_ang_vel)
+        set_drone_state(real_pos, real_quat, real_vel, real_ang_vel)
+        # if i == 0:
+        #     set_drone_state(real_pos, real_quat, real_vel, real_ang_vel)
         
         # log
         next_real_pos = torch.tensor(real_data[i + 1, :, 1:4])
@@ -252,14 +251,10 @@ def main(cfg):
         target_rate = torch.tensor(real_data[i, :, 28:31]).to(device=sim.device).float()
         real_rate = real_rate.to(device=sim.device).float()
         curret_body_rate = quat_rotate_inverse(rot, angvel)
-        
-        if use_real_body_rate:
-            insert_body_rate = real_rate
-        else:
-            insert_body_rate = curret_body_rate
+        # real_rate = curret_body_rate
         
         action, cmd = controller.debug_step(
-            real_body_rate=insert_body_rate,
+            real_body_rate=curret_body_rate,
             target_rate=target_rate,
             target_thrust=target_thrust.unsqueeze(1)
         )
@@ -278,7 +273,7 @@ def main(cfg):
         r = real_cmd_r / 2.0
         p = real_cmd_p / 2.0
         y = real_cmd_y # 固件中已经翻转
-        m1 = real_cmd_thrust - r + p + y
+        m1 = real_cmd_thrust - r + p + y # 真机中的计算方式
         m2 = real_cmd_thrust - r - p - y
         m3 = real_cmd_thrust + r - p + y
         m4 = real_cmd_thrust + r + p - y
@@ -541,36 +536,36 @@ def main(cfg):
     fig2, axs2 = plt.subplots(4, 3, figsize=(20, 12))
     fig2.subplots_adjust()
     # motor thrust error
-    axs2[0, 0].scatter(steps[:], sim_motor[:, 0, 0], s=5, c='red', label='controller')
-    axs2[0, 0].scatter(steps[:], real_motor_compute[:, 0, 0], s=5, c='green', label='compute real')
+    axs2[0, 0].scatter(steps[:], sim_motor[:, 0, 0], s=5, c='red', label='sim')
+    axs2[0, 0].scatter(steps[:], real_motor[:, 0, 0], s=5, c='green', label='real')
     axs2[0, 0].set_xlabel('steps')
     axs2[0, 0].set_ylabel('ratio')
-    axs2[0, 0].set_title('sim/compute_real_motor_1')
+    axs2[0, 0].set_title('sim/real_motor_1')
     axs2[0, 0].legend()
     
-    axs2[1, 0].scatter(steps[:], sim_motor[:, 0, 1], s=5, c='red', label='controller')
-    axs2[1, 0].scatter(steps[:], real_motor_compute[:, 1, 0], s=5, c='green', label='compute real')
+    axs2[1, 0].scatter(steps[:], sim_motor[:, 0, 1], s=5, c='red', label='sim')
+    axs2[1, 0].scatter(steps[:], real_motor[:, 0, 1], s=5, c='green', label='real')
     axs2[1, 0].set_xlabel('steps')
     axs2[1, 0].set_ylabel('ratio')
-    axs2[1, 0].set_title('sim/compute_real_motor_2')
+    axs2[1, 0].set_title('sim/real_motor_2')
     axs2[1, 0].legend()
     
-    axs2[2, 0].scatter(steps[:], sim_motor[:, 0, 2], s=5, c='red', label='controller')
-    axs2[2, 0].scatter(steps[:], real_motor_compute[:, 2, 0], s=5, c='green', label='compute real')
+    axs2[2, 0].scatter(steps[:], sim_motor[:, 0, 2], s=5, c='red', label='sim')
+    axs2[2, 0].scatter(steps[:], real_motor[:, 0, 2], s=5, c='green', label='real')
     axs2[2, 0].set_xlabel('steps')
     axs2[2, 0].set_ylabel('ratio')
-    axs2[2, 0].set_title('sim/compute_real_motor_3')
+    axs2[2, 0].set_title('sim/real_motor_3')
     axs2[2, 0].legend()
 
-    axs2[3, 0].scatter(steps[:], sim_motor[:, 0, 3], s=5, c='red', label='controller')
-    axs2[3, 0].scatter(steps[:], real_motor_compute[:, 3, 0], s=5, c='green', label='compute real')
+    axs2[3, 0].scatter(steps[:], sim_motor[:, 0, 3], s=5, c='red', label='sim')
+    axs2[3, 0].scatter(steps[:], real_motor[:, 0, 3], s=5, c='green', label='real')
     axs2[3, 0].set_xlabel('steps')
     axs2[3, 0].set_ylabel('ratio')
-    axs2[3, 0].set_title('sim/compute_real_motor_4')
+    axs2[3, 0].set_title('sim/real_motor_4')
     axs2[3, 0].legend()
    
-    motor_thrust_error = np.square((sim_motor - real_motor_compute.transpose(0, 2, 1)) / 2**16)
-    print('sim_compute_real/motor_error', np.mean(motor_thrust_error))
+    motor_thrust_error = np.square((sim_motor - real_motor))
+    print('sim_real/motor_error', np.mean(motor_thrust_error))
 
     # compute motor thrust error
     axs2[0, 1].scatter(steps[:], real_motor_compute[:, 0, 0], s=5, c='red', label='compute_real')
@@ -601,37 +596,46 @@ def main(cfg):
     axs2[3, 1].set_title('compute_real/real_motor_4')
     axs2[3, 1].legend()
     
-    motor_thrust_error = np.square((real_motor - real_motor_compute.transpose(0, 2, 1)) / 2**16)
+    motor_thrust_error = np.square((real_motor - real_motor_compute.transpose(0, 2, 1)))
     print('real_compute_real/motor_error', np.mean(motor_thrust_error))
 
     # cmd error
-    axs2[0, 2].scatter(steps[:], sim_cmd_r_list[:, 0], s=5, c='red', label='controller')
+    axs2[0, 2].scatter(steps[:], sim_cmd_r_list[:, 0], s=5, c='red', label='sim')
     axs2[0, 2].scatter(steps[:], real_cmd_r_list[:, 0], s=5, c='green', label='real')
     axs2[0, 2].set_xlabel('steps')
     axs2[0, 2].set_ylabel('ratio')
     axs2[0, 2].set_title('sim/real_cmd_r')
     axs2[0, 2].legend()
     
-    axs2[1, 2].scatter(steps[:], sim_cmd_p_list[:, 0], s=5, c='red', label='controller')
+    axs2[1, 2].scatter(steps[:], sim_cmd_p_list[:, 0], s=5, c='red', label='sim')
     axs2[1, 2].scatter(steps[:], real_cmd_p_list[:, 0], s=5, c='green', label='real')
     axs2[1, 2].set_xlabel('steps')
     axs2[1, 2].set_ylabel('ratio')
     axs2[1, 2].set_title('sim/real_cmd_p')
     axs2[1, 2].legend()
     
-    axs2[2, 2].scatter(steps[:], sim_cmd_y_list[:, 0], s=5, c='red', label='controller')
+    axs2[2, 2].scatter(steps[:], sim_cmd_y_list[:, 0], s=5, c='red', label='sim')
     axs2[2, 2].scatter(steps[:], real_cmd_y_list[:, 0], s=5, c='green', label='real')
     axs2[2, 2].set_xlabel('steps')
     axs2[2, 2].set_ylabel('ratio')
     axs2[2, 2].set_title('sim/real_cmd_y')
     axs2[2, 2].legend()
 
-    axs2[3, 2].scatter(steps[:], sim_cmd_thrust_list[:, 0, 0], s=5, c='red', label='controller')
+    axs2[3, 2].scatter(steps[:], sim_cmd_thrust_list[:, 0, 0], s=5, c='red', label='sim')
     axs2[3, 2].scatter(steps[:], real_cmd_thrust_list[:, 0], s=5, c='green', label='real')
     axs2[3, 2].set_xlabel('steps')
     axs2[3, 2].set_ylabel('ratio')
     axs2[3, 2].set_title('sim/real_cmd_thrust')
     axs2[3, 2].legend()
+    
+    cmd_r_error = np.square((sim_cmd_r_list - real_cmd_r_list) / 2**15)
+    print('sim_real/cmd_r_error', np.mean(cmd_r_error))
+    cmd_p_error = np.square((sim_cmd_p_list - real_cmd_p_list) / 2**15)
+    print('sim_real/cmd_p_error', np.mean(cmd_p_error))
+    cmd_y_error = np.square((sim_cmd_y_list - real_cmd_y_list) / 2**15)
+    print('sim_real/cmd_y_error', np.mean(cmd_y_error))
+    cmd_thrust_error = np.square((sim_cmd_thrust_list[:, 0, 0] - real_cmd_r_list[:, 0]) / 2**16)
+    print('sim_real/cmd_thrust_error', np.mean(cmd_thrust_error))
 
     plt.tight_layout()
     plt.savefig('comparison_controller.png')
@@ -645,7 +649,7 @@ def main(cfg):
     ax_3d.set_ylabel('Y')
     ax_3d.set_zlabel('Z')
     ax_3d.legend()
-    plt.savefig('use_real_action.png')
+    plt.savefig('trajectory.png')
     
     simulation_app.close()
 
