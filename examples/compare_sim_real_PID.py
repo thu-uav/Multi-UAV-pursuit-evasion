@@ -113,10 +113,20 @@ def main(cfg):
         drone: crazyflie
         controller: the predefined controller
     """
+    # # origin
+    # params = [
+    #     0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
+    #     2.88e-8, 2315, 7.24e-10, 0.2, 0.43,
+    #     # controller
+    #     250.0, 250.0, 120.0, # kp
+    #     2.5, 2.5, 2.5, # kd
+    #     500.0, 500.0, 16.7, # ki
+    #     33.3, 33.3, 166.7 # ilimit
+    # ]
     # origin
     params = [
-        0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
-        2.88e-8, 2315, 7.24e-10, 0.2, 0.43,
+        0.0321, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
+        2.350347298350041e-08, 2315, 7.24e-10, 0.2, 0.43,
         # controller
         250.0, 250.0, 120.0, # kp
         2.5, 2.5, 2.5, # kd
@@ -208,7 +218,7 @@ def main(cfg):
     real_cmd_y_list = []
     real_cmd_thrust_list = []
 
-    use_real_action = True # sim和real_action的主要差别是有没有电池补偿
+    use_real_action = False # sim和real_action的主要差别是有没有电池补偿
     trajectory_len = real_data.shape[0] - 1
     
     for i in range(trajectory_len):

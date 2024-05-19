@@ -22,7 +22,7 @@ viewer:
 wandb:
   group: ${oc.select:..task.name}
   # run_name: debug
-  run_name: Hover_PID
+  run_name: Hover_PID_opt
   job_type: train
   entity: chenjy
   project: Track
