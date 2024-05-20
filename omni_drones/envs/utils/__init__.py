@@ -150,8 +150,9 @@ def lemniscate(t, c):
 
     return x
 
-def line_acc(t, a):
-    x = 0.5 * a * t**2
+def line_acc(t, a, threshold):
+    v_max = a * threshold
+    x = torch.where(t <= threshold, 0.5 * a * t**2, 0.5 * a * threshold**2 + v_max * (t - threshold) - 0.5 * a * (t - threshold)**2)
     y = torch.zeros_like(t)
     z = torch.zeros_like(t)
 

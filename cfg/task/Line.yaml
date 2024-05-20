@@ -27,11 +27,10 @@ angular_acc_max: 100.0
 linear_acc_max: 10.0
 reward_linear_jerk_weight: 0.0 # 0.001
 reward_angular_jerk_weight: 0.0 # 0.0001
-use_acc: 1
-use_jerk: 1
+use_acc: 0
+use_jerk: 0
 
-action_transform: rate
-# action_transform: PIDrate
+action_transform: PIDrate
 # history: true
 # randomization:
 #   drone:

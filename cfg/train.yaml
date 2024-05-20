@@ -16,13 +16,13 @@ seed: 0
 
 viewer:
   resolution: [960, 720]
-  eye: [0.005, 0., 5.]
-  lookat: [0., 0., 1.]
+  eye: [1.0, 0., 8.]
+  lookat: [2., 0., 1.]
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: Track_star
-  # run_name: Turn
+  run_name: Line_a1to3
+  # run_name: debug
   job_type: train
   entity: chenjy
   project: Track
@@ -33,7 +33,7 @@ wandb:
   tags: 
 
 defaults:
-  # - task: Hover
-  - task: Track
+  - task: Line
+  # - task: Track
   - algo: mappo
   - _self_
