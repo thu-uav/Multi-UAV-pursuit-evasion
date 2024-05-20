@@ -6,8 +6,8 @@ defaults:
   - /base/sim_base@_here_
 
 env:
-  num_envs: 1
-  max_episode_length: 400
+  num_envs: 10
+  max_episode_length: 300
 
 drone_model: Crazyflie
 force_sensor: false
@@ -19,6 +19,8 @@ latency: false
 reset_thres: 1.
 future_traj_steps: 4
 
+use_acc: 0
+use_jerk: 0
 reward_effort_weight: 0.
 reward_action_smoothness_weight: 0.0
 reward_distance_scale: 1.6
@@ -27,11 +29,8 @@ angular_acc_max: 100.0
 linear_acc_max: 10.0
 reward_linear_jerk_weight: 0.0 # 0.001
 reward_angular_jerk_weight: 0.0 # 0.0001
-use_acc: 1
-use_jerk: 1
 
-action_transform: rate
-# action_transform: PIDrate
+action_transform: PIDrate
 # history: true
 # randomization:
 #   drone:

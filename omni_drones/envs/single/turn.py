@@ -142,9 +142,14 @@ class Turn(IsaacEnv):
             torch.tensor(3.0, device=self.device)
         )
         
-        self.threshold_scale_dist = D.Uniform(
-            torch.tensor(0.5 * scale_time(torch.tensor(self.max_episode_length * self.dt)), device=self.device),
-            torch.tensor(0.5 * scale_time(torch.tensor(self.max_episode_length * self.dt)), device=self.device)
+        self.unif_start_dist = D.Uniform(
+            torch.tensor(0.33 * scale_time(torch.tensor(self.max_episode_length * self.dt)), device=self.device),
+            torch.tensor(0.33 * scale_time(torch.tensor(self.max_episode_length * self.dt)), device=self.device)
+        )
+
+        self.unif_end_dist = D.Uniform(
+            torch.tensor(0.66 * scale_time(torch.tensor(self.max_episode_length * self.dt)), device=self.device),
+            torch.tensor(0.66 * scale_time(torch.tensor(self.max_episode_length * self.dt)), device=self.device)
         )
         
         self.c_scale_dist = D.Uniform(
@@ -169,7 +174,8 @@ class Turn(IsaacEnv):
         self.traj_t0 = 0.0
         # self.v_scale = torch.zeros(self.num_envs, device=self.device)
         self.a_scale = torch.zeros(self.num_envs, device=self.device)
-        self.threshold_scale = torch.zeros(self.num_envs, device=self.device)
+        self.unif_start_scale = torch.zeros(self.num_envs, device=self.device)
+        self.unif_end_scale = torch.zeros(self.num_envs, device=self.device)
         self.c_scale = torch.zeros(self.num_envs, device=self.device)
 
         self.last_linear_v = torch.zeros(self.num_envs, 1, device=self.device)
@@ -276,7 +282,9 @@ class Turn(IsaacEnv):
         
         # self.v_scale[env_ids] = self.v_scale_dist.sample(env_ids.shape)
         self.a_scale[env_ids] = self.a_scale_dist.sample(env_ids.shape)
-        self.threshold_scale[env_ids] = self.threshold_scale_dist.sample(env_ids.shape)
+        # self.threshold_scale[env_ids] = self.threshold_scale_dist.sample(env_ids.shape)
+        self.unif_start_scale[env_ids] = self.unif_start_dist.sample(env_ids.shape)
+        self.unif_end_scale[env_ids] = self.unif_end_dist.sample(env_ids.shape)
         self.c_scale[env_ids] = self.c_scale_dist.sample(env_ids.shape)
 
         t0 = torch.zeros(len(env_ids), device=self.device)
@@ -311,8 +319,10 @@ class Turn(IsaacEnv):
         if self._should_render(0) and (env_ids == self.central_env_idx).any() :
             # visualize the trajectory
             self.draw.clear_lines()
-
+            
+            breakpoint()
             traj_vis = self._compute_traj(self.max_episode_length, self.central_env_idx.unsqueeze(0))[0]
+            breakpoint()
             traj_vis = traj_vis + self.envs_positions[self.central_env_idx]
             point_list_0 = traj_vis[:-1].tolist()
             point_list_1 = traj_vis[1:].tolist()
@@ -483,13 +493,14 @@ class Turn(IsaacEnv):
         if env_ids is None:
             env_ids = ...
         t = self.progress_buf[env_ids].unsqueeze(1) + step_size * torch.arange(steps, device=self.device)
-        t = self.traj_t0 + scale_time(torch.ones((self.num_envs, 1), device=self.device)[env_ids] * t * self.dt)
+        t = self.traj_t0 + torch.ones((self.num_envs, 1), device=self.device)[env_ids] * t * self.dt
+        # t = self.traj_t0 + scale_time(torch.ones((self.num_envs, 1), device=self.device)[env_ids] * t * self.dt)
         # t = self.traj_t0 + torch.ones((self.num_envs, 1), device=self.device) * t * self.dt
         # traj_rot = self.traj_rot[env_ids].unsqueeze(1).expand(-1, t.shape[1], 4)
         
         # target_pos = vmap(lemniscate)(t, self.traj_c[env_ids])
         # target_pos = vmap(line_segments)(t, self.v_scale[env_ids], self.threshold_scale[env_ids], torch.pi * self.c_scale[env_ids])
-        target_pos = vmap(line_segments_acc)(t, self.a_scale[env_ids], self.threshold_scale[env_ids], torch.pi * self.c_scale[env_ids])
+        target_pos = vmap(line_segments_acc)(t, self.a_scale[env_ids], self.unif_start_scale[env_ids], self.unif_start_scale[env_ids], torch.pi * self.c_scale[env_ids])
         # target_pos = vmap(torch_utils.quat_rotate)(traj_rot, target_pos) * self.traj_scale[env_ids].unsqueeze(1)
 
         return self.origin + target_pos

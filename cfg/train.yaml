@@ -10,19 +10,19 @@ model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
 max_iters: -1
-eval_interval: -1
+eval_interval: 100
 save_interval: 100
 seed: 0
 
 viewer:
   resolution: [960, 720]
-  eye: [-2., 0., 2.]
+  eye: [0.005, 0., 5.]
   lookat: [0., 0., 1.]
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: debug
-  run_name: Hover_PID_opt
+  run_name: Track_star
+  # run_name: Turn
   job_type: train
   entity: chenjy
   project: Track
@@ -33,7 +33,7 @@ wandb:
   tags: 
 
 defaults:
-  - task: Hover
-  # - task: Turn
+  # - task: Hover
+  - task: Track
   - algo: mappo
   - _self_

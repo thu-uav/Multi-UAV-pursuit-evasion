@@ -123,7 +123,6 @@ def main(cfg):
     #     500.0, 500.0, 16.7, # ki
     #     33.3, 33.3, 166.7 # ilimit
     # ]
-    # origin
     params = [
         0.0321, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
         2.350347298350041e-08, 2315, 7.24e-10, 0.2, 0.43,
@@ -261,7 +260,7 @@ def main(cfg):
         target_rate = torch.tensor(real_data[i, :, 28:31]).to(device=sim.device).float()
         real_rate = real_rate.to(device=sim.device).float()
         curret_body_rate = quat_rotate_inverse(rot, angvel)
-        # real_rate = curret_body_rate
+        # real_rate == curret_body_rate
         
         action, cmd = controller.debug_step(
             real_body_rate=curret_body_rate,

@@ -45,8 +45,7 @@ def main(cfg):
         preprocess_df = np.array(preprocess_df)
     else:
         preprocess_df = df
-    # episode_length = preprocess_df.shape[0]
-    episode_length = 1400
+    episode_length = min(1300, preprocess_df.shape[0])
     real_data = []
     # real_date: [episode_length, num_trajectory, dim]
     T = 1
@@ -54,13 +53,29 @@ def main(cfg):
         _slice = slice(i, i+T)
         real_data.append(preprocess_df[_slice])
     real_data = np.array(real_data)
-    
+
+    '''
+    df:
+    Index(['pos.time', 'pos.x', 'pos.y', 'pos.z', [1:4]
+        'quat.time', 'quat.w', 'quat.x','quat.y', 'quat.z', [5:9]
+        'vel.time', 'vel.x', 'vel.y', 'vel.z', [10:13]
+        'omega.time','omega.r', 'omega.p', 'omega.y', [14:17] (gyro, degree/s)
+        'command_rpy.time', 'command_rpy.cmd_r', 'command_rpy.cmd_p',
+        'command_rpy.cmd_y', 'command_rpy.cmd_thrust', [18:22]
+        'real_rate.time', 'real_rate.r', 'real_rate.p', 'real_rate.y',
+        'real_rate.thrust', [23:27] (radians, pitch = -gyro.y)
+        'target_rate.time','target_rate.r', 'target_rate.p', 'target_rate.y', 
+        'target_rate.thrust',[28:32] (degree)
+        'motor.time', 'motor.m1', 'motor.m2', 'motor.m3', 'motor.m4'],[33:37]
+        dtype='object')
+    '''
+
     # add real next_body_rate
-    next_body_rate = real_data[1:,:,18:21]
+    next_body_rate = real_data[1:, :, 23:26]
     # add real next motor_thrust
-    next_motor_thrust = real_data[1:,:,28:32]
+    next_motor_thrust = real_data[1:, :, 33:37]
     # add real next_vel
-    next_vel = real_data[1:,:,10:13]
+    next_vel = real_data[1:, :, 10:13]
     real_data = np.concatenate([real_data[:-1],next_body_rate], axis=-1)
     real_data = np.concatenate([real_data, next_motor_thrust], axis=-1)
     real_data = np.concatenate([real_data, next_vel], axis=-1)
@@ -75,11 +90,12 @@ def main(cfg):
     from omni_drones.utils.torch import euler_to_quaternion, quaternion_to_euler
     from omni_drones.sensors.camera import Camera, PinholeCameraCfg
 
-    average_dt = 0.01
+    dt = 0.01
+    g = 9.81
     sim = SimulationContext(
         stage_units_in_meters=1.0,
-        physics_dt=average_dt,
-        rendering_dt=average_dt,
+        physics_dt=dt,
+        rendering_dt=dt,
         sim_params=cfg.sim,
         backend="torch",
         device=cfg.sim.device,
@@ -94,7 +110,7 @@ def main(cfg):
     
     # apply_action, if True, opt for rotor
     # if False, opt for controller
-    use_real_action = False
+    use_real_action = True
 
     def evaluate(params, real_data):
         """
@@ -126,16 +142,13 @@ def main(cfg):
         # reset sim
         sim.reset()
         drone.initialize_byTunablePara(tunable_parameters=tunable_parameters)
-        # controller = RateController(9.81, drone.params).to(sim.device)
-        controller = PIDRateController(9.81, drone.params).to(sim.device)
-        controller.set_byTunablePara(tunable_parameters=tunable_parameters)
+        controller = PIDRateController(dt, g, drone.params).to(sim.device)
         controller = controller.to(sim.device)
-        max_thrust = controller.max_thrusts.sum(-1)
         
-        # # shuffle index and split into batches
-        # shuffled_idx = torch.randperm(real_data.shape[0])
-        # # shuffled_idx = np.arange(0,real_data.shape[0])
-        # shuffled_real_data = real_data[shuffled_idx]
+        # shuffle index and split into batches
+        shuffled_idx = torch.randperm(real_data.shape[0])
+        # shuffled_idx = np.arange(0,real_data.shape[0])
+        shuffled_real_data = real_data[shuffled_idx]
         
         loss = torch.tensor(0.0, dtype=torch.float)
         # update simulation parameters
@@ -155,25 +168,25 @@ def main(cfg):
             # flush the buffer so that the next getter invocation 
             # returns up-to-date values
             sim._physics_sim_view.flush() 
-        
+
         '''
         df:
-        Index(['pos.time', 'pos.x', 'pos.y', 'pos.z', (1:4)
-            'quat.time', 'quat.w', 'quat.x','quat.y', 'quat.z', (5:9)
-            'vel.time', 'vel.x', 'vel.y', 'vel.z', (10:13)
-            'omega.time','omega.r', 'omega.p', 'omega.y', (14:17)
-            'real_rate.time', 'real_rate.r', 'real_rate.p', 'real_rate.y', 
-            'real_rate.thrust', (18:22)
+        Index(['pos.time', 'pos.x', 'pos.y', 'pos.z', [1:4]
+            'quat.time', 'quat.w', 'quat.x','quat.y', 'quat.z', [5:9]
+            'vel.time', 'vel.x', 'vel.y', 'vel.z', [10:13]
+            'omega.time','omega.r', 'omega.p', 'omega.y', [14:17] (gyro, degree/s)
+            'command_rpy.time', 'command_rpy.cmd_r', 'command_rpy.cmd_p',
+            'command_rpy.cmd_y', 'command_rpy.cmd_thrust', [18:22]
+            'real_rate.time', 'real_rate.r', 'real_rate.p', 'real_rate.y',
+            'real_rate.thrust', [23:27] (radians, pitch = -gyro.y)
             'target_rate.time','target_rate.r', 'target_rate.p', 'target_rate.y', 
-            'target_rate.thrust',(23:27)
-            'motor.time', 'motor.m1', 'motor.m2', 'motor.m3', 'motor.m4',(28:32)
-            'next_real_rate.r', 'next_real_rate.p', 'next_real_rate.y', (33:35)
-            'next_motor1', 'next_motor2', 'next_motor3', 'next_motor4', (35:39)
-            'next_vel.x', 'next_vel.y', 'next_vel.z', (39:42)]
+            'target_rate.thrust',[28:32] (degree)
+            'motor.time', 'motor.m1', 'motor.m2', 'motor.m3', 'motor.m4'],[33:37]
+            'next_real_rate.r', 'next_real_rate.p', 'next_real_rate.y', (37:40)
+            'next_motor1', 'next_motor2', 'next_motor3', 'next_motor4', (40:44)
+            'next_vel.x', 'next_vel.y', 'next_vel.z', (44:47)]
             dtype='object')
-        '''
-        # for i in range(max(1, real_data.shape[1]-1)):
-        
+        '''        
         sim_action_list = []
         real_action_list = []
         
@@ -183,16 +196,16 @@ def main(cfg):
         sim_vel_list = []
         real_vel_list = []
         
-        for i in range(real_data.shape[0]):
-            pos = torch.tensor(real_data[i, :, 1:4])
-            quat = torch.tensor(real_data[i, :, 5:9])
-            vel = torch.tensor(real_data[i, :, 10:13])
-            real_rate = torch.tensor(real_data[i, :, 18:21])
-            next_real_rate = torch.tensor(real_data[i, :, 32:35])
-            next_real_motor_thrust = torch.tensor(real_data[i, :, 35:39])
-            next_vel = torch.tensor(real_data[i, :, 39:42])
-            real_rate[:, 1] = -real_rate[:, 1]
-            next_real_rate[:, 1] = -next_real_rate[:, 1]
+        for i in range(shuffled_real_data.shape[0]):
+            pos = torch.tensor(shuffled_real_data[i, :, 1:4])
+            quat = torch.tensor(shuffled_real_data[i, :, 5:9])
+            vel = torch.tensor(shuffled_real_data[i, :, 10:13])
+            real_rate = torch.tensor(shuffled_real_data[i, :, 23:26])
+            next_real_rate = torch.tensor(shuffled_real_data[i, :, 37:40])
+            next_real_motor_thrust = torch.tensor(shuffled_real_data[i, :, 40:44])
+            next_vel = torch.tensor(shuffled_real_data[i, :, 44:47])
+            # real_rate[:, 1] = -real_rate[:, 1]
+            # next_real_rate[:, 1] = -next_real_rate[:, 1]
             # get angvel
             ang_vel = quat_rotate(quat, real_rate)
             # if i == 0 :
@@ -200,18 +213,19 @@ def main(cfg):
 
             drone_state = drone.get_state()[..., :13].reshape(-1, 13)
             # get current_rate
-            pos, rot, linvel, angvel = drone_state.split([3, 4, 3, 3], dim=1)
-            current_rate = quat_rotate_inverse(rot, angvel)
-            target_thrust = torch.tensor(real_data[i, :, 26]).to(device=sim.device).float()
-            target_rate = torch.tensor(real_data[i, :, 23:26]).to(device=sim.device).float()
+            current_pos, current_rot, current_linvel, current_angvel = drone_state.split([3, 4, 3, 3], dim=1)
+            target_thrust = torch.tensor(shuffled_real_data[i, :, 31]).to(device=sim.device).float()
+            target_rate = torch.tensor(shuffled_real_data[i, :, 28:31]).to(device=sim.device).float()
             real_rate = real_rate.to(device=sim.device).float()
-            next_real_rate = next_real_rate.to(device=sim.device).float()
-            target_rate[:, 1] = -target_rate[:, 1]
-            action = controller.sim_step(
-                current_rate=current_rate,
-                target_rate=target_rate / 180 * torch.pi,
+            curret_body_rate = quat_rotate_inverse(current_rot, current_angvel)
+            
+            # target_rate[:, 1] = -target_rate[:, 1]
+            action, cmd = controller.debug_step(
+                real_body_rate=curret_body_rate,
+                target_rate=target_rate,
                 target_thrust=target_thrust.unsqueeze(1)
             )
+            sim_cmd_r, sim_cmd_p, sim_cmd_y, sim_cmd_thrust = cmd
             
             sim_action_list.append(action.detach().to('cpu').numpy())
             
@@ -266,11 +280,11 @@ def main(cfg):
 
     # PID
     params = [
-        0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
-        2.88e-8, 2315, 7.24e-10, 0.2, 0.43,
+        0.0321, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
+        2.350347298350041e-08, 2315, 7.24e-10, 0.2, 0.43,
         # controller
         250.0, 250.0, 120.0, # kp
-        2.5, 2.5, # kd
+        2.5, 2.5, 2.5, # kd
         500.0, 500.0, 16.7, # ki
         33.3, 33.3, 166.7 # ilimit
     ]
@@ -297,7 +311,7 @@ def main(cfg):
         # update rotor params
         params_mask[5] = 1
         params_mask[7] = 1
-        # params_mask[9] = 1
+        params_mask[9] = 1
     else:
         # update controller params
         # params_mask[1] = 1

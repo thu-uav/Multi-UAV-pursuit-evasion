@@ -167,20 +167,31 @@ def line_segments(t, v, threshold, c):
 
     return torch.stack([x, y, z], dim=-1)
 
-def line_segments_acc(t, a, threshold, c):
-    # v = torch.tensor(v)
-    # threshold = torch.tensor(threshold)
-    # c = torch.tensor(c)
-    v_turn = a * threshold
-    x = torch.where(t <= threshold, 0.5 * a * t**2, 0.5 * a * threshold**2 + v_turn * (t - threshold) * torch.cos(c))
-    y = torch.where(t <= threshold, torch.zeros_like(t), v_turn * (t - threshold) * torch.sin(c))
+def line_segments_acc(t, a, unif_start, unif_end, c):
+    v_turn = a * unif_start
+    
+    # 1th phase
+    x1 = 0.5 * a * t**2
+    y1 = torch.zeros_like(t)
+    
+    # 2th phase
+    x2 = 0.5 * a * unif_start**2 + v_turn * (t - unif_start) * torch.cos(c)
+    y2 = v_turn * (t - unif_start) * torch.sin(c)
+    
+    # 3th phase
+    x3 = 0.5 * a * unif_start**2 + v_turn * (unif_end - unif_start) * torch.cos(c) + \
+          (v_turn * (t - unif_end) - 0.5 * a * (t - unif_end)**2) * torch.cos(c)
+    y3 = v_turn * (unif_end - unif_start) * torch.sin(c) + \
+          (v_turn * (t - unif_end) - 0.5 * a * (t - unif_end)**2) * torch.sin(c)
+    
+    x = torch.where(t <= unif_start, x1, torch.where(t <= unif_end, x2, x3))
+    y = torch.where(t <= unif_start, y1, torch.where(t <= unif_end, y2, y3))
     z = torch.zeros_like(t)
-
+    
     return torch.stack([x, y, z], dim=-1)
 
-def pentagram(t, c):
-    # TODO: use c
-    a = 1.5
+def pentagram(t):
+    a = 1.0
     b = 0.5
     x = -a * torch.sin(2 * t) - b * torch.sin(3 * t)
     y = a * torch.cos(2 * t) - b * torch.cos(3 * t)

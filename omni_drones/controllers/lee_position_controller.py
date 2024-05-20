@@ -463,29 +463,6 @@ class PIDRateController(nn.Module):
         self,
         tunable_parameters: dict = {},
     ):        
-        force_constants = torch.as_tensor(self.rotor_config["force_constants"])
-        max_rot_vel = torch.as_tensor(self.rotor_config["max_rotation_velocities"])
-        self.max_thrusts = nn.Parameter(max_rot_vel.square() * force_constants)
-        inertia_xx = tunable_parameters['inertia_xx']
-        inertia_yy = tunable_parameters['inertia_yy']
-        inertia_zz = tunable_parameters['inertia_zz']
-        # gain = tunable_parameters['gain']
-        I = torch.diag_embed(
-            torch.tensor([inertia_xx, inertia_yy, inertia_zz, 1])
-        ).float()
-
-        self.rotor_config['arm_lengths'] = [tunable_parameters['arm_lengths']] * 4
-        self.rotor_config['force_constants'] = [tunable_parameters['force_constants']] * 4
-        self.rotor_config['max_rotation_velocities'] = [tunable_parameters['max_rotation_velocities']] * 4
-        self.rotor_config['moment_constants'] = [tunable_parameters['moment_constants']] * 4
-        # self.rotor_config['rotor_angles'] = tunable_parameters['rotor_angles']
-        self.rotor_config['time_constant'] = tunable_parameters['time_constant']
-
-        self.mixer = nn.Parameter(compute_parameters(self.rotor_config, I))
-        # self.gain_angular_rate = nn.Parameter(
-        #     torch.tensor(gain).float() @ I[:3, :3].inverse()
-        # )
-        
         # PID param
         self.dt = nn.Parameter(torch.tensor(0.02))
         self.pid_kp = nn.Parameter(torch.tensor(tunable_parameters['pid_kp']))
