@@ -138,7 +138,7 @@ class Line(IsaacEnv):
         #     torch.tensor(5.1, device=self.device)
         # )
         self.a_scale_dist = D.Uniform(
-            torch.tensor(1.0, device=self.device),
+            torch.tensor(3.0, device=self.device),
             torch.tensor(3.0, device=self.device)
         )
         
@@ -436,7 +436,7 @@ class Line(IsaacEnv):
 
         reward = (
             reward_pose 
-            + reward_pose * (reward_up + reward_spin)
+            # + reward_pose * (reward_up + reward_spin)
             + reward_effort
             + reward_action_smoothness
             + reward_acc
