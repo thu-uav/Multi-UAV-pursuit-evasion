@@ -10,7 +10,7 @@ model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
 max_iters: -1
-eval_interval: -1
+eval_interval: 100
 save_interval: 100
 seed: 0
 
@@ -21,8 +21,8 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: Track_mass00321_force235_time043
-  # run_name: eval_cf13_cf13model
+  run_name: Hover_mass00321_force235_time06
+  # run_name: debug
   job_type: train
   entity: chenjy
   project: Track
@@ -34,6 +34,6 @@ wandb:
 
 defaults:
   # - task: Line
-  - task: Track
+  - task: Hover
   - algo: mappo
   - _self_
