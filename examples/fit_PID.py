@@ -309,8 +309,8 @@ def main(cfg):
     params_mask = np.array([0] * len(params))
     if use_real_action:
         # update rotor params
-        params_mask[5] = 1
-        params_mask[7] = 1
+        # params_mask[5] = 1
+        # params_mask[7] = 1
         params_mask[9] = 1
     else:
         # update controller params

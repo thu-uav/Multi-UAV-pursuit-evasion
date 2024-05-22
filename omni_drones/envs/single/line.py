@@ -36,7 +36,7 @@ from tensordict.tensordict import TensorDict, TensorDictBase
 from torchrl.data import UnboundedContinuousTensorSpec, CompositeSpec
 from omni.isaac.debug_draw import _debug_draw
 
-from ..utils import lemniscate, pentagram, scale_time, line_segments, line_segments_acc, line_acc
+from ..utils import lemniscate, pentagram, scale_time, line_acc
 import collections
 
 class Line(IsaacEnv):
@@ -93,13 +93,6 @@ class Line(IsaacEnv):
         self.reward_effort_weight = cfg.task.reward_effort_weight
         self.reward_action_smoothness_weight = cfg.task.reward_action_smoothness_weight
         self.reward_distance_scale = cfg.task.reward_distance_scale
-        self.reward_acc_weight = cfg.task.reward_acc_weight
-        self.reward_linear_jerk_weight = cfg.task.reward_linear_jerk_weight
-        self.reward_angular_jerk_weight = cfg.task.reward_angular_jerk_weight
-        self.angular_acc_max = cfg.task.angular_acc_max
-        self.linear_acc_max = cfg.task.linear_acc_max
-        self.use_acc = cfg.task.use_acc
-        self.use_jerk = cfg.task.use_jerk
         self.time_encoding = cfg.task.time_encoding
         self.future_traj_steps = int(cfg.task.future_traj_steps)
         assert self.future_traj_steps > 0
@@ -130,48 +123,50 @@ class Line(IsaacEnv):
         
         self.init_rpy_dist = D.Uniform(
             torch.tensor([-.2, -.2, 0.], device=self.device) * torch.pi,
-            torch.tensor([0.2, 0.2, .2], device=self.device) * torch.pi
+            torch.tensor([0.2, 0.2, 2.], device=self.device) * torch.pi
+        )
+        self.traj_rpy_dist = D.Uniform(
+            torch.tensor([0., 0., 0.], device=self.device) * torch.pi,
+            torch.tensor([0., 0., 2.], device=self.device) * torch.pi
+        )
+        self.traj_c_dist = D.Uniform(
+            torch.tensor(-0.6, device=self.device),
+            torch.tensor(0.6, device=self.device)
+        )
+        self.traj_scale_dist = D.Uniform(
+            torch.tensor([1.8, 1.8, 1.], device=self.device),
+            torch.tensor([3.2, 3.2, 1.5], device=self.device)
+        )
+        self.traj_w_dist = D.Uniform(
+            torch.tensor(0.8, device=self.device),
+            torch.tensor(1.1, device=self.device)
         )
         
-        # self.v_scale_dist = D.Uniform(
-        #     torch.tensor(5.0, device=self.device),
-        #     torch.tensor(5.1, device=self.device)
-        # )
         self.a_scale_dist = D.Uniform(
-            torch.tensor(3.0, device=self.device),
-            torch.tensor(3.0, device=self.device)
+            torch.tensor(1.0, device=self.device),
+            torch.tensor(1.0, device=self.device)
         )
         
         self.threshold_scale_dist = D.Uniform(
-            torch.tensor(0.5 * torch.tensor(self.max_episode_length * self.dt), device=self.device),
-            torch.tensor(0.5 * torch.tensor(self.max_episode_length * self.dt), device=self.device)
+            torch.tensor(0.5 * scale_time(torch.tensor(self.max_episode_length * self.dt)), device=self.device),
+            torch.tensor(0.5 * scale_time(torch.tensor(self.max_episode_length * self.dt)), device=self.device)
         )
-
-        # self.traj_c_dist = D.Uniform(
-        #     torch.tensor(-0.6, device=self.device),
-        #     torch.tensor(0.6, device=self.device)
-        # )
-        # self.traj_scale_dist = D.Uniform(
-        #     torch.tensor([1.8, 1.8, 1.], device=self.device),
-        #     torch.tensor([3.2, 3.2, 1.5], device=self.device)
-        # )
-        # self.traj_w_dist = D.Uniform(
-        #     torch.tensor(0.8, device=self.device),
-        #     torch.tensor(1.1, device=self.device)
-        # )
+        
+        self.alpha_scale_dist = D.Uniform(
+            torch.tensor(0.0, device=self.device),
+            torch.tensor(180.0, device=self.device)
+        )
+        
         self.origin = torch.tensor([0., 0., 1.], device=self.device)
 
-        self.traj_t0 = 0.0
-        # self.v_scale = torch.zeros(self.num_envs, device=self.device)
+        self.traj_t0 = torch.pi / 2
+        self.traj_c = torch.zeros(self.num_envs, device=self.device)
+        self.traj_scale = torch.zeros(self.num_envs, 3, device=self.device)
+        self.traj_rot = torch.zeros(self.num_envs, 4, device=self.device)
+        self.traj_w = torch.ones(self.num_envs, device=self.device)
         self.a_scale = torch.zeros(self.num_envs, device=self.device)
         self.threshold_scale = torch.zeros(self.num_envs, device=self.device)
-
-        self.last_linear_v = torch.zeros(self.num_envs, 1, device=self.device)
-        self.last_angular_v = torch.zeros(self.num_envs, 1, device=self.device)
-        self.last_linear_a = torch.zeros(self.num_envs, 1, device=self.device)
-        self.last_angular_a = torch.zeros(self.num_envs, 1, device=self.device)
-        self.last_linear_jerk = torch.zeros(self.num_envs, 1, device=self.device)
-        self.last_angular_jerk = torch.zeros(self.num_envs, 1, device=self.device)
+        self.alpha_scale = torch.zeros(self.num_envs, device=self.device)
 
         self.target_pos = torch.zeros(self.num_envs, self.future_traj_steps, 3, device=self.device)
 
@@ -196,10 +191,6 @@ class Line(IsaacEnv):
     def _set_specs(self):
         drone_state_dim = 3 + 3 + 4 + 3 + 3 # position, velocity, quaternion, heading, up
         obs_dim = drone_state_dim + 3 * (self.future_traj_steps-1)
-        if self.use_acc:
-            obs_dim += 2
-        if self.use_jerk:
-            obs_dim += 2
         if self.time_encoding:
             self.time_encoding_dim = 4
             obs_dim += self.time_encoding_dim
@@ -232,26 +223,8 @@ class Line(IsaacEnv):
             "episode_len": UnboundedContinuousTensorSpec(1),
             "tracking_error": UnboundedContinuousTensorSpec(1),
             "tracking_error_ema": UnboundedContinuousTensorSpec(1),
-            "action_smoothness_max": UnboundedContinuousTensorSpec(1),
-            "action_smoothness_mean": UnboundedContinuousTensorSpec(1),
+            "action_smoothness": UnboundedContinuousTensorSpec(1),
             "drone_state": UnboundedContinuousTensorSpec(13),
-            "linear_v_max": UnboundedContinuousTensorSpec(1),
-            "angular_v_max": UnboundedContinuousTensorSpec(1),
-            "linear_a_max": UnboundedContinuousTensorSpec(1),
-            "angular_a_max": UnboundedContinuousTensorSpec(1),
-            "linear_jerk_max": UnboundedContinuousTensorSpec(1),
-            "angular_jerk_max": UnboundedContinuousTensorSpec(1),
-            "linear_v_mean": UnboundedContinuousTensorSpec(1),
-            "angular_v_mean": UnboundedContinuousTensorSpec(1),
-            "linear_a_mean": UnboundedContinuousTensorSpec(1),
-            "angular_a_mean": UnboundedContinuousTensorSpec(1),
-            "linear_jerk_mean": UnboundedContinuousTensorSpec(1),
-            "angular_jerk_mean": UnboundedContinuousTensorSpec(1),
-            "reward_pos": UnboundedContinuousTensorSpec(1),
-            "reward_up": UnboundedContinuousTensorSpec(1),
-            "reward_acc": UnboundedContinuousTensorSpec(1),
-            "reward_smooth": UnboundedContinuousTensorSpec(1),
-            "reward_jerk": UnboundedContinuousTensorSpec(1),
         }).expand(self.num_envs).to(self.device)
         info_spec = CompositeSpec({
             "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13)),
@@ -267,37 +240,25 @@ class Line(IsaacEnv):
 
     def _reset_idx(self, env_ids: torch.Tensor):
         self.drone._reset_idx(env_ids)
-        
-        # self.v_scale[env_ids] = self.v_scale_dist.sample(env_ids.shape)
+        self.traj_c[env_ids] = self.traj_c_dist.sample(env_ids.shape)
+        self.traj_rot[env_ids] = euler_to_quaternion(self.traj_rpy_dist.sample(env_ids.shape))
+        self.traj_scale[env_ids] = self.traj_scale_dist.sample(env_ids.shape) / 4 # for crazyflie, traj should be smaller
+        traj_w = self.traj_w_dist.sample(env_ids.shape)
+        self.traj_w[env_ids] = torch.randn_like(traj_w).sign() * traj_w
         self.a_scale[env_ids] = self.a_scale_dist.sample(env_ids.shape)
         self.threshold_scale[env_ids] = self.threshold_scale_dist.sample(env_ids.shape)
+        self.alpha_scale[env_ids] = self.alpha_scale_dist.sample(env_ids.shape)
 
         t0 = torch.zeros(len(env_ids), device=self.device)
-        pos = self.origin
+        pos = lemniscate(t0 + self.traj_t0, self.traj_c[env_ids]) + self.origin
         rot = euler_to_quaternion(self.init_rpy_dist.sample(env_ids.shape))
         vel = torch.zeros(len(env_ids), 1, 6, device=self.device)
         self.drone.set_world_poses(
             pos + self.envs_positions[env_ids], rot, env_ids
         )
         self.drone.set_velocities(vel, env_ids)
-        
-        # set last values
-        self.last_linear_v[env_ids] = torch.norm(vel[..., :3], dim=-1)
-        self.last_angular_v[env_ids] = torch.norm(vel[..., 3:], dim=-1)
-        self.last_linear_a[env_ids] = torch.zeros_like(self.last_linear_v[env_ids])
-        self.last_angular_a[env_ids] = torch.zeros_like(self.last_angular_v[env_ids])
-        self.last_linear_jerk[env_ids] = torch.zeros_like(self.last_linear_a[env_ids])
-        self.last_angular_jerk[env_ids] = torch.zeros_like(self.last_angular_a[env_ids])
 
         self.stats[env_ids] = 0.
-        
-        self.action_smoothness_episode = torch.zeros_like(self.stats["action_smoothness_mean"])
-        self.linear_v_episode = torch.zeros_like(self.stats["linear_v_mean"])
-        self.angular_v_episode = torch.zeros_like(self.stats["angular_v_mean"])
-        self.linear_a_episode = torch.zeros_like(self.stats["linear_a_mean"])
-        self.angular_a_episode = torch.zeros_like(self.stats["angular_a_mean"])
-        self.linear_jerk_episode = torch.zeros_like(self.stats["linear_jerk_mean"])
-        self.angular_jerk_episode = torch.zeros_like(self.stats["angular_jerk_mean"])
 
         # self.info[env_ids] = self.drone.info[env_ids]
 
@@ -346,55 +307,9 @@ class Line(IsaacEnv):
         if self.intrinsics:
             obs.append(self.drone.get_info())
 
-        # set smoothness entities
-        self.stats["action_smoothness_max"].set_(torch.max(self.stats["action_smoothness_max"], torch.abs(self.drone.throttle_difference)))
-        self.action_smoothness_episode.add_(torch.abs(self.drone.throttle_difference))
-        self.stats["action_smoothness_mean"].set_(self.action_smoothness_episode / (self.progress_buf + 1.0).unsqueeze(1))
-        # linear_v, angular_v
-        self.linear_v = torch.norm(self.root_state[..., 7:10], dim=-1)
-        self.angular_v = torch.norm(self.root_state[..., 10:13], dim=-1)
-        self.stats["linear_v_max"].set_(torch.max(self.stats["linear_v_max"], torch.abs(self.linear_v)))
-        self.linear_v_episode.add_(torch.abs(self.linear_v))
-        self.stats["linear_v_mean"].set_(self.linear_v_episode / (self.progress_buf + 1.0).unsqueeze(1))
-        self.stats["angular_v_max"].set_(torch.max(self.stats["angular_v_max"], torch.abs(self.angular_v)))
-        self.angular_v_episode.add_(torch.abs(self.angular_v))
-        self.stats["angular_v_mean"].set_(self.angular_v_episode / (self.progress_buf + 1.0).unsqueeze(1))
-        # linear_a, angular_a
-        self.linear_a = torch.abs(self.linear_v - self.last_linear_v) / self.dt
-        self.angular_a = torch.abs(self.angular_v - self.last_angular_v) / self.dt
-        self.stats["linear_a_max"].set_(torch.max(self.stats["linear_a_max"], torch.abs(self.linear_a)))
-        self.linear_a_episode.add_(torch.abs(self.linear_a))
-        self.stats["linear_a_mean"].set_(self.linear_a_episode / (self.progress_buf + 1.0).unsqueeze(1))
-        self.stats["angular_a_max"].set_(torch.max(self.stats["angular_a_max"], torch.abs(self.angular_a)))
-        self.angular_a_episode.add_(torch.abs(self.angular_a))
-        self.stats["angular_a_mean"].set_(self.angular_a_episode / (self.progress_buf + 1.0).unsqueeze(1))
-        # linear_jerk, angular_jerk
-        self.linear_jerk = torch.abs(self.linear_a - self.last_linear_a) / self.dt
-        self.angular_jerk = torch.abs(self.angular_a - self.last_angular_a) / self.dt
-        self.stats["linear_jerk_max"].set_(torch.max(self.stats["linear_jerk_max"], torch.abs(self.linear_jerk)))
-        self.linear_jerk_episode.add_(torch.abs(self.linear_jerk))
-        self.stats["linear_jerk_mean"].set_(self.linear_jerk_episode / (self.progress_buf + 1.0).unsqueeze(1))
-        self.stats["angular_jerk_max"].set_(torch.max(self.stats["angular_jerk_max"], torch.abs(self.angular_jerk)))
-        self.angular_jerk_episode.add_(torch.abs(self.angular_jerk))
-        self.stats["angular_jerk_mean"].set_(self.angular_jerk_episode / (self.progress_buf + 1.0).unsqueeze(1))
-        
-        # set last
-        self.last_linear_v = self.linear_v.clone()
-        self.last_angular_v = self.angular_v.clone()
-        self.last_linear_a = self.linear_a.clone()
-        self.last_angular_a = self.angular_a.clone()
-        self.last_linear_jerk = self.linear_jerk.clone()
-        self.last_angular_jerk = self.angular_jerk.clone()
-        
-        # add acc and jerk
-        if self.use_acc:
-            obs.append(self.linear_a.unsqueeze(1) / 10.0)
-            obs.append(self.angular_a.unsqueeze(1) / 100.0)
-        if self.use_jerk:
-            obs.append(self.linear_jerk.unsqueeze(1) / 1000.0)
-            obs.append(self.angular_jerk.unsqueeze(1) / 10000.0)
-        
         obs = torch.cat(obs, dim=-1)
+
+        self.stats["action_smoothness"].lerp_(-self.drone.throttle_difference, (1-self.alpha))
         
         if self.latency:
             self.obs_buffer.append(obs)
@@ -430,24 +345,12 @@ class Line(IsaacEnv):
         reward_spin = 0.5 / (1.0 + torch.square(spin))
         # not_spin_bonus = torch.abs(torch.square(self.drone.vel[..., -1])) < 1e-5
 
-        # reward acc and jerk
-        reward_acc = - self.reward_acc_weight * ((self.angular_a > self.angular_acc_max).float() + (self.linear_a > self.linear_acc_max).float())
-        reward_jerk = - self.reward_linear_jerk_weight * self.linear_jerk - self.reward_angular_jerk_weight * self.angular_jerk
-
         reward = (
             reward_pose 
-            # + reward_pose * (reward_up + reward_spin)
+            + reward_pose * (reward_up + reward_spin)
             + reward_effort
             + reward_action_smoothness
-            + reward_acc
-            + reward_jerk
         )
-        
-        self.stats["reward_pos"].set_(reward_pose)
-        self.stats["reward_up"].set_(reward_pose * (reward_up + reward_spin))
-        self.stats["reward_smooth"].set_(reward_action_smoothness)
-        self.stats["reward_acc"].set_(reward_acc)
-        self.stats["reward_jerk"].set_(reward_jerk)
 
         done = (
             (self.progress_buf >= self.max_episode_length).unsqueeze(-1)
@@ -476,14 +379,13 @@ class Line(IsaacEnv):
         if env_ids is None:
             env_ids = ...
         t = self.progress_buf[env_ids].unsqueeze(1) + step_size * torch.arange(steps, device=self.device)
-        t = self.traj_t0 + torch.ones((self.num_envs, 1), device=self.device)[env_ids] * t * self.dt
-        # t = self.traj_t0 + scale_time(torch.ones((self.num_envs, 1), device=self.device)[env_ids] * t * self.dt)
-        # t = self.traj_t0 + torch.ones((self.num_envs, 1), device=self.device) * t * self.dt
-        # traj_rot = self.traj_rot[env_ids].unsqueeze(1).expand(-1, t.shape[1], 4)
+        t = self.traj_t0 + scale_time(self.traj_w[env_ids].unsqueeze(1) * t * self.dt)
+        traj_rot = self.traj_rot[env_ids].unsqueeze(1).expand(-1, t.shape[1], 4)
         
         # target_pos = vmap(lemniscate)(t, self.traj_c[env_ids])
-        target_pos = vmap(line_acc)(t, self.a_scale[env_ids], self.threshold_scale[env_ids])
-        # target_pos = vmap(torch_utils.quat_rotate)(traj_rot, target_pos) * self.traj_scale[env_ids].unsqueeze(1)
+        # target_pos = vmap(pentagram)(t)
+        target_pos = vmap(line_acc)(t, self.a_scale[env_ids], self.threshold_scale[env_ids], self.alpha_scale[env_ids])
+        target_pos = vmap(torch_utils.quat_rotate)(traj_rot, target_pos) * self.traj_scale[env_ids].unsqueeze(1)
 
         return self.origin + target_pos
 

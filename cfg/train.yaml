@@ -5,7 +5,7 @@ headless: true
 sim: ${task.sim}
 env: ${task.env}
 
-# model_dir: /home/jiayu/OmniDrones/scripts/outputs/Line_a1to3_worewardup/05-20_21-10/wandb/run-20240520_211011-p5caagxx/files/checkpoint_final.pt
+# model_dir: /home/jiayu/OmniDrones/scripts/outputs/Track_star.pt
 model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
@@ -16,13 +16,13 @@ seed: 0
 
 viewer:
   resolution: [960, 720]
-  eye: [1.0, 0., 8.]
-  lookat: [2., 0., 1.]
+  eye: [0.005, 0., 8.]
+  lookat: [0., 0., 1.]
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: Track_star_cf12
-  # run_name: debug
+  run_name: Track_mass00321_force235_time043
+  # run_name: eval_cf13_cf13model
   job_type: train
   entity: chenjy
   project: Track

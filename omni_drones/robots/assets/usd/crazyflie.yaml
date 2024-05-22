@@ -11,7 +11,7 @@ inertia:
   yy: 1.4e-5
   yz: 0.0
   zz: 2.17e-5
-mass: 0.0313 # cf13: 0.0321, cf11:0.0308, cf12: 0.0313
+mass: 0.0321 # cf13: 0.0321, cf11:0.0308, cf12: 0.0313
 l: 0.096
 drag_coef: 0.2
 rotor_configuration:
@@ -26,10 +26,7 @@ rotor_configuration:
   - -1.0
   - 1.0
   force_constants:
-  # - 2.88e-8 # KF = 4 * max_rot_vel**2 * force_constants / mg
-  # - 2.88e-8
-  # - 2.88e-8
-  # - 2.88e-8
+  # 1/4mg = (mean_hover_pwm / 2**16) * omega_max^2 * force_constants
   - 2.350347298350041e-08
   - 2.350347298350041e-08
   - 2.350347298350041e-08
@@ -50,10 +47,10 @@ rotor_configuration:
   - 2.35619449
   - 3.92699082
   - 5.49778714
-  time_constant: 0.0178 # 1.0 - torch.exp(self.dt / tau)
-controller_configuration:
+  time_constant: 0.43
+controller_configuration: # invalid
   gain:
-  - 0.0052 # origin
+  - 0.0052
   - 0.0052
   - 0.00025
 

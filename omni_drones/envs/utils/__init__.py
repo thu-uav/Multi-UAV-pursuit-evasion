@@ -150,10 +150,33 @@ def lemniscate(t, c):
 
     return x
 
-def line_acc(t, a, threshold):
-    v_max = a * threshold
-    x = torch.where(t <= threshold, 0.5 * a * t**2, 0.5 * a * threshold**2 + v_max * (t - threshold) - 0.5 * a * (t - threshold)**2)
-    y = torch.zeros_like(t)
+# def line_acc(t, a, threshold):
+#     v_max = a * threshold
+#     x = torch.where(t <= threshold, 0.5 * a * t**2, 0.5 * a * threshold**2 + v_max * (t - threshold) - 0.5 * a * (t - threshold)**2)
+#     y = torch.zeros_like(t)
+#     z = torch.zeros_like(t)
+
+#     return torch.stack([x, y, z], dim=-1)
+
+def line_acc(t, a, threshold, alpha):
+    # Convert angle c from degrees to radians
+    c = torch.deg2rad(alpha)
+    
+    # Calculate the components of acceleration
+    a_x = a * torch.cos(c)
+    a_y = a * torch.sin(c)
+    
+    # Calculate maximum velocities in x and y directions
+    v_max_x = a_x * threshold
+    v_max_y = a_y * threshold
+    
+    # Calculate position components for x and y directions
+    x = torch.where(t <= threshold, 0.5 * a_x * t**2, 
+                    0.5 * a_x * threshold**2 + v_max_x * (t - threshold) - 0.5 * a_x * (t - threshold)**2)
+    y = torch.where(t <= threshold, 0.5 * a_y * t**2, 
+                    0.5 * a_y * threshold**2 + v_max_y * (t - threshold) - 0.5 * a_y * (t - threshold)**2)
+    
+    # z remains zero since no movement along z-axis
     z = torch.zeros_like(t)
 
     return torch.stack([x, y, z], dim=-1)
