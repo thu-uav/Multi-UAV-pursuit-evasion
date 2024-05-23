@@ -152,3 +152,7 @@ local_test/
 *.png
 
 log_files_*
+
+*.gif
+*.bash
+test*
