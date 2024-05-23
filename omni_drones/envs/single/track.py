@@ -229,6 +229,8 @@ class Track(IsaacEnv):
             "tracking_error_ema": UnboundedContinuousTensorSpec(1),
             "action_smoothness": UnboundedContinuousTensorSpec(1),
             "drone_state": UnboundedContinuousTensorSpec(13),
+            "reward_pos": UnboundedContinuousTensorSpec(1),
+            "reward_smooth": UnboundedContinuousTensorSpec(1),
         }).expand(self.num_envs).to(self.device)
         info_spec = CompositeSpec({
             "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13)),
@@ -348,10 +350,13 @@ class Track(IsaacEnv):
 
         reward = (
             reward_pose 
-            + reward_pose * (reward_up + reward_spin)
-            + reward_effort
+            # + reward_pose * (reward_up + reward_spin)
+            # + reward_effort
             + reward_action_smoothness
         )
+        
+        self.stats['reward_pos'].set_(reward_pose)
+        self.stats['reward_smooth'].set_(reward_action_smoothness)
 
         done = (
             (self.progress_buf >= self.max_episode_length).unsqueeze(-1)

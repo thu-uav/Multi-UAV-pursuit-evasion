@@ -21,7 +21,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: Track_smooth
+  run_name: Track_smoothscale0_5_woup_spin_reward
   # run_name: debug
   job_type: train
   entity: chenjy
