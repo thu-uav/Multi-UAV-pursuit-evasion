@@ -5,7 +5,7 @@ headless: true
 sim: ${task.sim}
 env: ${task.env}
 
-# model_dir: /home/jiayu/OmniDrones/scripts/outputs/Track_star.pt
+# model_dir: /home/jiayu/OmniDrones/scripts/outputs/Track_star_random.pt
 model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
@@ -16,12 +16,12 @@ seed: 0
 
 viewer:
   resolution: [960, 720]
-  eye: [0.005, 0., 8.]
+  eye: [1.0, 0., 3.]
   lookat: [0., 0., 1.]
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: Hover_mass00321_force235_time06
+  run_name: Track_smooth
   # run_name: debug
   job_type: train
   entity: chenjy
@@ -33,7 +33,8 @@ wandb:
   tags: 
 
 defaults:
+  - task: Track
   # - task: Line
-  - task: Hover
+  # - task: Hover
   - algo: mappo
   - _self_

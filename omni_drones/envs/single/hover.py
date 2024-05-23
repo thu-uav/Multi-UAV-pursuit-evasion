@@ -121,10 +121,10 @@ class Hover(IsaacEnv):
         self.init_poses = self.drone.get_world_poses(clone=True)
         self.init_vels = torch.zeros_like(self.drone.get_velocities())
 
-        # eval
+        # # eval
         # self.init_pos_dist = D.Uniform(
-        #     torch.tensor([0.0, 0.0, 1.0], device=self.device),
-        #     torch.tensor([0.0, 0.0, 1.0], device=self.device)
+        #     torch.tensor([0.0, 0.0, 0.05], device=self.device),
+        #     torch.tensor([0.0, 0.0, 0.05], device=self.device)
         # )
         self.init_pos_dist = D.Uniform(
             torch.tensor([-1., -1., 0.05], device=self.device),
