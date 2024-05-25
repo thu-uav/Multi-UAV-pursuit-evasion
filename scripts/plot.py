@@ -1,49 +1,54 @@
 import torch
 import matplotlib.pyplot as plt
 
-def line_segments_acc(t, a, threshold):
-    v_max = a * threshold
-    x = torch.where(t <= threshold, 0.5 * a * t**2, 0.5 * a * threshold**2 + v_max * (t - threshold) - 0.5 * a * (t - threshold)**2)
+def infeasible_pentagram(t, max_time):    
+    v = 1.0
+    T = 0.2 * max_time
+    max_cycle_number = 5
+    cycle_number = torch.clip(torch.floor(t / T).long(), 0, max_cycle_number - 1)
+    time_in_cycle = t % T
+    
+    # init
+    x = torch.zeros_like(t)
     y = torch.zeros_like(t)
-    z = torch.zeros_like(t)
+    
+    # get all corners
+    x0 = torch.tensor(0.0).to(t.device)
+    y0 = torch.tensor(0.0).to(t.device)
+    angle = torch.tensor(0.0).to(t.device)
+    pos_init = [torch.stack([x0, y0], dim=-1).clone()]
+    angle_list = [angle.clone()]
+    for _ in range(max_cycle_number - 1):
+        x0 += v * T * torch.cos(angle)
+        y0 += v * T * torch.sin(angle)
+        angle -= torch.tensor(144.0) * (torch.pi / 180.0)
+        pos_init.append(torch.stack([x0, y0], dim=-1).clone())
+        angle_list.append(angle.clone())
+    pos_init = torch.stack(pos_init)
+    angle_list = torch.stack(angle_list)
 
-    return x, y, z
+    x = v * time_in_cycle * torch.cos(angle_list[cycle_number]) + pos_init[cycle_number][:, 0]
+    y = v * time_in_cycle * torch.sin(angle_list[cycle_number]) + pos_init[cycle_number][:, 1]
+    
+    z = torch.zeros_like(x)
 
-# 定义参数
-a = 3.0
-t_max = 2
-t = torch.linspace(0, t_max, 200)
-threshold = torch.tensor(0.5) * t_max
+    return torch.stack([x, y, z], dim=-1)
 
-# 调用函数
-x, y, z = line_segments_acc(t, a, threshold)
+# 生成轨迹
+max_time = 10
+t = torch.linspace(0, max_time, 1000)
+trajectory = infeasible_pentagram(t, max_time)
 
-# 绘制图形
-plt.figure(figsize=(10, 5))
+# 提取坐标
+x_traj = trajectory[:, 0]
+y_traj = trajectory[:, 1]
 
-# 绘制 x 曲线
-plt.subplot(1, 2, 1)
-plt.plot(t.numpy(), x.numpy(), label='x(t)')
-plt.xlabel('t')
-plt.ylabel('x')
-plt.title('x vs t')
+# 绘制轨迹
+plt.figure(figsize=(8, 8))
+plt.plot(x_traj.cpu(), y_traj.cpu(), label='Trajectory')
+plt.xlabel('X')
+plt.ylabel('Y')
+plt.title('Trajectory of Infeasible Pentagram')
+plt.grid(True)
 plt.legend()
-
-# # 绘制 y 曲线
-# plt.subplot(1, 3, 2)
-# plt.plot(t.numpy(), y.numpy(), label='y(t)', color='orange')
-# plt.xlabel('t')
-# plt.ylabel('y')
-# plt.title('y vs t')
-# plt.legend()
-
-# 绘制 x-y 曲线
-plt.subplot(1, 2, 2)
-plt.plot(x.numpy(), y.numpy(), label='y(x)', color='red')
-plt.xlabel('x')
-plt.ylabel('y')
-plt.title('y vs x')
-plt.legend()
-
-plt.tight_layout()
-plt.savefig('plot.png')
+plt.savefig('star')

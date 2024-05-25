@@ -1,4 +1,4 @@
-name: Track
+name: Infeasible
 
 defaults:
   # see https://hydra.cc/docs/advanced/overriding_packages/
@@ -6,7 +6,7 @@ defaults:
   - /base/sim_base@_here_
 
 env:
-  num_envs: 1000
+  num_envs: 2048
   max_episode_length: 1000
 
 drone_model: Crazyflie
