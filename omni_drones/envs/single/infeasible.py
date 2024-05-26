@@ -125,23 +125,25 @@ class Infeasible(IsaacEnv):
             torch.tensor([-.2, -.2, 0.], device=self.device) * torch.pi,
             torch.tensor([0.2, 0.2, 2.], device=self.device) * torch.pi
         )
+        
         self.traj_rpy_dist = D.Uniform(
             torch.tensor([0., 0., 0.], device=self.device) * torch.pi,
             torch.tensor([0., 0., 2.], device=self.device) * torch.pi
         )
 
         self.traj_scale_dist = D.Uniform(
-            torch.tensor([1.8, 1.8, 1.], device=self.device),
-            torch.tensor([3.2, 3.2, 1.], device=self.device)
+            torch.tensor([0.5, 0.5, 0.25], device=self.device),
+            torch.tensor([2.0, 2.0, 0.25], device=self.device)
         )
         
         self.max_time_length = scale_time(torch.tensor(self.max_episode_length * self.dt))
         
         # # eval
         # self.init_rpy_dist = D.Uniform(
-        #     torch.tensor([-.0, -.0, 0.], device=self.device) * torch.pi,
-        #     torch.tensor([0., 0., 0.], device=self.device) * torch.pi
+        #     torch.tensor([-0.0, -0.0, 0.], device=self.device) * torch.pi,
+        #     torch.tensor([0.0, 0.0, 0.], device=self.device) * torch.pi
         # )
+        
         # self.traj_rpy_dist = D.Uniform(
         #     torch.tensor([0., 0., 0.], device=self.device) * torch.pi,
         #     torch.tensor([0., 0., 0.], device=self.device) * torch.pi
@@ -253,11 +255,8 @@ class Infeasible(IsaacEnv):
     def _reset_idx(self, env_ids: torch.Tensor):
         self.drone._reset_idx(env_ids)
         self.traj_rot[env_ids] = euler_to_quaternion(self.traj_rpy_dist.sample(env_ids.shape))
-        self.traj_scale[env_ids] = self.traj_scale_dist.sample(env_ids.shape) / 4 # for crazyflie, traj should be smaller
-        # traj_w = self.traj_w_dist.sample(env_ids.shape)
-        # self.traj_w[env_ids] = torch.randn_like(traj_w).sign() * traj_w
-        
-        # self.traj_c[env_ids] = self.traj_c_dist.sample(env_ids.shape)
+        # self.traj_scale[env_ids] = self.traj_scale_dist.sample(env_ids.shape) / 4 # for crazyflie, traj should be smaller
+        self.traj_scale[env_ids] = self.traj_scale_dist.sample(env_ids.shape)
 
         t0 = torch.zeros(len(env_ids), device=self.device)
         # pos = lemniscate(t0 + self.traj_t0, self.traj_c[env_ids]) + self.origin

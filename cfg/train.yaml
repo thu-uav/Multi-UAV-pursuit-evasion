@@ -5,7 +5,7 @@ headless: true
 sim: ${task.sim}
 env: ${task.env}
 
-# model_dir: /home/jiayu/OmniDrones/scripts/outputs/Track_smooth0012_reward005.pt
+# model_dir: /home/jiayu/OmniDrones/scripts/outputs/Infeasible_smooth0/05-26_15-42/wandb/run-20240526_154241-can7aie0/files/checkpoint_471990272.pt
 model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
@@ -16,13 +16,13 @@ seed: 0
 
 viewer:
   resolution: [960, 720]
-  eye: [1.0, 0., 3.]
+  eye: [0.005, 0., 5.]
   lookat: [0., 0., 1.]
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: Infeasible_smooth0
-  # run_name: debug
+  run_name: Track_large_smooth0
+  # run_name: Track_eval_size2_smooth005
   job_type: train
   entity: chenjy
   project: Track
@@ -33,8 +33,8 @@ wandb:
   tags: 
 
 defaults:
-  - task: Infeasible
-  # - task: Track
+  # - task: Infeasible
+  - task: Track
   # - task: Line
   # - task: Hover
   - algo: mappo
