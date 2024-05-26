@@ -320,9 +320,7 @@ class Turn(IsaacEnv):
             # visualize the trajectory
             self.draw.clear_lines()
             
-            breakpoint()
             traj_vis = self._compute_traj(self.max_episode_length, self.central_env_idx.unsqueeze(0))[0]
-            breakpoint()
             traj_vis = traj_vis + self.envs_positions[self.central_env_idx]
             point_list_0 = traj_vis[:-1].tolist()
             point_list_1 = traj_vis[1:].tolist()
