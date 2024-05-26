@@ -135,7 +135,7 @@ class Track(IsaacEnv):
         )
         self.traj_scale_dist = D.Uniform(
             torch.tensor([0.5, 0.5, 0.25], device=self.device),
-            torch.tensor([2.0, 2.0, 0.25], device=self.device)
+            torch.tensor([1.0, 1.0, 0.25], device=self.device)
         )
         self.traj_w_dist = D.Uniform(
             torch.tensor(0.8, device=self.device),
