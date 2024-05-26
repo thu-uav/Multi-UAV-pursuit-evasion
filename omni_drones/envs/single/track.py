@@ -172,6 +172,13 @@ class Track(IsaacEnv):
         self.traj_rot = torch.zeros(self.num_envs, 4, device=self.device)
         self.traj_w = torch.ones(self.num_envs, device=self.device)
 
+        self.last_linear_v = torch.zeros(self.num_envs, 1, device=self.device)
+        self.last_angular_v = torch.zeros(self.num_envs, 1, device=self.device)
+        self.last_linear_a = torch.zeros(self.num_envs, 1, device=self.device)
+        self.last_angular_a = torch.zeros(self.num_envs, 1, device=self.device)
+        self.last_linear_jerk = torch.zeros(self.num_envs, 1, device=self.device)
+        self.last_angular_jerk = torch.zeros(self.num_envs, 1, device=self.device)
+
         self.target_pos = torch.zeros(self.num_envs, self.future_traj_steps, 3, device=self.device)
 
         self.alpha = 0.8
@@ -231,6 +238,18 @@ class Track(IsaacEnv):
             "drone_state": UnboundedContinuousTensorSpec(13),
             "reward_pos": UnboundedContinuousTensorSpec(1),
             "reward_smooth": UnboundedContinuousTensorSpec(1),
+            "linear_v_max": UnboundedContinuousTensorSpec(1),
+            "angular_v_max": UnboundedContinuousTensorSpec(1),
+            "linear_a_max": UnboundedContinuousTensorSpec(1),
+            "angular_a_max": UnboundedContinuousTensorSpec(1),
+            "linear_jerk_max": UnboundedContinuousTensorSpec(1),
+            "angular_jerk_max": UnboundedContinuousTensorSpec(1),
+            "linear_v_mean": UnboundedContinuousTensorSpec(1),
+            "angular_v_mean": UnboundedContinuousTensorSpec(1),
+            "linear_a_mean": UnboundedContinuousTensorSpec(1),
+            "angular_a_mean": UnboundedContinuousTensorSpec(1),
+            "linear_jerk_mean": UnboundedContinuousTensorSpec(1),
+            "angular_jerk_mean": UnboundedContinuousTensorSpec(1),
         }).expand(self.num_envs).to(self.device)
         info_spec = CompositeSpec({
             "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13)),
@@ -263,9 +282,22 @@ class Track(IsaacEnv):
         )
         self.drone.set_velocities(vel, env_ids)
 
+        # set last values
+        self.last_linear_v[env_ids] = torch.norm(vel[..., :3], dim=-1)
+        self.last_angular_v[env_ids] = torch.norm(vel[..., 3:], dim=-1)
+        self.last_linear_a[env_ids] = torch.zeros_like(self.last_linear_v[env_ids])
+        self.last_angular_a[env_ids] = torch.zeros_like(self.last_angular_v[env_ids])
+        self.last_linear_jerk[env_ids] = torch.zeros_like(self.last_linear_a[env_ids])
+        self.last_angular_jerk[env_ids] = torch.zeros_like(self.last_angular_a[env_ids])
+
         self.stats[env_ids] = 0.
 
-        # self.info[env_ids] = self.drone.info[env_ids]
+        self.linear_v_episode = torch.zeros_like(self.stats["linear_v_mean"])
+        self.angular_v_episode = torch.zeros_like(self.stats["angular_v_mean"])
+        self.linear_a_episode = torch.zeros_like(self.stats["linear_a_mean"])
+        self.angular_a_episode = torch.zeros_like(self.stats["angular_a_mean"])
+        self.linear_jerk_episode = torch.zeros_like(self.stats["linear_jerk_mean"])
+        self.angular_jerk_episode = torch.zeros_like(self.stats["angular_jerk_mean"])
 
         if self._should_render(0) and (env_ids == self.central_env_idx).any() :
             # visualize the trajectory
@@ -315,7 +347,43 @@ class Track(IsaacEnv):
         obs = torch.cat(obs, dim=-1)
 
         self.stats["action_smoothness"].lerp_(-self.drone.throttle_difference, (1-self.alpha))
+
+        # linear_v, angular_v
+        self.linear_v = torch.norm(self.root_state[..., 7:10], dim=-1)
+        self.angular_v = torch.norm(self.root_state[..., 10:13], dim=-1)
+        self.stats["linear_v_max"].set_(torch.max(self.stats["linear_v_max"], torch.abs(self.linear_v)))
+        self.linear_v_episode.add_(torch.abs(self.linear_v))
+        self.stats["linear_v_mean"].set_(self.linear_v_episode / (self.progress_buf + 1.0).unsqueeze(1))
+        self.stats["angular_v_max"].set_(torch.max(self.stats["angular_v_max"], torch.abs(self.angular_v)))
+        self.angular_v_episode.add_(torch.abs(self.angular_v))
+        self.stats["angular_v_mean"].set_(self.angular_v_episode / (self.progress_buf + 1.0).unsqueeze(1))
+        # linear_a, angular_a
+        self.linear_a = torch.abs(self.linear_v - self.last_linear_v) / self.dt
+        self.angular_a = torch.abs(self.angular_v - self.last_angular_v) / self.dt
+        self.stats["linear_a_max"].set_(torch.max(self.stats["linear_a_max"], torch.abs(self.linear_a)))
+        self.linear_a_episode.add_(torch.abs(self.linear_a))
+        self.stats["linear_a_mean"].set_(self.linear_a_episode / (self.progress_buf + 1.0).unsqueeze(1))
+        self.stats["angular_a_max"].set_(torch.max(self.stats["angular_a_max"], torch.abs(self.angular_a)))
+        self.angular_a_episode.add_(torch.abs(self.angular_a))
+        self.stats["angular_a_mean"].set_(self.angular_a_episode / (self.progress_buf + 1.0).unsqueeze(1))
+        # linear_jerk, angular_jerk
+        self.linear_jerk = torch.abs(self.linear_a - self.last_linear_a) / self.dt
+        self.angular_jerk = torch.abs(self.angular_a - self.last_angular_a) / self.dt
+        self.stats["linear_jerk_max"].set_(torch.max(self.stats["linear_jerk_max"], torch.abs(self.linear_jerk)))
+        self.linear_jerk_episode.add_(torch.abs(self.linear_jerk))
+        self.stats["linear_jerk_mean"].set_(self.linear_jerk_episode / (self.progress_buf + 1.0).unsqueeze(1))
+        self.stats["angular_jerk_max"].set_(torch.max(self.stats["angular_jerk_max"], torch.abs(self.angular_jerk)))
+        self.angular_jerk_episode.add_(torch.abs(self.angular_jerk))
+        self.stats["angular_jerk_mean"].set_(self.angular_jerk_episode / (self.progress_buf + 1.0).unsqueeze(1))
         
+        # set last
+        self.last_linear_v = self.linear_v.clone()
+        self.last_angular_v = self.angular_v.clone()
+        self.last_linear_a = self.linear_a.clone()
+        self.last_angular_a = self.angular_a.clone()
+        self.last_linear_jerk = self.linear_jerk.clone()
+        self.last_angular_jerk = self.angular_jerk.clone()
+
         if self.latency:
             self.obs_buffer.append(obs)
             obs = self.obs_buffer[0]
