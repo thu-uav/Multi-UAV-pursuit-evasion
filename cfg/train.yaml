@@ -22,7 +22,7 @@ viewer:
 wandb:
   group: ${oc.select:..task.name}
   # run_name: debug
-  run_name: Track_large_smooth0_fixedz
+  run_name: Track_size1_5_smooth0_fixedz
   job_type: train
   entity: chenjy
   project: Track

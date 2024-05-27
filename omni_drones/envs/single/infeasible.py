@@ -121,38 +121,38 @@ class Infeasible(IsaacEnv):
             self.wind_w = torch.zeros(self.num_envs, 3, 8, device=self.device)
             self.wind_i = torch.zeros(self.num_envs, 1, device=self.device)
         
-        self.init_rpy_dist = D.Uniform(
-            torch.tensor([-.2, -.2, 0.], device=self.device) * torch.pi,
-            torch.tensor([0.2, 0.2, 2.], device=self.device) * torch.pi
-        )
-        
-        self.traj_rpy_dist = D.Uniform(
-            torch.tensor([0., 0., 0.], device=self.device) * torch.pi,
-            torch.tensor([0., 0., 2.], device=self.device) * torch.pi
-        )
-
-        self.traj_scale_dist = D.Uniform(
-            torch.tensor([0.5, 0.5, 0.25], device=self.device),
-            torch.tensor([2.0, 2.0, 0.25], device=self.device)
-        )
-        
-        self.max_time_length = scale_time(torch.tensor(self.max_episode_length * self.dt))
-        
-        # # eval
         # self.init_rpy_dist = D.Uniform(
-        #     torch.tensor([-0.0, -0.0, 0.], device=self.device) * torch.pi,
-        #     torch.tensor([0.0, 0.0, 0.], device=self.device) * torch.pi
+        #     torch.tensor([-.2, -.2, 0.], device=self.device) * torch.pi,
+        #     torch.tensor([0.2, 0.2, 2.], device=self.device) * torch.pi
         # )
         
         # self.traj_rpy_dist = D.Uniform(
         #     torch.tensor([0., 0., 0.], device=self.device) * torch.pi,
-        #     torch.tensor([0., 0., 0.], device=self.device) * torch.pi
+        #     torch.tensor([0., 0., 2.], device=self.device) * torch.pi
         # )
 
         # self.traj_scale_dist = D.Uniform(
-        #     torch.tensor([3.0, 3.0, 1.], device=self.device),
-        #     torch.tensor([3.0, 3.0, 1.], device=self.device)
+        #     torch.tensor([0.5, 0.5, 0.25], device=self.device),
+        #     torch.tensor([2.0, 2.0, 0.25], device=self.device)
         # )
+        
+        self.max_time_length = scale_time(torch.tensor(self.max_episode_length * self.dt))
+        
+        # eval
+        self.init_rpy_dist = D.Uniform(
+            torch.tensor([-0.0, -0.0, 0.], device=self.device) * torch.pi,
+            torch.tensor([0.0, 0.0, 0.], device=self.device) * torch.pi
+        )
+        
+        self.traj_rpy_dist = D.Uniform(
+            torch.tensor([0., 0., 0.], device=self.device) * torch.pi,
+            torch.tensor([0., 0., 0.], device=self.device) * torch.pi
+        )
+
+        self.traj_scale_dist = D.Uniform(
+            torch.tensor([2.0, 2.0, 0.25], device=self.device),
+            torch.tensor([2.0, 2.0, 0.25], device=self.device)
+        )
         
         self.origin = torch.tensor([0., 0., 1.], device=self.device)
 
@@ -259,7 +259,7 @@ class Infeasible(IsaacEnv):
         self.traj_scale[env_ids] = self.traj_scale_dist.sample(env_ids.shape)
 
         t0 = torch.zeros(len(env_ids), device=self.device)
-        pos = vmap(infeasible_pentagram)(t0 + self.traj_t0, max_time = self.max_time_length).unsqueeze(1)
+        pos = infeasible_pentagram(t0 + self.traj_t0, self.max_time_length).unsqueeze(1)
         pos = (vmap(torch_utils.quat_rotate)(self.traj_rot[env_ids].unsqueeze(1), pos) * self.traj_scale[env_ids].unsqueeze(1) + self.origin).squeeze(1)
         rot = euler_to_quaternion(self.init_rpy_dist.sample(env_ids.shape))
         vel = torch.zeros(len(env_ids), 1, 6, device=self.device)
