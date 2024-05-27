@@ -259,8 +259,8 @@ class Infeasible(IsaacEnv):
         self.traj_scale[env_ids] = self.traj_scale_dist.sample(env_ids.shape)
 
         t0 = torch.zeros(len(env_ids), device=self.device)
-        # pos = lemniscate(t0 + self.traj_t0, self.traj_c[env_ids]) + self.origin
-        pos = infeasible_pentagram(t0 + self.traj_t0, self.max_time_length) + self.origin
+        pos = vmap(infeasible_pentagram)(t0 + self.traj_t0, max_time = self.max_time_length).unsqueeze(1)
+        pos = (vmap(torch_utils.quat_rotate)(self.traj_rot[env_ids].unsqueeze(1), pos) * self.traj_scale[env_ids].unsqueeze(1) + self.origin).squeeze(1)
         rot = euler_to_quaternion(self.init_rpy_dist.sample(env_ids.shape))
         vel = torch.zeros(len(env_ids), 1, 6, device=self.device)
         self.drone.set_world_poses(

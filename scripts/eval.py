@@ -199,14 +199,6 @@ def main(cfg):
         if isinstance(k, tuple) and k[0]=="stats"
     ]
     episode_stats = EpisodeStats(stats_keys)
-    collector = SyncDataCollector(
-        env,
-        policy=policy,
-        frames_per_batch=frames_per_batch,
-        total_frames=total_frames,
-        device=cfg.sim.device,
-        return_same_td=True,
-    )
 
     @torch.no_grad()
     def evaluate(
@@ -273,61 +265,9 @@ def main(cfg):
         
         return info
 
-    pbar = tqdm(collector)
-    env.train()
-    fps = []
-    for i, data in enumerate(pbar):
-        # fps.append(collector._fps)
-        info = {"env_frames": collector._frames, "rollout_fps": collector._fps}
-        episode_stats(data.to_tensordict())
-
-        # if len(episode_stats) >= base_env.num_envs:
-        #     stats = {
-        #         "train/" + (".".join(k) if isinstance(k, tuple) else k): torch.mean(v).item() 
-        #         for k, v in episode_stats.pop().items(True, True)
-        #     }
-        #     info.update(stats)
-        
-        # info.update(policy.train_op(data.to_tensordict()))
-
-        if eval_interval > 0 and i % eval_interval == 0:
-            logging.info(f"Eval at {collector._frames} steps.")
-            info.update(evaluate())
-            env.train()
-
-        if save_interval > 0 and i % save_interval == 0:
-            if hasattr(policy, "state_dict"):
-                ckpt_path = os.path.join(run.dir, f"checkpoint_{collector._frames}.pt")
-                logging.info(f"Save checkpoint to {str(ckpt_path)}")
-                torch.save(policy.state_dict(), ckpt_path)
-
-        run.log(info)
-        print(OmegaConf.to_yaml({k: v for k, v in info.items() if isinstance(v, float)}))
-
-        pbar.set_postfix({
-            "rollout_fps": collector._fps,
-            "frames": collector._frames,
-        })
-
-        if max_iters > 0 and i >= max_iters - 1:
-            break 
-
-        # if len(fps) > 50:
-        #     fps = np.array(fps)[10:]
-        #     print(fps.mean(), fps.std())
-        #     exit()
-    
-    logging.info(f"Final Eval at {collector._frames} steps.")
-    info = {"env_frames": collector._frames}
+    info = {}
     info.update(evaluate())
     run.log(info)
-
-    if hasattr(policy, "state_dict"):
-        ckpt_path = os.path.join(run.dir, "checkpoint_final.pt")
-        logging.info(f"Save checkpoint to {str(ckpt_path)}")
-        torch.save(policy.state_dict(), ckpt_path)
-
-    wandb.save(os.path.join(run.dir, "checkpoint*"))
     wandb.finish()
     
     simulation_app.close()

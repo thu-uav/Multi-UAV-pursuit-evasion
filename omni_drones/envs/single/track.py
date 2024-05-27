@@ -135,7 +135,7 @@ class Track(IsaacEnv):
         )
         self.traj_scale_dist = D.Uniform(
             torch.tensor([0.5, 0.5, 0.25], device=self.device),
-            torch.tensor([1.0, 1.0, 0.25], device=self.device)
+            torch.tensor([1.5, 1.5, 0.25], device=self.device)
         )
         self.traj_w_dist = D.Uniform(
             torch.tensor(0.8, device=self.device),
@@ -156,8 +156,8 @@ class Track(IsaacEnv):
         #     torch.tensor(0.0, device=self.device)
         # )
         # self.traj_scale_dist = D.Uniform(
-        #     torch.tensor([0.5, 0.5, 1.], device=self.device),
-        #     torch.tensor([0.5, 0.5, 1.], device=self.device)
+        #     torch.tensor([1.5, 1.5, 0.25], device=self.device),
+        #     torch.tensor([1.5, 1.5, 0.25], device=self.device)
         # )
         # self.traj_w_dist = D.Uniform(
         #     torch.tensor(1., device=self.device),
@@ -273,8 +273,8 @@ class Track(IsaacEnv):
         self.traj_w[env_ids] = torch.randn_like(traj_w).sign() * traj_w
 
         t0 = torch.zeros(len(env_ids), device=self.device)
-        # pos = lemniscate(t0 + self.traj_t0, self.traj_c[env_ids]) + self.origin
-        pos = pentagram(t0 + self.traj_t0) + self.origin
+        pos = vmap(pentagram)(t0 + self.traj_t0).unsqueeze(1)
+        pos = (vmap(torch_utils.quat_rotate)(self.traj_rot[env_ids].unsqueeze(1), pos) * self.traj_scale[env_ids].unsqueeze(1) + self.origin).squeeze(1)
         rot = euler_to_quaternion(self.init_rpy_dist.sample(env_ids.shape))
         vel = torch.zeros(len(env_ids), 1, 6, device=self.device)
         self.drone.set_world_poses(
