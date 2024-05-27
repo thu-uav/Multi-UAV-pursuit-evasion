@@ -121,38 +121,38 @@ class Infeasible(IsaacEnv):
             self.wind_w = torch.zeros(self.num_envs, 3, 8, device=self.device)
             self.wind_i = torch.zeros(self.num_envs, 1, device=self.device)
         
-        # self.init_rpy_dist = D.Uniform(
-        #     torch.tensor([-.2, -.2, 0.], device=self.device) * torch.pi,
-        #     torch.tensor([0.2, 0.2, 2.], device=self.device) * torch.pi
-        # )
-        
-        # self.traj_rpy_dist = D.Uniform(
-        #     torch.tensor([0., 0., 0.], device=self.device) * torch.pi,
-        #     torch.tensor([0., 0., 2.], device=self.device) * torch.pi
-        # )
-
-        # self.traj_scale_dist = D.Uniform(
-        #     torch.tensor([0.5, 0.5, 0.25], device=self.device),
-        #     torch.tensor([2.0, 2.0, 0.25], device=self.device)
-        # )
-        
-        self.max_time_length = scale_time(torch.tensor(self.max_episode_length * self.dt))
-        
-        # eval
         self.init_rpy_dist = D.Uniform(
-            torch.tensor([-0.0, -0.0, 0.], device=self.device) * torch.pi,
-            torch.tensor([0.0, 0.0, 0.], device=self.device) * torch.pi
+            torch.tensor([-.2, -.2, 0.], device=self.device) * torch.pi,
+            torch.tensor([0.2, 0.2, 2.], device=self.device) * torch.pi
         )
         
         self.traj_rpy_dist = D.Uniform(
             torch.tensor([0., 0., 0.], device=self.device) * torch.pi,
-            torch.tensor([0., 0., 0.], device=self.device) * torch.pi
+            torch.tensor([0., 0., 2.], device=self.device) * torch.pi
         )
 
         self.traj_scale_dist = D.Uniform(
-            torch.tensor([2.0, 2.0, 0.25], device=self.device),
+            torch.tensor([0.5, 0.5, 0.25], device=self.device),
             torch.tensor([2.0, 2.0, 0.25], device=self.device)
         )
+        
+        self.max_time_length = scale_time(torch.tensor(self.max_episode_length * self.dt))
+        
+        # # eval
+        # self.init_rpy_dist = D.Uniform(
+        #     torch.tensor([-0.0, -0.0, 0.], device=self.device) * torch.pi,
+        #     torch.tensor([0.0, 0.0, 0.], device=self.device) * torch.pi
+        # )
+        
+        # self.traj_rpy_dist = D.Uniform(
+        #     torch.tensor([0., 0., 0.], device=self.device) * torch.pi,
+        #     torch.tensor([0., 0., 0.], device=self.device) * torch.pi
+        # )
+
+        # self.traj_scale_dist = D.Uniform(
+        #     torch.tensor([2.0, 2.0, 0.25], device=self.device),
+        #     torch.tensor([2.0, 2.0, 0.25], device=self.device)
+        # )
         
         self.origin = torch.tensor([0., 0., 1.], device=self.device)
 
