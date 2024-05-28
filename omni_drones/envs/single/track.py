@@ -134,35 +134,35 @@ class Track(IsaacEnv):
             torch.tensor(0.6, device=self.device)
         )
         self.traj_scale_dist = D.Uniform(
-            torch.tensor([0.5, 0.5, 0.25], device=self.device),
-            torch.tensor([0.8, 0.8, 0.25], device=self.device)
+            torch.tensor([0.45, 0.45, 0.25], device=self.device),
+            torch.tensor([0.55, 0.55, 0.25], device=self.device)
         )
         self.traj_w_dist = D.Uniform(
             torch.tensor(0.8, device=self.device),
             torch.tensor(1.1, device=self.device)
         )
         
-        # # eval
-        # self.init_rpy_dist = D.Uniform(
-        #     torch.tensor([-.0, -.0, 0.], device=self.device) * torch.pi,
-        #     torch.tensor([0., 0., 0.], device=self.device) * torch.pi
-        # )
-        # self.traj_rpy_dist = D.Uniform(
-        #     torch.tensor([0., 0., 0.], device=self.device) * torch.pi,
-        #     torch.tensor([0., 0., 0.], device=self.device) * torch.pi
-        # )
-        # self.traj_c_dist = D.Uniform(
-        #     torch.tensor(-0.0, device=self.device),
-        #     torch.tensor(0.0, device=self.device)
-        # )
-        # self.traj_scale_dist = D.Uniform(
-        #     torch.tensor([1.0, 1.0, 0.25], device=self.device),
-        #     torch.tensor([1.0, 1.0, 0.25], device=self.device)
-        # )
-        # self.traj_w_dist = D.Uniform(
-        #     torch.tensor(1., device=self.device),
-        #     torch.tensor(1., device=self.device)
-        # )
+        # eval
+        self.init_rpy_dist = D.Uniform(
+            torch.tensor([-.0, -.0, 0.], device=self.device) * torch.pi,
+            torch.tensor([0., 0., 0.], device=self.device) * torch.pi
+        )
+        self.traj_rpy_dist = D.Uniform(
+            torch.tensor([0., 0., 0.], device=self.device) * torch.pi,
+            torch.tensor([0., 0., 0.], device=self.device) * torch.pi
+        )
+        self.traj_c_dist = D.Uniform(
+            torch.tensor(-0.0, device=self.device),
+            torch.tensor(0.0, device=self.device)
+        )
+        self.traj_scale_dist = D.Uniform(
+            torch.tensor([0.5, 0.5, 0.25], device=self.device),
+            torch.tensor([0.5, 0.5, 0.25], device=self.device)
+        )
+        self.traj_w_dist = D.Uniform(
+            torch.tensor(1., device=self.device),
+            torch.tensor(1., device=self.device)
+        )
         
         self.origin = torch.tensor([0., 0., 1.], device=self.device)
 
@@ -234,7 +234,9 @@ class Track(IsaacEnv):
             "episode_len": UnboundedContinuousTensorSpec(1),
             "tracking_error": UnboundedContinuousTensorSpec(1),
             "tracking_error_ema": UnboundedContinuousTensorSpec(1),
-            "action_smoothness": UnboundedContinuousTensorSpec(1),
+            # "action_smoothness": UnboundedContinuousTensorSpec(1),
+            "action_smoothness_mean": UnboundedContinuousTensorSpec(1),
+            "action_smoothness_max": UnboundedContinuousTensorSpec(1),
             "drone_state": UnboundedContinuousTensorSpec(13),
             "reward_pos": UnboundedContinuousTensorSpec(1),
             "reward_smooth": UnboundedContinuousTensorSpec(1),
@@ -346,7 +348,9 @@ class Track(IsaacEnv):
 
         obs = torch.cat(obs, dim=-1)
 
-        self.stats["action_smoothness"].lerp_(-self.drone.throttle_difference, (1-self.alpha))
+        # self.stats["action_smoothness"].lerp_(-self.drone.throttle_difference, (1-self.alpha))
+        self.stats["action_smoothness_mean"].add_(self.drone.throttle_difference)
+        self.stats["action_smoothness_max"].set_(torch.max(self.drone.throttle_difference, self.stats["action_smoothness_max"]))
 
         # linear_v, angular_v
         self.linear_v = torch.norm(self.root_state[..., 7:10], dim=-1)
@@ -420,7 +424,7 @@ class Track(IsaacEnv):
 
         reward = (
             reward_pose 
-            # + reward_pose * (reward_up + reward_spin)
+            + reward_pose * (reward_up + reward_spin)
             # + reward_effort
             + reward_action_smoothness
         )
@@ -436,6 +440,9 @@ class Track(IsaacEnv):
 
         ep_len = self.progress_buf.unsqueeze(-1)
         self.stats["tracking_error"].div_(
+            torch.where(done, ep_len, torch.ones_like(ep_len))
+        )
+        self.stats['action_smoothness_mean'].div_(
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
         self.stats["return"] += reward

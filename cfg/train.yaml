@@ -5,8 +5,9 @@ headless: true
 sim: ${task.sim}
 env: ${task.env}
 
-# model_dir: /home/jiayu/OmniDrones/scripts/outputs/Track_size1_5_smooth0_fixedz/05-27_14-33/wandb/run-20240527_143325-ys2e4mj1/files/checkpoint_812777472.pt
-model_dir: null
+# model_dir: /home/jiayu/OmniDrones/scripts/outputs/Track_size05to08_smooth0_reward_up_spin/05-28_10-28/wandb/run-20240528_102811-crgu03wi/files/checkpoint_603062272.pt
+model_dir: /home/jiayu/OmniDrones/scripts/outputs/Track_size05to08_smooth0_reward_up_spin/05-28_10-28/wandb/run-20240528_102811-crgu03wi/files/checkpoint_603062272.pt
+# model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
 max_iters: -1
@@ -21,8 +22,8 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: Track_eval_size1_newmodel
-  run_name: Track_maxsize08_smooth0_fixedz
+  # run_name: Track_size045to055_rewardpose_smooth05
+  run_name: debug
   job_type: train
   entity: chenjy
   project: Track
