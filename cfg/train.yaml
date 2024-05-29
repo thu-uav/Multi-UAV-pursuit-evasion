@@ -6,12 +6,13 @@ sim: ${task.sim}
 env: ${task.env}
 
 # model_dir: /home/jiayu/OmniDrones/scripts/outputs/Track_size05to08_smooth0_reward_up_spin/05-28_10-28/wandb/run-20240528_102811-crgu03wi/files/checkpoint_603062272.pt
-# model_dir: /home/jiayu/OmniDrones/scripts/outputs/Track_size05to08_smooth0_reward_up_spin/05-28_10-28/wandb/run-20240528_102811-crgu03wi/files/checkpoint_603062272.pt
+# model_dir: /home/jiayu/OmniDrones/scripts/outputs/Track_reproduce_size03to08/05-28_21-06/wandb/run-20240528_210702-pepsk3y6/files/checkpoint_final.pt
+# model_dir: /home/jiayu/OmniDrones/scripts/outputs/Track_star.pt
 model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
 max_iters: -1
-eval_interval: 100
+eval_interval: -1
 save_interval: 100
 seed: 0
 
@@ -22,8 +23,8 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: Track_reproduce
-  # run_name: debug
+  run_name: Track_size07to08_latency0
+  # run_name: Track_sanity_latency0_eval_size05_latency0
   job_type: train
   entity: chenjy
   project: Track

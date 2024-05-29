@@ -14,7 +14,8 @@ force_sensor: false
 time_encoding: true
 intrinsics: false
 wind: false
-latency: true
+latency: false
+latency_step: 2
 
 reset_thres: 1.
 future_traj_steps: 4

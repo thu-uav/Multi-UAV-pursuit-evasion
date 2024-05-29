@@ -134,7 +134,7 @@ class Track(IsaacEnv):
             torch.tensor(0.6, device=self.device)
         )
         self.traj_scale_dist = D.Uniform(
-            torch.tensor([0.3, 0.3, 0.25], device=self.device),
+            torch.tensor([0.7, 0.7, 0.25], device=self.device),
             torch.tensor([0.8, 0.8, 0.25], device=self.device)
         )
         self.traj_w_dist = D.Uniform(
@@ -262,7 +262,7 @@ class Track(IsaacEnv):
         self.info = info_spec.zero()
         self.stats = stats_spec.zero()
 
-        self.latency = 2 if self.cfg.task.latency else 0
+        self.latency = self.cfg.task.latency_step if self.cfg.task.latency else 0
         self.obs_buffer = collections.deque(maxlen=self.latency)
 
     def _reset_idx(self, env_ids: torch.Tensor):
