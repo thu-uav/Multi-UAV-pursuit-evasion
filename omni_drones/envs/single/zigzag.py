@@ -137,9 +137,9 @@ class ZigZag(IsaacEnv):
         self.origin = torch.tensor([0., 0., 1.], device=self.device)
 
         self.traj_t0 = 0.0
-        self.target_times = torch.zeros(self.num_envs, device=self.device)
-        self.target_points = torch.zeros(self.num_envs, 2, device=self.device)
         self.num_points = 20
+        self.target_times = torch.zeros(self.num_envs, self.num_points - 1, device=self.device)
+        self.target_points = torch.zeros(self.num_envs, self.num_points, 2, device=self.device)
 
         self.last_linear_v = torch.zeros(self.num_envs, 1, device=self.device)
         self.last_angular_v = torch.zeros(self.num_envs, 1, device=self.device)
@@ -236,9 +236,8 @@ class ZigZag(IsaacEnv):
 
     def _reset_idx(self, env_ids: torch.Tensor):
         self.drone._reset_idx(env_ids)    
-        self.target_times[env_ids] = self.target_times_dist.sample(torch.Size([env_ids.shape[0], self.num_points]))
+        self.target_times[env_ids] = self.target_times_dist.sample(torch.Size([env_ids.shape[0], self.num_points - 1]))
         self.target_points[env_ids] = self.target_points_dist.sample(torch.Size([env_ids.shape[0], self.num_points]))
-        breakpoint()
 
         t0 = torch.zeros(len(env_ids), device=self.device)
         pos = vmap(pentagram)(t0 + self.traj_t0) + self.origin
@@ -428,7 +427,6 @@ class ZigZag(IsaacEnv):
             env_ids = ...
         t = self.progress_buf[env_ids].unsqueeze(1) + step_size * torch.arange(steps, device=self.device)
         t = self.traj_t0 + t * self.dt
-        breakpoint()
         target_pos = vmap(zigzag)(t, self.target_times[env_ids], self.target_points[env_ids])
 
         return self.origin + target_pos

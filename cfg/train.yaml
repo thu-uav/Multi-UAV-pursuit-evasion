@@ -18,18 +18,18 @@ seed: 0
 
 viewer:
   resolution: [960, 720]
-  eye: [0.005, 0., 10.]
+  eye: [0.005, 0., 6.]
   lookat: [0., 0., 1.]
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: Track_size05to08_latency0_smooth005_scratch
-  run_name: debug
+  run_name: ZigZag
+  # run_name: debug
   job_type: train
   entity: chenjy
   project: Track
-  mode: disabled
-  # mode: online # set to 'disabled' when debugging locally, online
+  # mode: disabled
+  mode: online # set to 'disabled' when debugging locally, online
   run_id: 
   monitor_gym: True
   tags: 

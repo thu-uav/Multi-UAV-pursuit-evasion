@@ -13,11 +13,12 @@ times = torch.concat([torch.zeros((intervals.shape[0], 1)), torch.cumsum(interva
 x_interval = size_min + (size_max - size_min) * torch.rand(n, num_points)
 y_interval = size_min + (size_max - size_min) *  torch.rand(n, num_points)
 t = torch.rand(n, 1) * 10.0
-steps = 100
+steps = 4
 step_size = 0.05
 t = t + step_size * torch.arange(0, steps)
 times_expanded = times.unsqueeze(1).expand(-1, t.shape[-1], -1)
 t_expanded = t.unsqueeze(-1)
+breakpoint()
 prev_idx = num_points - (times_expanded > t_expanded).sum(dim=-1) - 1
 next_idx = num_points - (times_expanded > t_expanded).sum(dim=-1)
 # clip

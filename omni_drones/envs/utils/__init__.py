@@ -248,7 +248,7 @@ def infeasible_pentagram(t, max_time):
 
     return torch.stack([x, y, z], dim=-1)
 
-def zigzag(t, target_times, target_points_x, target_points_y):
+def zigzag(t, target_times, target_points):
     # target_times: [batch, num_points]
     # target_points_x: [batch, num_points]
     
@@ -260,19 +260,18 @@ def zigzag(t, target_times, target_points_x, target_points_y):
     # n = 100 # batch size
     # random_data = torch.rand(n, num_points - 1) # 0~1
     # intervals = interval_min + (interval_max - interval_min) * random_data
-    # times = torch.concat([torch.zeros((intervals.shape[0], 1)), torch.cumsum(intervals, dim=1)], dim=1)
+    target_times = torch.concat([torch.zeros(1, device=target_times.device), torch.cumsum(target_times, dim=0)])
     # x_interval = size_min + (size_max - size_min) * torch.rand(n, num_points)
     # y_interval = size_min + (size_max - size_min) *  torch.rand(n, num_points)
     
-    num_points = target_times.shape[1]
-    batch_size = target_times.shape[0]
+    num_points = 20
     
     # t = torch.rand(n, 1) * 10.0
     # steps = 100
     # step_size = 0.05
     # t = t + step_size * torch.arange(0, steps)
     
-    times_expanded = target_times.unsqueeze(1).expand(-1, t.shape[-1], -1)
+    times_expanded = target_times.unsqueeze(0).expand(t.shape[-1], -1)
     t_expanded = t.unsqueeze(-1)
     prev_idx = num_points - (times_expanded > t_expanded).sum(dim=-1) - 1
     next_idx = num_points - (times_expanded > t_expanded).sum(dim=-1)
@@ -280,12 +279,12 @@ def zigzag(t, target_times, target_points_x, target_points_y):
     prev_idx = torch.clamp(prev_idx, max=num_points - 2) # [batch, future_step]
     next_idx = torch.clamp(next_idx, max=num_points - 1) # [batch, future_step]
 
-    prev_x = torch.gather(target_points_x, 1, prev_idx) # [batch, future_step]
-    next_x = torch.gather(target_points_x, 1, next_idx)
-    prev_y = torch.gather(target_points_y, 1, prev_idx)
-    next_y = torch.gather(target_points_y, 1, next_idx)
-    prev_times = torch.gather(target_times, 1, prev_idx)
-    next_times = torch.gather(target_times, 1, next_idx)
+    prev_x = torch.gather(target_points[:,0], 0, prev_idx) # [batch, future_step]
+    next_x = torch.gather(target_points[:,0], 0, next_idx)
+    prev_y = torch.gather(target_points[:,1], 0, prev_idx)
+    next_y = torch.gather(target_points[:,1], 0, next_idx)
+    prev_times = torch.gather(target_times, 0, prev_idx)
+    next_times = torch.gather(target_times, 0, next_idx)
     k_x = (next_x - prev_x) / (next_times - prev_times)
     k_y = (next_y - prev_y) / (next_times - prev_times)
     x = prev_x + k_x * (t - prev_times) # [batch, future_step]
