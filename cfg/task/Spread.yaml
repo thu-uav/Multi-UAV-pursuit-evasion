@@ -6,8 +6,12 @@ defaults:
   - /base/sim_base@_here_
   # - /base/randomization_base@_here_
 
-drone_model: Firefly
-num_drones: 3
+env:
+  num_envs: 100
+  max_episode_length: 500
 
-action_transform: null
+drone_model: Crazyflie
+num_drones: 2
+
+action_transform: PIDrate
 

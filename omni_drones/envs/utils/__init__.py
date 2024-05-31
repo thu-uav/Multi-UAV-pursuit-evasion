@@ -250,26 +250,10 @@ def infeasible_pentagram(t, max_time):
 
 def zigzag(t, target_times, target_points):
     # target_times: [batch, num_points]
-    # target_points_x: [batch, num_points]
+    # target_points: [batch, num_points, 2]
     
-    # num_points = 20
-    # interval_min = 0.5
-    # interval_max = 1.5
-    # size_min = -1.0
-    # size_max = 1.0
-    # n = 100 # batch size
-    # random_data = torch.rand(n, num_points - 1) # 0~1
-    # intervals = interval_min + (interval_max - interval_min) * random_data
     target_times = torch.concat([torch.zeros(1, device=target_times.device), torch.cumsum(target_times, dim=0)])
-    # x_interval = size_min + (size_max - size_min) * torch.rand(n, num_points)
-    # y_interval = size_min + (size_max - size_min) *  torch.rand(n, num_points)
-    
-    num_points = 20
-    
-    # t = torch.rand(n, 1) * 10.0
-    # steps = 100
-    # step_size = 0.05
-    # t = t + step_size * torch.arange(0, steps)
+    num_points = target_times.shape[0]
     
     times_expanded = target_times.unsqueeze(0).expand(t.shape[-1], -1)
     t_expanded = t.unsqueeze(-1)

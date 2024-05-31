@@ -106,6 +106,10 @@ class Spread(IsaacEnv):
             )
         return ["/World/defaultGroundPlane"]
 
+    # TODO
+    def _set_specs(self):
+        pass
+
     def _reset_idx(self, env_ids: torch.Tensor):
         _, rot = self.init_poses
         self.drone._reset_idx(env_ids)
@@ -130,13 +134,15 @@ class Spread(IsaacEnv):
         pos = drone_states[..., :3]
         drone_relative_pos = -functorch.vmap(cpos)(pos, pos)
         target_relative_pos = -functorch.vmap(cpos)(pos, self.target_pos)
+        breakpoint()
 
-        identity = torch.eye(self.drone.n, device=self.device).expand(self.num_envs, -1, -1)
+        # identity = torch.eye(self.drone.n, device=self.device).expand(self.num_envs, -1, -1)
         obs = torch.cat([
             drone_relative_pos.flatten(2),
-            drone_states[..., 3:],
+            # drone_states[..., 3:],
+            drone_states[..., 3:10], drone_states[..., 13:19],
             target_relative_pos.flatten(2),
-            identity
+            # identity
         ], dim=-1)
 
         state = obs.flatten(1)

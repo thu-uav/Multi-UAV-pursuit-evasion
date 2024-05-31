@@ -239,6 +239,16 @@ class ZigZag(IsaacEnv):
         self.target_times[env_ids] = self.target_times_dist.sample(torch.Size([env_ids.shape[0], self.num_points - 1]))
         self.target_points[env_ids] = self.target_points_dist.sample(torch.Size([env_ids.shape[0], self.num_points]))
 
+        # # eval
+        # star_times = torch.Tensor([1.3, 2.6, 3.9, 5.2, 6.5, 7.8, 9.1, 10.4, 11.7, \
+        #     13.0, 14.3, 15.6, 16.9, 18.2, 19.5, 20.8, 22.1, 23.4, 24.7]).to(self.device)
+        # star_points = torch.Tensor([[0.0, 0.0], [0.5, 0.0], [-0.5, 0.4], [0.25, -0.6], [0.25, 0.6], [-0.5, -0.4], \
+        #     [0.5, 0.0], [-0.5, 0.4], [0.25, -0.6], [0.25, 0.6], [-0.5, -0.4], \
+        #     [0.5, 0.0], [-0.5, 0.4], [0.25, -0.6], [0.25, 0.6], [-0.5, -0.4], \
+        #     [0.5, 0.0], [-0.5, 0.4], [0.25, -0.6], [0.25, 0.6]]).to(self.device)
+        # self.target_times[env_ids] = star_times
+        # self.target_points[env_ids] = star_points
+
         t0 = torch.zeros(len(env_ids), device=self.device)
         pos = vmap(pentagram)(t0 + self.traj_t0) + self.origin
         rot = euler_to_quaternion(self.init_rpy_dist.sample(env_ids.shape))
@@ -399,7 +409,7 @@ class ZigZag(IsaacEnv):
         done = (
             (self.progress_buf >= self.max_episode_length).unsqueeze(-1)
             | (self.drone.pos[..., 2] < 0.1)
-            | (distance > self.reset_thres)
+            # | (distance > self.reset_thres)
         ) 
 
         ep_len = self.progress_buf.unsqueeze(-1)
