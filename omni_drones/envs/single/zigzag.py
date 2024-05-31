@@ -36,10 +36,10 @@ from tensordict.tensordict import TensorDict, TensorDictBase
 from torchrl.data import UnboundedContinuousTensorSpec, CompositeSpec
 from omni.isaac.debug_draw import _debug_draw
 
-from ..utils import lemniscate, pentagram, scale_time
+from ..utils import lemniscate, pentagram, scale_time, zigzag
 import collections
 
-class Track(IsaacEnv):
+class ZigZag(IsaacEnv):
     r"""
     A basic control task. The goal for the agent is to track a reference 
     lemniscate trajectory in the 3D space.
@@ -125,52 +125,21 @@ class Track(IsaacEnv):
             torch.tensor([-.2, -.2, 0.], device=self.device) * torch.pi,
             torch.tensor([0.2, 0.2, 2.], device=self.device) * torch.pi
         )
-        self.traj_rpy_dist = D.Uniform(
-            torch.tensor([0., 0., 0.], device=self.device) * torch.pi,
-            torch.tensor([0., 0., 2.], device=self.device) * torch.pi
+        self.target_times_dist = D.Uniform(
+            torch.tensor(0.5, device=self.device),
+            torch.tensor(1.5, device=self.device)
         )
-        self.traj_c_dist = D.Uniform(
-            torch.tensor(-0.6, device=self.device),
-            torch.tensor(0.6, device=self.device)
+        self.target_points_dist = D.Uniform(
+            torch.tensor([-1.0, -1.0], device=self.device),
+            torch.tensor([1.0, 1.0], device=self.device)
         )
-        self.traj_scale_dist = D.Uniform(
-            torch.tensor([0.5, 0.5, 0.25], device=self.device),
-            torch.tensor([0.8, 0.8, 0.25], device=self.device)
-        )
-        self.traj_w_dist = D.Uniform(
-            torch.tensor(0.8, device=self.device),
-            torch.tensor(1.1, device=self.device)
-        )
-        
-        # # eval
-        # self.init_rpy_dist = D.Uniform(
-        #     torch.tensor([-.0, -.0, 0.], device=self.device) * torch.pi,
-        #     torch.tensor([0., 0., 0.], device=self.device) * torch.pi
-        # )
-        # self.traj_rpy_dist = D.Uniform(
-        #     torch.tensor([0., 0., 0.], device=self.device) * torch.pi,
-        #     torch.tensor([0., 0., 0.], device=self.device) * torch.pi
-        # )
-        # self.traj_c_dist = D.Uniform(
-        #     torch.tensor(-0.0, device=self.device),
-        #     torch.tensor(0.0, device=self.device)
-        # )
-        # self.traj_scale_dist = D.Uniform(
-        #     torch.tensor([0.8, 0.8, 0.25], device=self.device),
-        #     torch.tensor([0.8, 0.8, 0.25], device=self.device)
-        # )
-        # self.traj_w_dist = D.Uniform(
-        #     torch.tensor(1., device=self.device),
-        #     torch.tensor(1., device=self.device)
-        # )
         
         self.origin = torch.tensor([0., 0., 1.], device=self.device)
 
         self.traj_t0 = 0.0
-        self.traj_c = torch.zeros(self.num_envs, device=self.device)
-        self.traj_scale = torch.zeros(self.num_envs, 3, device=self.device)
-        self.traj_rot = torch.zeros(self.num_envs, 4, device=self.device)
-        self.traj_w = torch.ones(self.num_envs, device=self.device)
+        self.target_times = torch.zeros(self.num_envs, device=self.device)
+        self.target_points = torch.zeros(self.num_envs, 2, device=self.device)
+        self.num_points = 20
 
         self.last_linear_v = torch.zeros(self.num_envs, 1, device=self.device)
         self.last_angular_v = torch.zeros(self.num_envs, 1, device=self.device)
@@ -266,17 +235,13 @@ class Track(IsaacEnv):
         self.obs_buffer = collections.deque(maxlen=self.latency)
 
     def _reset_idx(self, env_ids: torch.Tensor):
-        self.drone._reset_idx(env_ids)
-        self.traj_c[env_ids] = self.traj_c_dist.sample(env_ids.shape)
-        self.traj_rot[env_ids] = euler_to_quaternion(self.traj_rpy_dist.sample(env_ids.shape))
-        # self.traj_scale[env_ids] = self.traj_scale_dist.sample(env_ids.shape) / 4 # for crazyflie, traj should be smaller
-        self.traj_scale[env_ids] = self.traj_scale_dist.sample(env_ids.shape)
-        traj_w = self.traj_w_dist.sample(env_ids.shape)
-        self.traj_w[env_ids] = torch.randn_like(traj_w).sign() * traj_w
+        self.drone._reset_idx(env_ids)    
+        self.target_times[env_ids] = self.target_times_dist.sample(torch.Size([env_ids.shape[0], self.num_points]))
+        self.target_points[env_ids] = self.target_points_dist.sample(torch.Size([env_ids.shape[0], self.num_points]))
+        breakpoint()
 
         t0 = torch.zeros(len(env_ids), device=self.device)
-        pos = vmap(pentagram)(t0 + self.traj_t0).unsqueeze(1)
-        pos = (vmap(torch_utils.quat_rotate)(self.traj_rot[env_ids].unsqueeze(1), pos) * self.traj_scale[env_ids].unsqueeze(1) + self.origin).squeeze(1)
+        pos = vmap(pentagram)(t0 + self.traj_t0) + self.origin
         rot = euler_to_quaternion(self.init_rpy_dist.sample(env_ids.shape))
         vel = torch.zeros(len(env_ids), 1, 6, device=self.device)
         self.drone.set_world_poses(
@@ -332,7 +297,7 @@ class Track(IsaacEnv):
         self.root_state = self.drone.get_state()
         self.info["drone_state"][:] = self.root_state[..., :13]
         
-        self.target_pos[:] = self._compute_traj(self.future_traj_steps, step_size=5)
+        self.target_pos[:] = self._compute_traj(self.future_traj_steps, step_size=1)
         
         self.rpos = self.target_pos - self.root_state[..., :3]
         obs = [
@@ -462,12 +427,9 @@ class Track(IsaacEnv):
         if env_ids is None:
             env_ids = ...
         t = self.progress_buf[env_ids].unsqueeze(1) + step_size * torch.arange(steps, device=self.device)
-        t = self.traj_t0 + scale_time(self.traj_w[env_ids].unsqueeze(1) * t * self.dt)
-        traj_rot = self.traj_rot[env_ids].unsqueeze(1).expand(-1, t.shape[1], 4)
-        
-        # target_pos = vmap(lemniscate)(t, self.traj_c[env_ids])
-        target_pos = vmap(pentagram)(t)
-        target_pos = vmap(torch_utils.quat_rotate)(traj_rot, target_pos) * self.traj_scale[env_ids].unsqueeze(1)
+        t = self.traj_t0 + t * self.dt
+        breakpoint()
+        target_pos = vmap(zigzag)(t, self.target_times[env_ids], self.target_points[env_ids])
 
         return self.origin + target_pos
 
