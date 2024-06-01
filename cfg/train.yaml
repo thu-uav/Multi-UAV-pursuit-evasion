@@ -7,7 +7,7 @@ env: ${task.env}
 
 # model_dir: /home/jiayu/OmniDrones/scripts/outputs/Track_size05to08_smooth0_reward_up_spin/05-28_10-28/wandb/run-20240528_102811-crgu03wi/files/checkpoint_603062272.pt
 # model_dir: /home/jiayu/OmniDrones/scripts/outputs/Track_size05to08_latency2/05-30_10-54/wandb/run-20240530_105420-04m29gq4/files/checkpoint_final.pt
-# model_dir: /home/chenjy/OmniDrones/scripts/outputs/ZigZag_smooth0/05-31_16-39/wandb/run-20240531_163949-8t1012nx/files/checkpoint_524419072.pt
+# model_dir: /home/chenjy/OmniDrones/scripts/outputs/ZigZag_rewardshaping/05-31_21-56/wandb/run-20240531_215651-482ytp3v/files/checkpoint_final.pt
 model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
@@ -23,13 +23,13 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: ZigZag_smooth0_wodone
-  run_name: debug
+  run_name: ZigZag_rewardshaping
+  # run_name: eval_star
   job_type: train
   entity: chenjy
   project: Track
-  mode: disabled
-  # mode: online # set to 'disabled' when debugging locally, online
+  # mode: disabled
+  mode: online # set to 'disabled' when debugging locally, online
   run_id: 
   monitor_gym: True
   tags: 

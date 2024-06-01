@@ -90,7 +90,6 @@ class ZigZag(IsaacEnv):
     """
     def __init__(self, cfg, headless):
         self.reset_thres = cfg.task.reset_thres
-        self.reward_effort_weight = cfg.task.reward_effort_weight
         self.reward_action_smoothness_weight = cfg.task.reward_action_smoothness_weight
         self.reward_distance_scale = cfg.task.reward_distance_scale
         self.time_encoding = cfg.task.time_encoding
@@ -209,6 +208,8 @@ class ZigZag(IsaacEnv):
             "drone_state": UnboundedContinuousTensorSpec(13),
             "reward_pos": UnboundedContinuousTensorSpec(1),
             "reward_smooth": UnboundedContinuousTensorSpec(1),
+            "reward_up": UnboundedContinuousTensorSpec(1),
+            "reward_spin": UnboundedContinuousTensorSpec(1),
             "linear_v_max": UnboundedContinuousTensorSpec(1),
             "angular_v_max": UnboundedContinuousTensorSpec(1),
             "linear_a_max": UnboundedContinuousTensorSpec(1),
@@ -240,8 +241,8 @@ class ZigZag(IsaacEnv):
         self.target_points[env_ids] = self.target_points_dist.sample(torch.Size([env_ids.shape[0], self.num_points]))
 
         # # eval
-        # star_times = torch.Tensor([1.3, 2.6, 3.9, 5.2, 6.5, 7.8, 9.1, 10.4, 11.7, \
-        #     13.0, 14.3, 15.6, 16.9, 18.2, 19.5, 20.8, 22.1, 23.4, 24.7]).to(self.device)
+        # star_times = torch.Tensor([1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, \
+        #     1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3]).to(self.device)
         # star_points = torch.Tensor([[0.0, 0.0], [0.5, 0.0], [-0.5, 0.4], [0.25, -0.6], [0.25, 0.6], [-0.5, -0.4], \
         #     [0.5, 0.0], [-0.5, 0.4], [0.25, -0.6], [0.25, 0.6], [-0.5, -0.4], \
         #     [0.5, 0.0], [-0.5, 0.4], [0.25, -0.6], [0.25, 0.6], [-0.5, -0.4], \
@@ -249,12 +250,12 @@ class ZigZag(IsaacEnv):
         # self.target_times[env_ids] = star_times
         # self.target_points[env_ids] = star_points
 
-        t0 = torch.zeros(len(env_ids), device=self.device)
-        pos = vmap(pentagram)(t0 + self.traj_t0) + self.origin
+        t0 = torch.zeros((len(env_ids), 1), device=self.device)
+        pos = vmap(zigzag)(t0 + self.traj_t0, self.target_times[env_ids], self.target_points[env_ids]) + self.origin
         rot = euler_to_quaternion(self.init_rpy_dist.sample(env_ids.shape))
         vel = torch.zeros(len(env_ids), 1, 6, device=self.device)
         self.drone.set_world_poses(
-            pos + self.envs_positions[env_ids], rot, env_ids
+            pos.squeeze(1) + self.envs_positions[env_ids], rot, env_ids
         )
         self.drone.set_velocities(vel, env_ids)
 
@@ -387,24 +388,27 @@ class ZigZag(IsaacEnv):
         tiltage = torch.abs(1 - self.drone.up[..., 2])
         reward_up = 0.5 / (1.0 + torch.square(tiltage))
 
-        # effort
-        reward_effort = self.reward_effort_weight * torch.exp(-self.effort)
+        # smoothness
         reward_action_smoothness = self.reward_action_smoothness_weight * torch.exp(-self.drone.throttle_difference)
 
         # spin reward, fixed z
         spin = torch.square(self.drone.vel[..., -1])
+        # reward_spin = - torch.square(spin)
         reward_spin = 0.5 / (1.0 + torch.square(spin))
         # not_spin_bonus = torch.abs(torch.square(self.drone.vel[..., -1])) < 1e-5
 
         reward = (
-            reward_pose 
-            + reward_pose * (reward_up + reward_spin)
+            reward_pose
+            # + reward_pose * reward_up
+            + reward_pose * reward_spin
             # + reward_effort
             + reward_action_smoothness
         )
         
         self.stats['reward_pos'].set_(reward_pose)
         self.stats['reward_smooth'].set_(reward_action_smoothness)
+        self.stats['reward_up'].set_(reward_pose * reward_up)
+        self.stats['reward_spin'].set_(reward_pose * reward_spin)
 
         done = (
             (self.progress_buf >= self.max_episode_length).unsqueeze(-1)
