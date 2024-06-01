@@ -26,6 +26,7 @@ from .takeoff import Takeoff
 from .turn import Turn
 from .track import Track
 from .zigzag import ZigZag
+from .star import Star
 from .infeasible import Infeasible
 from .line import Line
 from .trackV1 import TrackV1

@@ -39,7 +39,7 @@ from omni.isaac.debug_draw import _debug_draw
 from ..utils import lemniscate, pentagram, scale_time, zigzag
 import collections
 
-class ZigZag(IsaacEnv):
+class Star(IsaacEnv):
     r"""
     A basic control task. The goal for the agent is to track a reference 
     lemniscate trajectory in the 3D space.
@@ -128,10 +128,14 @@ class ZigZag(IsaacEnv):
             torch.tensor(0.5, device=self.device),
             torch.tensor(1.5, device=self.device)
         )
-        self.target_points_dist = D.Uniform(
-            torch.tensor([-0.5, -0.5], device=self.device),
-            torch.tensor([0.5, 0.5], device=self.device)
-        )
+        # self.target_times_dist = D.Uniform(
+        #     torch.tensor(0.5, device=self.device),
+        #     torch.tensor(1.5, device=self.device)
+        # )
+        # self.target_points_dist = D.Uniform(
+        #     torch.tensor([-0.5, -0.5], device=self.device),
+        #     torch.tensor([0.5, 0.5], device=self.device)
+        # )
         
         self.origin = torch.tensor([0., 0., 1.], device=self.device)
 
@@ -237,18 +241,16 @@ class ZigZag(IsaacEnv):
 
     def _reset_idx(self, env_ids: torch.Tensor):
         self.drone._reset_idx(env_ids)    
-        self.target_times[env_ids] = self.target_times_dist.sample(torch.Size([env_ids.shape[0], self.num_points - 1]))
-        self.target_points[env_ids] = self.target_points_dist.sample(torch.Size([env_ids.shape[0], self.num_points]))
+        # self.target_times[env_ids] = self.target_times_dist.sample(torch.Size([env_ids.shape[0], self.num_points - 1]))
+        # self.target_points[env_ids] = self.target_points_dist.sample(torch.Size([env_ids.shape[0], self.num_points]))
 
-        # # eval
-        # star_times = torch.Tensor([1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, \
-        #     1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3]).to(self.device)
-        # star_points = torch.Tensor([[0.0, 0.0], [0.5, 0.0], [-0.5, 0.4], [0.25, -0.6], [0.25, 0.6], [-0.5, -0.4], \
-        #     [0.5, 0.0], [-0.5, 0.4], [0.25, -0.6], [0.25, 0.6], [-0.5, -0.4], \
-        #     [0.5, 0.0], [-0.5, 0.4], [0.25, -0.6], [0.25, 0.6], [-0.5, -0.4], \
-        #     [0.5, 0.0], [-0.5, 0.4], [0.25, -0.6], [0.25, 0.6]]).to(self.device)
-        # self.target_times[env_ids] = star_times
-        # self.target_points[env_ids] = star_points
+        self.target_times[env_ids] = torch.ones((env_ids.shape[0], self.num_points - 1), device=self.device) * self.target_times_dist.sample(torch.Size([env_ids.shape[0], 1]))
+        
+        star_points = torch.Tensor([[0.0, 0.0], [0.5, 0.0], [-0.5, 0.4], [0.25, -0.6], [0.25, 0.6], [-0.5, -0.4], \
+            [0.5, 0.0], [-0.5, 0.4], [0.25, -0.6], [0.25, 0.6], [-0.5, -0.4], \
+            [0.5, 0.0], [-0.5, 0.4], [0.25, -0.6], [0.25, 0.6], [-0.5, -0.4], \
+            [0.5, 0.0], [-0.5, 0.4], [0.25, -0.6], [0.25, 0.6]]).to(self.device) * 2.0
+        self.target_points[env_ids] = star_points
 
         t0 = torch.zeros((len(env_ids), 1), device=self.device)
         pos = vmap(zigzag)(t0 + self.traj_t0, self.target_times[env_ids], self.target_points[env_ids]) + self.origin

@@ -23,8 +23,8 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: ZigZag_rewardshaping
-  # run_name: eval_star
+  run_name: star
+  # run_name: debug
   job_type: train
   entity: chenjy
   project: Track
@@ -35,7 +35,8 @@ wandb:
   tags: 
 
 defaults:
-  - task: ZigZag
+  - task: Star
+  # - task: ZigZag
   # - task: Track
   # - task: Spread
   - algo: mappo

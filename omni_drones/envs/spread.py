@@ -22,6 +22,7 @@
 
 
 import functorch
+from functorch import vmap
 
 import omni.isaac.core.utils.torch as torch_utils
 import omni_drones.utils.kit as kit_utils
@@ -36,6 +37,7 @@ from omni_drones.robots.drone import MultirotorBase
 from tensordict.tensordict import TensorDict, TensorDictBase
 from torchrl.data import UnboundedContinuousTensorSpec
 from omni.isaac.debug_draw import _debug_draw
+from torchrl.data import UnboundedContinuousTensorSpec, CompositeSpec
 
 class Spread(IsaacEnv):
     def __init__(self, cfg, headless):
@@ -106,9 +108,52 @@ class Spread(IsaacEnv):
             )
         return ["/World/defaultGroundPlane"]
 
-    # TODO
-    def _set_specs(self):
-        pass
+    def _set_specs(self): 
+        drone_state_dim = self.drone.state_spec.shape[0]
+        observation_spec = CompositeSpec({
+            "drone_pos": UnboundedContinuousTensorSpec((3, 3, ), device=self.device),
+            "target_pos": UnboundedContinuousTensorSpec((3,), device=self.device),
+            "drone_state": UnboundedContinuousTensorSpec((drone_state_dim), device=self.device)
+        })
+        self.observation_spec = CompositeSpec({
+            "agents": {
+                "observation": observation_spec.expand(self.drone.n)
+            }
+        }).expand(self.num_envs).to(self.device)
+
+        self.action_spec = CompositeSpec({
+            "agents": CompositeSpec({
+                "action": torch.stack([self.drone.action_spec] * self.drone.n, 0),
+            })
+        }).expand(self.num_envs).to(self.device)
+
+        self.reward_spec = CompositeSpec({
+            "agents": CompositeSpec({
+                "reward": UnboundedContinuousTensorSpec((self.drone.n, 1))
+            })
+        }).expand(self.num_envs).to(self.device)
+
+        self.agent_spec["drone"] = AgentSpec(
+            "drone", self.drone.n,
+            observation_key=("agents", "observation"),
+            action_key=("agents", "action"),
+            reward_key=("agents", "reward"),
+        )
+        stats_spec = CompositeSpec({
+            "return": UnboundedContinuousTensorSpec(self.drone.n),
+            "episode_len": UnboundedContinuousTensorSpec(1),
+            "action_smoothness": UnboundedContinuousTensorSpec(self.drone.n),
+            "success_rate": UnboundedContinuousTensorSpec(self.drone.n),
+            "step": UnboundedContinuousTensorSpec(self.drone.n),
+        }).expand(self.num_envs).to(self.device)
+        
+        info_spec = CompositeSpec({
+            "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13), device=self.device),
+        }).expand(self.num_envs).to(self.device)
+        self.observation_spec["stats"] = stats_spec
+        self.observation_spec["info"] = info_spec
+        self.stats = stats_spec.zero()
+        self.info = info_spec.zero()
 
     def _reset_idx(self, env_ids: torch.Tensor):
         _, rot = self.init_poses
@@ -132,11 +177,15 @@ class Spread(IsaacEnv):
     def _compute_state_and_obs(self):
         drone_states = self.drone.get_state()
         pos = drone_states[..., :3]
-        drone_relative_pos = -functorch.vmap(cpos)(pos, pos)
-        target_relative_pos = -functorch.vmap(cpos)(pos, self.target_pos)
+        # drone_relative_pos = -functorch.vmap(cpos)(pos, pos)
+        # target_relative_pos = -functorch.vmap(cpos)(pos, self.target_pos)
+
+        self.drone_rpos = vmap(cpos)(drone_pos, drone_pos)
+        self.drone_rpos = vmap(off_diag)(self.drone_rpos)
         breakpoint()
 
-        # identity = torch.eye(self.drone.n, device=self.device).expand(self.num_envs, -1, -1)
+        # obs_self = 
+        
         obs = torch.cat([
             drone_relative_pos.flatten(2),
             # drone_states[..., 3:],
