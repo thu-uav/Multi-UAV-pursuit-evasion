@@ -123,9 +123,13 @@ class Track(IsaacEnv):
             self.wind_w = torch.zeros(self.num_envs, 3, 8, device=self.device)
             self.wind_i = torch.zeros(self.num_envs, 1, device=self.device)
         
+        # self.init_rpy_dist = D.Uniform(
+        #     torch.tensor([-.2, -.2, 0.], device=self.device) * torch.pi,
+        #     torch.tensor([0.2, 0.2, 2.], device=self.device) * torch.pi
+        # )
         self.init_rpy_dist = D.Uniform(
-            torch.tensor([-.2, -.2, 0.], device=self.device) * torch.pi,
-            torch.tensor([0.2, 0.2, 2.], device=self.device) * torch.pi
+            torch.tensor([-0.0, -0.0, 0.], device=self.device) * torch.pi,
+            torch.tensor([0.0, 0.0, 2.], device=self.device) * torch.pi
         )
         self.traj_rpy_dist = D.Uniform(
             torch.tensor([0., 0., 0.], device=self.device) * torch.pi,
@@ -327,8 +331,8 @@ class Track(IsaacEnv):
     
         # prepare, hover
         if self.prepare:
-            if self.progress_buf[0] <= self.prepare_step:
-                actions[:] = torch.tensor([0.2666, 0.2666, 0.2666, 0.2666], device=self.device)
+            actions[self.progress_buf <= self.prepare_step] = torch.tensor([0.2666, 0.2666, 0.2666, 0.2666], device=self.device)
+            tensordict.set(("agents", "action"), actions)
         
         self.effort = self.drone.apply_action(actions)
 
@@ -442,7 +446,7 @@ class Track(IsaacEnv):
         
         # set reward = 0.0, in the preparation phase
         if self.prepare:
-            reward[:] = 0.0
+            reward[self.progress_buf <= self.prepare_step] = 0.0
         
         self.stats['reward_pos'].set_(reward_pose)
         self.stats['reward_smooth'].set_(reward_action_smoothness)

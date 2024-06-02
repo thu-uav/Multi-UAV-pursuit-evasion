@@ -28,7 +28,7 @@ viewer:
 wandb:
   group: ${oc.select:..task.name}
   run_name: Track_wo_traj_w_preparation10
-  # run_name: eval_hover
+  # run_name: eval_track_preparation10
   job_type: train
   entity: chenjy
   project: Track
