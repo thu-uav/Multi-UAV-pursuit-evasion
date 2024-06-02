@@ -128,6 +128,10 @@ class Star(IsaacEnv):
             torch.tensor(0.5, device=self.device),
             torch.tensor(1.5, device=self.device)
         )
+        self.traj_w_dist = D.Uniform(
+            torch.tensor(0.8, device=self.device),
+            torch.tensor(1.1, device=self.device)
+        )
         # self.target_times_dist = D.Uniform(
         #     torch.tensor(0.5, device=self.device),
         #     torch.tensor(1.5, device=self.device)
@@ -143,6 +147,7 @@ class Star(IsaacEnv):
         self.num_points = 20
         self.target_times = torch.zeros(self.num_envs, self.num_points - 1, device=self.device)
         self.target_points = torch.zeros(self.num_envs, self.num_points, 2, device=self.device)
+        self.traj_w = torch.ones(self.num_envs, device=self.device)
 
         self.last_linear_v = torch.zeros(self.num_envs, 1, device=self.device)
         self.last_angular_v = torch.zeros(self.num_envs, 1, device=self.device)
@@ -243,6 +248,9 @@ class Star(IsaacEnv):
         self.drone._reset_idx(env_ids)    
         # self.target_times[env_ids] = self.target_times_dist.sample(torch.Size([env_ids.shape[0], self.num_points - 1]))
         # self.target_points[env_ids] = self.target_points_dist.sample(torch.Size([env_ids.shape[0], self.num_points]))
+
+        traj_w = self.traj_w_dist.sample(env_ids.shape)
+        self.traj_w[env_ids] = torch.randn_like(traj_w).sign() * traj_w
 
         self.target_times[env_ids] = torch.ones((env_ids.shape[0], self.num_points - 1), device=self.device) * self.target_times_dist.sample(torch.Size([env_ids.shape[0], 1]))
         
@@ -442,7 +450,8 @@ class Star(IsaacEnv):
         if env_ids is None:
             env_ids = ...
         t = self.progress_buf[env_ids].unsqueeze(1) + step_size * torch.arange(steps, device=self.device)
-        t = self.traj_t0 + t * self.dt
+        # t = self.traj_t0 + t * self.dt
+        t = self.traj_t0 + scale_time(self.traj_w[env_ids].unsqueeze(1) * t * self.dt)
         target_pos = vmap(zigzag)(t, self.target_times[env_ids], self.target_points[env_ids])
 
         return self.origin + target_pos

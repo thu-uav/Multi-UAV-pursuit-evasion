@@ -229,7 +229,7 @@ class MultirotorBase(RobotBase):
         self.acc = self.acc_w = torch.zeros(*self.shape, 6, device=self.device)
         self.acc_b = torch.zeros_like(self.acc_w)
 
-        # self.jerk = torch.zeros(*self.shape, 6, device=self.device)
+        self.jerk = torch.zeros(*self.shape, 6, device=self.device)
         self.alpha = 0.9
 
         self.rotor_pos_0 = (
@@ -370,7 +370,7 @@ class MultirotorBase(RobotBase):
         self.acc = self.acc_w = torch.zeros(*self.shape, 6, device=self.device)
         self.acc_b = torch.zeros_like(self.acc_w)
 
-        # self.jerk = torch.zeros(*self.shape, 6, device=self.device)
+        self.jerk = torch.zeros(*self.shape, 6, device=self.device)
         self.alpha = 0.9
 
         self.rotor_pos_0 = (
@@ -601,7 +601,7 @@ class MultirotorBase(RobotBase):
         self.torques[env_ids] = 0.0
         self.vel[env_ids] = 0.
         self.acc[env_ids] = 0.
-        # self.jerk[env_ids] = 0.
+        self.jerk[env_ids] = 0.
         if train and "train" in self.randomization:
             self._randomize(env_ids, self.randomization["train"])
         elif "eval" in self.randomization:

@@ -342,6 +342,7 @@ class Hover(IsaacEnv):
         self.stats['motor2'].set_(actions[..., 1])
         self.stats['motor3'].set_(actions[..., 2])
         self.stats['motor4'].set_(actions[..., 3])
+        
         self.effort = self.drone.apply_action(actions)
         
         # log ctbr

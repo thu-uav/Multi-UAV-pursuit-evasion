@@ -98,6 +98,8 @@ class Track(IsaacEnv):
         assert self.future_traj_steps > 0
         self.intrinsics = cfg.task.intrinsics
         self.wind = cfg.task.wind
+        self.prepare = cfg.task.prepare
+        self.prepare_step = cfg.task.prepare_step
 
         super().__init__(cfg, headless)
 
@@ -156,8 +158,8 @@ class Track(IsaacEnv):
         #     torch.tensor(0.0, device=self.device)
         # )
         # self.traj_scale_dist = D.Uniform(
-        #     torch.tensor([0.8, 0.8, 0.25], device=self.device),
-        #     torch.tensor([0.8, 0.8, 0.25], device=self.device)
+        #     torch.tensor([0.5, 0.5, 0.25], device=self.device),
+        #     torch.tensor([0.5, 0.5, 0.25], device=self.device)
         # )
         # self.traj_w_dist = D.Uniform(
         #     torch.tensor(1., device=self.device),
@@ -166,7 +168,10 @@ class Track(IsaacEnv):
         
         self.origin = torch.tensor([0., 0., 1.], device=self.device)
 
-        self.traj_t0 = 0.0
+        if self.prepare:
+            self.traj_t0 = - scale_time(torch.tensor(self.prepare_step) * self.dt)
+        else:
+            self.traj_t0 = 0.0
         self.traj_c = torch.zeros(self.num_envs, device=self.device)
         self.traj_scale = torch.zeros(self.num_envs, 3, device=self.device)
         self.traj_rot = torch.zeros(self.num_envs, 4, device=self.device)
@@ -319,6 +324,12 @@ class Track(IsaacEnv):
 
     def _pre_sim_step(self, tensordict: TensorDictBase):
         actions = tensordict[("agents", "action")]
+    
+        # prepare, hover
+        if self.prepare:
+            if self.progress_buf[0] <= self.prepare_step:
+                actions[:] = torch.tensor([0.2666, 0.2666, 0.2666, 0.2666], device=self.device)
+        
         self.effort = self.drone.apply_action(actions)
 
         if self.wind:
@@ -429,6 +440,10 @@ class Track(IsaacEnv):
             + reward_action_smoothness
         )
         
+        # set reward = 0.0, in the preparation phase
+        if self.prepare:
+            reward[:] = 0.0
+        
         self.stats['reward_pos'].set_(reward_pose)
         self.stats['reward_smooth'].set_(reward_action_smoothness)
 
@@ -462,7 +477,8 @@ class Track(IsaacEnv):
         if env_ids is None:
             env_ids = ...
         t = self.progress_buf[env_ids].unsqueeze(1) + step_size * torch.arange(steps, device=self.device)
-        t = self.traj_t0 + scale_time(self.traj_w[env_ids].unsqueeze(1) * t * self.dt)
+        # t = self.traj_t0 + scale_time(self.traj_w[env_ids].unsqueeze(1) * t * self.dt)
+        t = self.traj_t0 + scale_time(t * self.dt)
         traj_rot = self.traj_rot[env_ids].unsqueeze(1).expand(-1, t.shape[1], 4)
         
         # target_pos = vmap(lemniscate)(t, self.traj_c[env_ids])
