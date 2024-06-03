@@ -148,27 +148,27 @@ class Track(IsaacEnv):
             torch.tensor(1.1, device=self.device)
         )
         
-        # # eval
-        # self.init_rpy_dist = D.Uniform(
-        #     torch.tensor([-.0, -.0, 0.], device=self.device) * torch.pi,
-        #     torch.tensor([0., 0., 0.], device=self.device) * torch.pi
-        # )
-        # self.traj_rpy_dist = D.Uniform(
-        #     torch.tensor([0., 0., 0.], device=self.device) * torch.pi,
-        #     torch.tensor([0., 0., 0.], device=self.device) * torch.pi
-        # )
-        # self.traj_c_dist = D.Uniform(
-        #     torch.tensor(-0.0, device=self.device),
-        #     torch.tensor(0.0, device=self.device)
-        # )
-        # self.traj_scale_dist = D.Uniform(
-        #     torch.tensor([0.5, 0.5, 0.25], device=self.device),
-        #     torch.tensor([0.5, 0.5, 0.25], device=self.device)
-        # )
-        # self.traj_w_dist = D.Uniform(
-        #     torch.tensor(1., device=self.device),
-        #     torch.tensor(1., device=self.device)
-        # )
+        # eval
+        self.init_rpy_dist = D.Uniform(
+            torch.tensor([-.0, -.0, 0.], device=self.device) * torch.pi,
+            torch.tensor([0., 0., 0.], device=self.device) * torch.pi
+        )
+        self.traj_rpy_dist = D.Uniform(
+            torch.tensor([0., 0., 0.], device=self.device) * torch.pi,
+            torch.tensor([0., 0., 0.], device=self.device) * torch.pi
+        )
+        self.traj_c_dist = D.Uniform(
+            torch.tensor(-0.0, device=self.device),
+            torch.tensor(0.0, device=self.device)
+        )
+        self.traj_scale_dist = D.Uniform(
+            torch.tensor([0.5, 0.5, 0.25], device=self.device),
+            torch.tensor([0.5, 0.5, 0.25], device=self.device)
+        )
+        self.traj_w_dist = D.Uniform(
+            torch.tensor(1., device=self.device),
+            torch.tensor(1., device=self.device)
+        )
         
         self.origin = torch.tensor([0., 0., 1.], device=self.device)
 

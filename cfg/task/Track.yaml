@@ -6,7 +6,7 @@ defaults:
   - /base/sim_base@_here_
 
 env:
-  num_envs: 2048
+  num_envs: 100
   max_episode_length: 1000
 
 drone_model: Crazyflie
@@ -23,7 +23,7 @@ future_traj_steps: 4
 reward_effort_weight: 0.
 reward_action_smoothness_weight: 0.0
 reward_distance_scale: 1.6
-prepare: true
+prepare: false
 prepare_step: 10
 
 action_transform: PIDrate
