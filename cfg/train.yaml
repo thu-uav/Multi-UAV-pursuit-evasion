@@ -7,7 +7,7 @@ env: ${task.env}
 
 # model_dir: /home/jiayu/OmniDrones/scripts/outputs/Track_size05to08_smooth0_reward_up_spin/05-28_10-28/wandb/run-20240528_102811-crgu03wi/files/checkpoint_603062272.pt
 # model_dir: /home/chenjy/OmniDrones/scripts/outputs/Track_star.pt
-# model_dir: /home/chenjy/OmniDrones/scripts/outputs/Track_wo_traj_w_fixed_train_dist/06-03_14-42/wandb/run-20240603_144222-lgq6tr04/files/checkpoint_891420672.pt
+# model_dir: /home/jiayu/OmniDrones/scripts/outputs/Track_newobs/06-03_20-00/wandb/run-20240603_200100-fmkob21i/files/checkpoint_249167872.pt
 model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
@@ -27,7 +27,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: Track_wo_traj_w_fixed_train_dist
+  run_name: Track_newobs_add_acc
   # run_name: debug
   job_type: train
   entity: chenjy

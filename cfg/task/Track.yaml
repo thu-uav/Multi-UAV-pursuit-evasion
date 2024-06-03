@@ -26,6 +26,13 @@ reward_distance_scale: 1.6
 prepare: false
 prepare_step: 10
 
+# vel and acc constraint
+use_acc: true
+max_linear_v: 2.0
+max_angular_v: 2.0
+max_linear_a: 3.5
+max_angular_a: 50
+
 action_transform: PIDrate
 # history: true
 # randomization:
