@@ -262,6 +262,8 @@ class Track(IsaacEnv):
             "drone_state": UnboundedContinuousTensorSpec(13),
             "reward_pos": UnboundedContinuousTensorSpec(1),
             "reward_smooth": UnboundedContinuousTensorSpec(1),
+            "reward_linear_v": UnboundedContinuousTensorSpec(1),
+            "reward_angular_v": UnboundedContinuousTensorSpec(1),
             "reward_linear_a": UnboundedContinuousTensorSpec(1),
             "reward_angular_a": UnboundedContinuousTensorSpec(1),
             "linear_v_max": UnboundedContinuousTensorSpec(1),
