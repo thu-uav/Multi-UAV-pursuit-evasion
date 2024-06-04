@@ -23,11 +23,13 @@ future_traj_steps: 4
 reward_effort_weight: 0.
 reward_action_smoothness_weight: 0.0
 reward_distance_scale: 1.6
+reward_acc_scale: 100
 prepare: false
 prepare_step: 10
 
 # vel and acc constraint
 use_acc: true
+use_acc_reward: true
 max_linear_v: 2.0
 max_angular_v: 2.0
 max_linear_a: 3.5
