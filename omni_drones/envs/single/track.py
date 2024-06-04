@@ -109,6 +109,7 @@ class Track(IsaacEnv):
         self.max_angular_a = cfg.task.max_angular_a
         self.use_acc = cfg.task.use_acc
         self.use_acc_reward = cfg.task.use_acc_reward
+        self.use_vel_reward = cfg.task.use_vel_reward
 
         super().__init__(cfg, headless)
 
@@ -219,7 +220,6 @@ class Track(IsaacEnv):
     
     def _set_specs(self):
         # drone_state_dim = 3 + 3 + 4 + 3 + 3 # position, velocity, quaternion, heading, up
-        # TODO
         drone_state_dim = 3 + 3 + 4 + 3
         obs_dim = drone_state_dim + 3 * (self.future_traj_steps-1)
         if self.use_acc:
@@ -467,11 +467,18 @@ class Track(IsaacEnv):
             reward_linear_acc = torch.zeros_like(reward_pose)
             reward_angular_acc = torch.zeros_like(reward_pose)
 
+        if self.use_vel_reward:
+            reward_linear_vel = - self.reward_acc_scale * (self.linear_v > self.max_linear_v).float()
+            reward_angular_vel = - self.reward_acc_scale * (self.angular_v > self.max_angular_v).float()
+        else:
+            reward_linear_vel = torch.zeros_like(reward_pose)
+            reward_angular_vel = torch.zeros_like(reward_pose)
+
         reward = (
             reward_pose 
             + reward_pose * (reward_up + reward_spin)
-            + reward_linear_acc
-            + reward_angular_acc
+            + reward_linear_acc + reward_angular_acc
+            + reward_linear_vel + reward_angular_vel
             + reward_action_smoothness
         )
         
@@ -483,11 +490,13 @@ class Track(IsaacEnv):
         self.stats['reward_smooth'].add_(reward_action_smoothness)
         self.stats['reward_linear_a'].add_(reward_linear_acc)
         self.stats['reward_angular_a'].add_(reward_angular_acc)
+        self.stats['reward_linear_v'].add_(reward_linear_vel)
+        self.stats['reward_angular_v'].add_(reward_angular_vel)
 
         done = (
             (self.progress_buf >= self.max_episode_length).unsqueeze(-1)
             | (self.drone.pos[..., 2] < 0.1)
-            | (distance > self.reset_thres)
+            # | (distance > self.reset_thres)
         ) 
 
         ep_len = self.progress_buf.unsqueeze(-1)
@@ -507,6 +516,12 @@ class Track(IsaacEnv):
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
         self.stats['reward_angular_a'].div_(
+            torch.where(done, ep_len, torch.ones_like(ep_len))
+        )
+        self.stats['reward_linear_v'].div_(
+            torch.where(done, ep_len, torch.ones_like(ep_len))
+        )
+        self.stats['reward_angular_v'].div_(
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
         self.stats["return"] += reward

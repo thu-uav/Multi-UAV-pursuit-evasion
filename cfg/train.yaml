@@ -27,7 +27,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: Track_acc_penalty
+  run_name: Track_vel_acc_penalty_scale10
   # run_name: debug
   job_type: train
   entity: chenjy
