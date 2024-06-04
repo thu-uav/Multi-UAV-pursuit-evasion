@@ -27,7 +27,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: Track_vel_omega_woreward
+  run_name: Track_uselastvel_woreward
   # run_name: debug
   job_type: train
   entity: chenjy

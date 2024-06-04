@@ -29,6 +29,7 @@ prepare_step: 10
 
 # vel and acc constraint
 use_acc: false
+use_last_vel: true
 use_acc_reward: false
 use_vel_reward: false
 max_linear_v: 2.0

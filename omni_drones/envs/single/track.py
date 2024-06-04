@@ -108,6 +108,7 @@ class Track(IsaacEnv):
         self.max_linear_a = cfg.task.max_linear_a
         self.max_angular_a = cfg.task.max_angular_a
         self.use_acc = cfg.task.use_acc
+        self.use_last_vel = cfg.task.use_last_vel
         self.use_acc_reward = cfg.task.use_acc_reward
         self.use_vel_reward = cfg.task.use_vel_reward
 
@@ -191,6 +192,10 @@ class Track(IsaacEnv):
         self.traj_rot = torch.zeros(self.num_envs, 4, device=self.device)
         self.traj_w = torch.ones(self.num_envs, device=self.device)
 
+        # add obs
+        self.last_linear_v3 = torch.zeros(self.num_envs, 1, 3, device=self.device)
+        self.last_angular_v3 = torch.zeros(self.num_envs, 1, 3, device=self.device)
+        
         self.last_linear_v = torch.zeros(self.num_envs, 1, device=self.device)
         self.last_angular_v = torch.zeros(self.num_envs, 1, device=self.device)
         self.last_linear_a = torch.zeros(self.num_envs, 1, device=self.device)
@@ -224,6 +229,8 @@ class Track(IsaacEnv):
         obs_dim = drone_state_dim + 3 * (self.future_traj_steps-1)
         if self.use_acc:
             obs_dim += 2
+        if self.use_last_vel:
+            obs_dim += 6
         if self.time_encoding:
             self.time_encoding_dim = 4
             obs_dim += self.time_encoding_dim
@@ -311,6 +318,9 @@ class Track(IsaacEnv):
         self.drone.set_velocities(vel, env_ids)
 
         # set last values
+        if self.use_last_vel:
+            self.last_linear_v3[env_ids] = vel[..., :3].clone()
+            self.last_angular_v3[env_ids] = vel[..., 3:].clone()
         self.last_linear_v[env_ids] = torch.norm(vel[..., :3], dim=-1)
         self.last_angular_v[env_ids] = torch.norm(vel[..., 3:], dim=-1)
         self.last_linear_a[env_ids] = torch.zeros_like(self.last_linear_v[env_ids])
@@ -417,10 +427,17 @@ class Track(IsaacEnv):
         if self.use_acc:
             obs.append(self.linear_a.unsqueeze(1) / self.max_linear_a)
             obs.append(self.angular_a.unsqueeze(1) / self.max_angular_a)
+
+        if self.use_last_vel:
+            obs.append(self.last_linear_v3)
+            obs.append(self.last_angular_v3)
         
         obs = torch.cat(obs, dim=-1)
         
         # set last
+        self.last_linear_v3 = self.root_state[..., 7:10].clone()
+        self.last_angular_v3 = self.root_state[..., 10:13].clone()
+            
         self.last_linear_v = self.linear_v.clone()
         self.last_angular_v = self.angular_v.clone()
         self.last_linear_a = self.linear_a.clone()
