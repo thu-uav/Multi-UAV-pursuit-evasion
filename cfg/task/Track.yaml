@@ -29,13 +29,17 @@ prepare_step: 10
 
 # vel and acc constraint
 use_acc: false
-use_last_vel: true
+use_last_vel: false
 use_acc_reward: true
 use_vel_reward: true
 max_linear_v: 2.0
 max_angular_v: 2.0
 max_linear_a: 3.5
 max_angular_a: 20
+
+# use action filter
+use_action_filter: false
+window_size: 5
 
 action_transform: PIDrate
 # history: true

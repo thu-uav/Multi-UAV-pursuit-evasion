@@ -224,8 +224,8 @@ class Track(IsaacEnv):
         return ["/World/defaultGroundPlane"]
     
     def _set_specs(self):
-        # drone_state_dim = 3 + 3 + 4 + 3 + 3 # position, velocity, quaternion, heading, up
-        drone_state_dim = 3 + 3 + 4 + 3
+        drone_state_dim = 3 + 3 + 4 + 3 + 3 # position, velocity, quaternion, heading, up
+        # drone_state_dim = 3 + 3 + 4 + 3
         obs_dim = drone_state_dim + 3 * (self.future_traj_steps-1)
         if self.use_acc:
             obs_dim += 2
@@ -297,6 +297,11 @@ class Track(IsaacEnv):
 
         self.latency = self.cfg.task.latency_step if self.cfg.task.latency else 0
         self.obs_buffer = collections.deque(maxlen=self.latency)
+        
+        # smooth action
+        self.use_action_filter = self.cfg.task.use_action_filter
+        self.window_size = self.cfg.task.window_size
+        self.action_buffer = collections.deque(maxlen=self.window_size)
 
     def _reset_idx(self, env_ids: torch.Tensor):
         self.drone._reset_idx(env_ids)
@@ -361,6 +366,13 @@ class Track(IsaacEnv):
             actions[self.progress_buf <= self.prepare_step] = torch.tensor([0.2666, 0.2666, 0.2666, 0.2666], device=self.device)
             tensordict.set(("agents", "action"), actions)
         
+        # for smooth
+        self.action_buffer.append(actions)
+        if self.use_action_filter:
+            tmp_actions = torch.stack(list(self.action_buffer), dim=-1)
+            filter_idx = (self.progress_buf > self.window_size)
+            actions[filter_idx] = torch.mean(tmp_actions, dim=-1)[filter_idx]
+        
         self.effort = self.drone.apply_action(actions)
 
         if self.wind:
@@ -377,14 +389,14 @@ class Track(IsaacEnv):
         self.target_pos[:] = self._compute_traj(self.future_traj_steps, step_size=5)
         
         self.rpos = self.target_pos - self.root_state[..., :3]
-        # obs = [
-        #     self.rpos.flatten(1).unsqueeze(1),
-        #     self.root_state[..., 3:10], self.root_state[..., 13:19],
-        # ]
         obs = [
             self.rpos.flatten(1).unsqueeze(1),
-            self.root_state[..., 3:13],
+            self.root_state[..., 3:10], self.root_state[..., 13:19],
         ]
+        # obs = [
+        #     self.rpos.flatten(1).unsqueeze(1),
+        #     self.root_state[..., 3:13],
+        # ]
         self.stats['drone_state'] = self.root_state[..., :13].squeeze(1).clone()
         if self.time_encoding:
             t = (self.progress_buf / self.max_episode_length).unsqueeze(-1)
