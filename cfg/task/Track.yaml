@@ -30,12 +30,12 @@ prepare_step: 10
 # vel and acc constraint
 use_acc: false
 use_last_vel: true
-use_acc_reward: false
-use_vel_reward: false
+use_acc_reward: true
+use_vel_reward: true
 max_linear_v: 2.0
 max_angular_v: 2.0
 max_linear_a: 3.5
-max_angular_a: 50
+max_angular_a: 20
 
 action_transform: PIDrate
 # history: true
