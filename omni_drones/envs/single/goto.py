@@ -231,6 +231,7 @@ class Goto(IsaacEnv):
             "head_bonus": UnboundedContinuousTensorSpec(1),
             "reward_pos": UnboundedContinuousTensorSpec(1),
             "reward_pos_bonus": UnboundedContinuousTensorSpec(1),
+            "reward_spin": UnboundedContinuousTensorSpec(1),
             "reward_head": UnboundedContinuousTensorSpec(1),
             "reward_head_bonus": UnboundedContinuousTensorSpec(1),
             "reward_up": UnboundedContinuousTensorSpec(1),
@@ -405,6 +406,9 @@ class Goto(IsaacEnv):
         reward_head_bonus = ((head_error <= 0.02) * 10 * (reward_pos_bonus > 0)).float()
 
         reward_up = torch.square((self.drone.up[..., 2] + 1) / 2)
+
+        spin = torch.square(self.drone.vel[..., -1])
+        reward_spin = 0.5 / (1.0 + torch.square(spin))
         
         reward_time = self.reward_time_scale * (-self.progress_buf / self.max_episode_length).unsqueeze(1) * (reward_pos_bonus <= 0)
         
@@ -413,12 +417,14 @@ class Goto(IsaacEnv):
             + reward_pos_bonus
             # + reward_head 
             # + reward_head_bonus
+            + reward_spin
             + reward_up
             + reward_time
         )
 
         self.stats['reward_pos'].add_(reward_pos)
         self.stats['reward_pos_bonus'].add_(reward_pos_bonus)
+        self.stats['reward_spin'].add_(reward_spin)
         self.stats['reward_head'].add_(reward_head)
         self.stats['reward_head_bonus'].add_(reward_head_bonus)
         self.stats['reward_up'].add_(reward_up)
@@ -467,6 +473,9 @@ class Goto(IsaacEnv):
         )
         
         self.stats['reward_pos'].div_(
+            torch.where(done, ep_len, torch.ones_like(ep_len))
+        )
+        self.stats['reward_spin'].div_(
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
         self.stats['reward_pos_bonus'].div_(
