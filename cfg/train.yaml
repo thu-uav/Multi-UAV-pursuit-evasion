@@ -7,8 +7,8 @@ env: ${task.env}
 
 # model_dir: /home/jiayu/OmniDrones/scripts/outputs/Track_size05to08_smooth0_reward_up_spin/05-28_10-28/wandb/run-20240528_102811-crgu03wi/files/checkpoint_603062272.pt
 # model_dir: /home/jiayu/OmniDrones/scripts/outputs/Track_star.pt
-# model_dir: /home/jiayu/OmniDrones/scripts/outputs/Goto_wotime/06-06_16-40/wandb/run-20240606_164025-3c3xcwxu/files/checkpoint_2044854272.pt
-model_dir: null
+model_dir: /home/jiayu/OmniDrones/scripts/outputs/Goto_wotime_onlypos/06-06_19-38/wandb/run-20240606_193814-pd49vhgm/files/checkpoint_550764544.pt
+# model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
 max_iters: -1
@@ -27,13 +27,13 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: Goto_wotime_onlypos
-  # run_name: debug
+  # run_name: Goto_wotime_onlypos
+  run_name: Goto_wotime_onlypos_eval
   job_type: train
   entity: chenjy
   project: Goto
-  # mode: disabled
-  mode: online # set to 'disabled' when debugging locally, online
+  mode: disabled
+  # mode: online # set to 'disabled' when debugging locally, online
   run_id: 
   monitor_gym: True
   tags: 

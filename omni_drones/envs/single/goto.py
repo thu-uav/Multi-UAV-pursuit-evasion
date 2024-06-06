@@ -235,6 +235,7 @@ class Goto(IsaacEnv):
             "reward_head_bonus": UnboundedContinuousTensorSpec(1),
             "reward_up": UnboundedContinuousTensorSpec(1),
             "reward_time": UnboundedContinuousTensorSpec(1),
+            "reach_time": UnboundedContinuousTensorSpec(1),
             "episode_len": UnboundedContinuousTensorSpec(1),
             "pos_error": UnboundedContinuousTensorSpec(1),
             "head_error": UnboundedContinuousTensorSpec(1),
@@ -306,6 +307,7 @@ class Goto(IsaacEnv):
         self.last_angular_jerk[env_ids] = torch.zeros_like(self.last_angular_a[env_ids])
 
         self.stats[env_ids] = 0.
+        self.stats['reach_time'][env_ids] = self.max_episode_length
         
     def _pre_sim_step(self, tensordict: TensorDictBase):
         actions = tensordict[("agents", "action")]
@@ -421,6 +423,9 @@ class Goto(IsaacEnv):
         self.stats['reward_head_bonus'].add_(reward_head_bonus)
         self.stats['reward_up'].add_(reward_up)
         self.stats['reward_time'].add_(reward_time)
+        reach_flag = (reward_pos_bonus > 0).float()
+        current_reach = self.progress_buf.unsqueeze(1) * reach_flag + self.max_episode_length * (1.0 - reach_flag)
+        self.stats['reach_time'].set_(torch.min(self.stats['reach_time'], current_reach))
         
         # done_misbehave = (distance > 0.5)
 
