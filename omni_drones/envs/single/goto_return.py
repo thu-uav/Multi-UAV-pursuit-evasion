@@ -197,6 +197,8 @@ class Goto_return(IsaacEnv):
         observation_dim = 3 + 3 + 4 + 3 + 3 # position, velocity, quaternion, heading, up
 
         observation_dim += 3 # start position
+        
+        observation_dim += 1 # reach flag
 
         if self.cfg.task.time_encoding:
             self.time_encoding_dim = 4
@@ -236,12 +238,16 @@ class Goto_return(IsaacEnv):
             "head_bonus": UnboundedContinuousTensorSpec(1),
             "reward_pos": UnboundedContinuousTensorSpec(1),
             "reward_pos_bonus": UnboundedContinuousTensorSpec(1),
+            "reward_start_pos": UnboundedContinuousTensorSpec(1),
+            "reward_start_pos_bonus": UnboundedContinuousTensorSpec(1),
             "reward_spin": UnboundedContinuousTensorSpec(1),
             "reward_head": UnboundedContinuousTensorSpec(1),
             "reward_head_bonus": UnboundedContinuousTensorSpec(1),
             "reward_up": UnboundedContinuousTensorSpec(1),
             "reward_time": UnboundedContinuousTensorSpec(1),
             "reach_time": UnboundedContinuousTensorSpec(1),
+            "return_time": UnboundedContinuousTensorSpec(1),
+            "reach_ratio": UnboundedContinuousTensorSpec(1),
             "episode_len": UnboundedContinuousTensorSpec(1),
             "pos_error": UnboundedContinuousTensorSpec(1),
             "start_pos_error": UnboundedContinuousTensorSpec(1),
@@ -317,6 +323,7 @@ class Goto_return(IsaacEnv):
 
         self.stats[env_ids] = 0.
         self.stats['reach_time'][env_ids] = self.max_episode_length
+        self.stats['return_time'][env_ids] = self.max_episode_length
         
     def _pre_sim_step(self, tensordict: TensorDictBase):
         actions = tensordict[("agents", "action")]
@@ -345,7 +352,15 @@ class Goto_return(IsaacEnv):
             t = (self.progress_buf / self.max_episode_length).unsqueeze(-1)
             obs.append(t.expand(-1, self.time_encoding_dim).unsqueeze(1))
         
+        # add start pos
         obs.append(self.start_rpos)
+        
+        # add reach flag
+        pos_error = torch.norm(self.rpos, dim=-1)
+        reward_pos_bonus = ((pos_error <= 0.02) * 10).float()
+        self.reach_flag = (self.reach_flag + (reward_pos_bonus > 0))
+        obs.append(self.reach_flag.float().unsqueeze(-1))
+        self.stats['reach_ratio'].set_(self.reach_flag.float())
         
         self.stats["action_smoothness_mean"].add_(self.drone.throttle_difference)
         self.stats["action_smoothness_max"].set_(torch.max(self.drone.throttle_difference, self.stats["action_smoothness_max"]))
@@ -413,7 +428,6 @@ class Goto_return(IsaacEnv):
         reward_head = - head_error * (reward_pos_bonus > 0)
         reward_head_bonus = ((head_error <= 0.02) * 10 * (reward_pos_bonus > 0)).float()
 
-        self.reach_flag = (self.reach_flag + (reward_pos_bonus > 0))
         reward_start_pos = self.reach_flag.float() * (- start_pos_error * self.reward_distance_scale)
         reward_start_pos_bonus = (self.reach_flag.float() * (start_pos_error <= 0.02) * 10).float()
 
@@ -425,8 +439,8 @@ class Goto_return(IsaacEnv):
         reward_time = self.reward_time_scale * (-self.progress_buf / self.max_episode_length).unsqueeze(1) * (reward_pos_bonus <= 0)
         
         reward = (
-            reward_pos
-            + reward_pos_bonus
+            reward_pos * (1.0 - self.reach_flag.float())
+            + reward_pos_bonus * (1.0 - self.reach_flag.float())
             + reward_start_pos
             + reward_start_pos_bonus
             + reward_spin
@@ -436,14 +450,21 @@ class Goto_return(IsaacEnv):
 
         self.stats['reward_pos'].add_(reward_pos)
         self.stats['reward_pos_bonus'].add_(reward_pos_bonus)
+        self.stats['reward_start_pos'].add_(reward_start_pos)
+        self.stats['reward_start_pos_bonus'].add_(reward_start_pos_bonus)
         self.stats['reward_spin'].add_(reward_spin)
         self.stats['reward_head'].add_(reward_head)
         self.stats['reward_head_bonus'].add_(reward_head_bonus)
         self.stats['reward_up'].add_(reward_up)
         self.stats['reward_time'].add_(reward_time)
+        
         reach_flag = (reward_pos_bonus > 0).float()
         current_reach = self.progress_buf.unsqueeze(1) * reach_flag + self.max_episode_length * (1.0 - reach_flag)
         self.stats['reach_time'].set_(torch.min(self.stats['reach_time'], current_reach))
+
+        return_flag = (reward_start_pos_bonus > 0).float()
+        current_return = self.progress_buf.unsqueeze(1) * return_flag + self.max_episode_length * (1.0 - return_flag)
+        self.stats['return_time'].set_(torch.min(self.stats['return_time'], current_return))
         
         # done_misbehave = (distance > 0.5)
 
@@ -487,13 +508,19 @@ class Goto_return(IsaacEnv):
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
         
-        self.stats['reward_pos'].div_(
-            torch.where(done, ep_len, torch.ones_like(ep_len))
-        )
         self.stats['reward_spin'].div_(
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
+        self.stats['reward_pos'].div_(
+            torch.where(done, ep_len, torch.ones_like(ep_len))
+        )
         self.stats['reward_pos_bonus'].div_(
+            torch.where(done, ep_len, torch.ones_like(ep_len))
+        )
+        self.stats['reward_start_pos'].div_(
+            torch.where(done, ep_len, torch.ones_like(ep_len))
+        )
+        self.stats['reward_start_pos_bonus'].div_(
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
         self.stats['reward_head'].div_(
