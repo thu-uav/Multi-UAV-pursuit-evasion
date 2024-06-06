@@ -242,7 +242,8 @@ class MultirotorBase(RobotBase):
         # set by yaml
         self.masses = torch.ones_like(self.base_link.get_masses().clone()) * self.mass
         self.base_link.set_masses(self.masses)
-        self.gravity = self.masses * 9.81
+        # self.gravity = self.masses * 9.81
+        self.gravity = self._view.get_body_masses().sum(-1).unsqueeze(-1) * 9.81
         # self.inertias = self.base_link.get_inertias().reshape(*self.shape, 3, 3).diagonal(0, -2, -1)
         # set by yaml
         self.inertias = torch.ones(self.shape).unsqueeze(-1).repeat(1,1,3).to(self.device)

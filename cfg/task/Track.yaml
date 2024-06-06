@@ -6,7 +6,7 @@ defaults:
   - /base/sim_base@_here_
 
 env:
-  num_envs: 2048
+  num_envs: 100
   max_episode_length: 1000
 
 drone_model: Crazyflie
@@ -23,15 +23,14 @@ future_traj_steps: 4
 reward_effort_weight: 0.
 reward_action_smoothness_weight: 0.0
 reward_distance_scale: 1.6
-reward_acc_scale: 10
-prepare: false
-prepare_step: 10
+reward_acc_scale: 0.0
+reward_diff_scale: 0.0
+diff_threshold: 0.005
 
 # vel and acc constraint
-use_acc: false
 use_last_vel: false
-use_acc_reward: true
-use_vel_reward: true
+use_acc_reward: false
+use_vel_reward: false
 max_linear_v: 2.0
 max_angular_v: 2.0
 max_linear_a: 3.5

@@ -22,6 +22,7 @@
 
 
 from .hover import Hover
+from .goto import Goto
 from .takeoff import Takeoff
 from .turn import Turn
 from .track import Track

@@ -38,6 +38,7 @@ from omni.isaac.debug_draw import _debug_draw
 
 from ..utils import lemniscate, pentagram, scale_time
 import collections
+import numpy as np
 
 class Track(IsaacEnv):
     r"""
@@ -94,20 +95,19 @@ class Track(IsaacEnv):
         self.reward_action_smoothness_weight = cfg.task.reward_action_smoothness_weight
         self.reward_distance_scale = cfg.task.reward_distance_scale
         self.reward_acc_scale = cfg.task.reward_acc_scale
+        self.reward_diff_scale = cfg.task.reward_diff_scale
+        self.diff_threshold = cfg.task.diff_threshold
         self.time_encoding = cfg.task.time_encoding
         self.future_traj_steps = int(cfg.task.future_traj_steps)
         assert self.future_traj_steps > 0
         self.intrinsics = cfg.task.intrinsics
         self.wind = cfg.task.wind
-        self.prepare = cfg.task.prepare
-        self.prepare_step = cfg.task.prepare_step
         
         # vel and acc constraint
         self.max_linear_v = cfg.task.max_linear_v
         self.max_angular_v = cfg.task.max_angular_v
         self.max_linear_a = cfg.task.max_linear_a
         self.max_angular_a = cfg.task.max_angular_a
-        self.use_acc = cfg.task.use_acc
         self.use_last_vel = cfg.task.use_last_vel
         self.use_acc_reward = cfg.task.use_acc_reward
         self.use_vel_reward = cfg.task.use_vel_reward
@@ -134,29 +134,17 @@ class Track(IsaacEnv):
             self.wind_w = torch.zeros(self.num_envs, 3, 8, device=self.device)
             self.wind_i = torch.zeros(self.num_envs, 1, device=self.device)
         
-        # self.init_rpy_dist = D.Uniform(
-        #     torch.tensor([-.2, -.2, 0.], device=self.device) * torch.pi,
-        #     torch.tensor([0.2, 0.2, 2.], device=self.device) * torch.pi
-        # )
         self.init_rpy_dist = D.Uniform(
-            torch.tensor([-0.0, -0.0, 0.], device=self.device) * torch.pi,
-            torch.tensor([0.0, 0.0, 2.], device=self.device) * torch.pi
+            torch.tensor([-.2, -.2, 0.], device=self.device) * torch.pi,
+            torch.tensor([0.2, 0.2, 2.], device=self.device) * torch.pi
         )
         self.traj_rpy_dist = D.Uniform(
             torch.tensor([0., 0., 0.], device=self.device) * torch.pi,
             torch.tensor([0., 0., 2.], device=self.device) * torch.pi
         )
-        self.traj_c_dist = D.Uniform(
-            torch.tensor(-0.6, device=self.device),
-            torch.tensor(0.6, device=self.device)
-        )
         self.traj_scale_dist = D.Uniform(
             torch.tensor([0.5, 0.5, 0.25], device=self.device),
             torch.tensor([0.8, 0.8, 0.25], device=self.device)
-        )
-        self.traj_w_dist = D.Uniform(
-            torch.tensor(0.8, device=self.device),
-            torch.tensor(1.1, device=self.device)
         )
         
         # eval
@@ -168,29 +156,16 @@ class Track(IsaacEnv):
             torch.tensor([0., 0., 0.], device=self.device) * torch.pi,
             torch.tensor([0., 0., 0.], device=self.device) * torch.pi
         )
-        self.traj_c_dist = D.Uniform(
-            torch.tensor(-0.0, device=self.device),
-            torch.tensor(0.0, device=self.device)
-        )
         self.traj_scale_dist = D.Uniform(
             torch.tensor([0.5, 0.5, 0.25], device=self.device),
             torch.tensor([0.5, 0.5, 0.25], device=self.device)
         )
-        self.traj_w_dist = D.Uniform(
-            torch.tensor(1., device=self.device),
-            torch.tensor(1., device=self.device)
-        )
         
         self.origin = torch.tensor([0., 0., 1.], device=self.device)
 
-        if self.prepare:
-            self.traj_t0 = - scale_time(torch.tensor(self.prepare_step) * self.dt)
-        else:
-            self.traj_t0 = 0.0
-        self.traj_c = torch.zeros(self.num_envs, device=self.device)
+        self.traj_t0 = 0.0
         self.traj_scale = torch.zeros(self.num_envs, 3, device=self.device)
         self.traj_rot = torch.zeros(self.num_envs, 4, device=self.device)
-        self.traj_w = torch.ones(self.num_envs, device=self.device)
 
         # add obs
         self.last_linear_v3 = torch.zeros(self.num_envs, 1, 3, device=self.device)
@@ -203,6 +178,7 @@ class Track(IsaacEnv):
         self.last_linear_jerk = torch.zeros(self.num_envs, 1, device=self.device)
         self.last_angular_jerk = torch.zeros(self.num_envs, 1, device=self.device)
 
+        self.last_actions = torch.zeros(self.num_envs, 1, 4, device=self.device)
         self.target_pos = torch.zeros(self.num_envs, self.future_traj_steps, 3, device=self.device)
 
         self.alpha = 0.8
@@ -227,8 +203,6 @@ class Track(IsaacEnv):
         drone_state_dim = 3 + 3 + 4 + 3 + 3 # position, velocity, quaternion, heading, up
         # drone_state_dim = 3 + 3 + 4 + 3
         obs_dim = drone_state_dim + 3 * (self.future_traj_steps-1)
-        if self.use_acc:
-            obs_dim += 2
         if self.use_last_vel:
             obs_dim += 6
         if self.time_encoding:
@@ -264,6 +238,8 @@ class Track(IsaacEnv):
             "tracking_error": UnboundedContinuousTensorSpec(1),
             "tracking_error_ema": UnboundedContinuousTensorSpec(1),
             # "action_smoothness": UnboundedContinuousTensorSpec(1),
+            "action_error_mean": UnboundedContinuousTensorSpec(1),
+            "action_error_max": UnboundedContinuousTensorSpec(1),
             "action_smoothness_mean": UnboundedContinuousTensorSpec(1),
             "action_smoothness_max": UnboundedContinuousTensorSpec(1),
             "drone_state": UnboundedContinuousTensorSpec(13),
@@ -302,15 +278,17 @@ class Track(IsaacEnv):
         self.use_action_filter = self.cfg.task.use_action_filter
         self.window_size = self.cfg.task.window_size
         self.action_buffer = collections.deque(maxlen=self.window_size)
+        
+        # # TODO: debug
+        # self.action_error_list = []
+        # self.vel_list = []
+        # self.acc_list = []
 
     def _reset_idx(self, env_ids: torch.Tensor):
         self.drone._reset_idx(env_ids)
-        self.traj_c[env_ids] = self.traj_c_dist.sample(env_ids.shape)
         self.traj_rot[env_ids] = euler_to_quaternion(self.traj_rpy_dist.sample(env_ids.shape))
         # self.traj_scale[env_ids] = self.traj_scale_dist.sample(env_ids.shape) / 4 # for crazyflie, traj should be smaller
         self.traj_scale[env_ids] = self.traj_scale_dist.sample(env_ids.shape)
-        traj_w = self.traj_w_dist.sample(env_ids.shape)
-        self.traj_w[env_ids] = torch.randn_like(traj_w).sign() * traj_w
 
         t0 = torch.zeros(len(env_ids), device=self.device)
         pos = vmap(pentagram)(t0 + self.traj_t0).unsqueeze(1)
@@ -321,6 +299,8 @@ class Track(IsaacEnv):
             pos + self.envs_positions[env_ids], rot, env_ids
         )
         self.drone.set_velocities(vel, env_ids)
+        
+        self.last_actions[env_ids] = 2.0 * torch.square(self.drone.throttle) - 1.0
 
         # set last values
         if self.use_last_vel:
@@ -360,11 +340,6 @@ class Track(IsaacEnv):
 
     def _pre_sim_step(self, tensordict: TensorDictBase):
         actions = tensordict[("agents", "action")]
-    
-        # prepare, hover
-        if self.prepare:
-            actions[self.progress_buf <= self.prepare_step] = torch.tensor([0.2666, 0.2666, 0.2666, 0.2666], device=self.device)
-            tensordict.set(("agents", "action"), actions)
         
         # for smooth
         self.action_buffer.append(actions)
@@ -372,8 +347,15 @@ class Track(IsaacEnv):
             tmp_actions = torch.stack(list(self.action_buffer), dim=-1)
             filter_idx = (self.progress_buf > self.window_size)
             actions[filter_idx] = torch.mean(tmp_actions, dim=-1)[filter_idx]
-        
+
         self.effort = self.drone.apply_action(actions)
+
+        # action difference
+        action_error = torch.norm(actions - self.last_actions, dim=-1)
+        self.action_error_list.append(torch.abs(actions - self.last_actions).to('cpu').numpy())
+        self.stats['action_error_mean'].add_(action_error)
+        self.stats['action_error_max'].set_(torch.max(action_error, self.stats['action_error_max']))
+        self.last_actions = actions.clone()
 
         if self.wind:
             t = (self.progress_buf * self.dt).reshape(-1, 1, 1)
@@ -393,10 +375,6 @@ class Track(IsaacEnv):
             self.rpos.flatten(1).unsqueeze(1),
             self.root_state[..., 3:10], self.root_state[..., 13:19],
         ]
-        # obs = [
-        #     self.rpos.flatten(1).unsqueeze(1),
-        #     self.root_state[..., 3:13],
-        # ]
         self.stats['drone_state'] = self.root_state[..., :13].squeeze(1).clone()
         if self.time_encoding:
             t = (self.progress_buf / self.max_episode_length).unsqueeze(-1)
@@ -404,7 +382,6 @@ class Track(IsaacEnv):
         if self.intrinsics:
             obs.append(self.drone.get_info())
 
-        # self.stats["action_smoothness"].lerp_(-self.drone.throttle_difference, (1-self.alpha))
         self.stats["action_smoothness_mean"].add_(self.drone.throttle_difference)
         self.stats["action_smoothness_max"].set_(torch.max(self.drone.throttle_difference, self.stats["action_smoothness_max"]))
 
@@ -436,15 +413,15 @@ class Track(IsaacEnv):
         self.angular_jerk_episode.add_(torch.abs(self.angular_jerk))
         self.stats["angular_jerk_mean"].set_(self.angular_jerk_episode / (self.progress_buf + 1.0).unsqueeze(1))
         
-        if self.use_acc:
-            obs.append(self.linear_a.unsqueeze(1) / self.max_linear_a)
-            obs.append(self.angular_a.unsqueeze(1) / self.max_angular_a)
-
         if self.use_last_vel:
             obs.append(self.last_linear_v3)
             obs.append(self.last_angular_v3)
         
         obs = torch.cat(obs, dim=-1)
+
+        # # TODO: debug
+        # self.vel_list.append(self.root_state[..., 7:13].to('cpu').numpy())
+        # self.acc_list.append(torch.stack([self.linear_a, self.angular_a]).to('cpu').numpy())
         
         # set last
         self.last_linear_v3 = self.root_state[..., 7:10].clone()
@@ -491,6 +468,9 @@ class Track(IsaacEnv):
         reward_spin = 0.5 / (1.0 + torch.square(spin))
         # not_spin_bonus = torch.abs(torch.square(self.drone.vel[..., -1])) < 1e-5
 
+        # reward diff reward
+        reward_action_diff = self.reward_diff_scale * (torch.abs(self.drone.throttle_difference) < self.diff_threshold).float()
+
         if self.use_acc_reward:
             reward_linear_acc = - self.reward_acc_scale * (self.linear_a > self.max_linear_a).float()
             reward_angular_acc = - self.reward_acc_scale * (self.angular_a > self.max_angular_a).float()
@@ -510,12 +490,9 @@ class Track(IsaacEnv):
             + reward_pose * (reward_up + reward_spin)
             + reward_linear_acc + reward_angular_acc
             + reward_linear_vel + reward_angular_vel
+            + reward_action_diff
             + reward_action_smoothness
         )
-        
-        # set reward = 0.0, in the preparation phase
-        if self.prepare:
-            reward[self.progress_buf <= self.prepare_step] = 0.0
         
         self.stats['reward_pos'].add_(reward_pose)
         self.stats['reward_smooth'].add_(reward_action_smoothness)
@@ -528,10 +505,18 @@ class Track(IsaacEnv):
             (self.progress_buf >= self.max_episode_length).unsqueeze(-1)
             | (self.drone.pos[..., 2] < 0.1)
             # | (distance > self.reset_thres)
-        ) 
+        )
+        
+        # if torch.all(done):
+        #     np.save('action_error.npy', np.array(self.action_error_list))
+        #     np.save('vel.npy', np.array(self.vel_list))
+        #     np.save('acc.npy', np.array(self.acc_list))
 
         ep_len = self.progress_buf.unsqueeze(-1)
         self.stats["tracking_error"].div_(
+            torch.where(done, ep_len, torch.ones_like(ep_len))
+        )
+        self.stats['action_error_mean'].div_(
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
         self.stats['action_smoothness_mean'].div_(
@@ -572,11 +557,9 @@ class Track(IsaacEnv):
         if env_ids is None:
             env_ids = ...
         t = self.progress_buf[env_ids].unsqueeze(1) + step_size * torch.arange(steps, device=self.device)
-        # t = self.traj_t0 + scale_time(self.traj_w[env_ids].unsqueeze(1) * t * self.dt)
         t = self.traj_t0 + scale_time(t * self.dt)
         traj_rot = self.traj_rot[env_ids].unsqueeze(1).expand(-1, t.shape[1], 4)
         
-        # target_pos = vmap(lemniscate)(t, self.traj_c[env_ids])
         target_pos = vmap(pentagram)(t)
         target_pos = vmap(torch_utils.quat_rotate)(traj_rot, target_pos) * self.traj_scale[env_ids].unsqueeze(1)
 

@@ -1,4 +1,4 @@
-name: Hover
+name: Goto
 
 defaults:
   # see https://hydra.cc/docs/advanced/overriding_packages/
@@ -6,7 +6,7 @@ defaults:
   - /base/sim_base@_here_
 
 env:
-  num_envs: 100
+  num_envs: 2048
   max_episode_length: 500
 
 drone_model: crazyflie
@@ -14,15 +14,9 @@ force_sensor: false
 
 reward_action_smoothness_weight: 0.0
 reward_distance_scale: 10.0
-reward_v_scale: 0.0
-reward_acc_scale: 0.0
-reward_jerk_scale: 0.0
-linear_vel_max: 3.0
-linear_acc_max: 10.0
+reward_time_scale: 0.0
 
 # observation options
-omega: false
-motor: false
 time_encoding: true
 
 action_transform: PIDrate
