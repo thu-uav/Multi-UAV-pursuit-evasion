@@ -127,19 +127,19 @@ class Goto(IsaacEnv):
             torch.tensor([0., 0., 0.], device=self.device) * torch.pi
         )
         
-        # eval
-        self.init_pos_dist = D.Uniform(
-            torch.tensor([1., 1., 0.05], device=self.device),
-            torch.tensor([1., 1., 0.05], device=self.device)
-        )
-        self.init_rpy_dist = D.Uniform(
-            torch.tensor([0., 0., 0.0], device=self.device) * torch.pi,
-            torch.tensor([0., 0., 0.0], device=self.device) * torch.pi
-        )
-        self.target_rpy_dist = D.Uniform(
-            torch.tensor([0., 0., 0.], device=self.device) * torch.pi,
-            torch.tensor([0., 0., 0.], device=self.device) * torch.pi
-        )
+        # # eval
+        # self.init_pos_dist = D.Uniform(
+        #     torch.tensor([1., 1., 0.05], device=self.device),
+        #     torch.tensor([1., 1., 0.05], device=self.device)
+        # )
+        # self.init_rpy_dist = D.Uniform(
+        #     torch.tensor([0., 0., 0.0], device=self.device) * torch.pi,
+        #     torch.tensor([0., 0., 0.0], device=self.device) * torch.pi
+        # )
+        # self.target_rpy_dist = D.Uniform(
+        #     torch.tensor([0., 0., 0.], device=self.device) * torch.pi,
+        #     torch.tensor([0., 0., 0.], device=self.device) * torch.pi
+        # )
 
         self.target_pos = torch.tensor([[0.0, 0.0, 1.]], device=self.device)
         self.target_heading = torch.zeros(self.num_envs, 1, 3, device=self.device)
@@ -409,8 +409,8 @@ class Goto(IsaacEnv):
         reward = (
             reward_pos
             + reward_pos_bonus
-            + reward_head 
-            + reward_head_bonus
+            # + reward_head 
+            # + reward_head_bonus
             + reward_up
             + reward_time
         )
@@ -431,6 +431,9 @@ class Goto(IsaacEnv):
 
         ep_len = self.progress_buf.unsqueeze(-1)
         self.stats["pos_error"].div_(
+            torch.where(done, ep_len, torch.ones_like(ep_len))
+        )
+        self.stats['action_error_mean'].div_(
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
         self.stats["head_error"].div_(
