@@ -126,6 +126,20 @@ class Goto(IsaacEnv):
             torch.tensor([0., 0., 0.], device=self.device) * torch.pi,
             torch.tensor([0., 0., 0.], device=self.device) * torch.pi
         )
+        
+        # eval
+        self.init_pos_dist = D.Uniform(
+            torch.tensor([1., 1., 0.05], device=self.device),
+            torch.tensor([1., 1., 0.05], device=self.device)
+        )
+        self.init_rpy_dist = D.Uniform(
+            torch.tensor([0., 0., 0.0], device=self.device) * torch.pi,
+            torch.tensor([0., 0., 0.0], device=self.device) * torch.pi
+        )
+        self.target_rpy_dist = D.Uniform(
+            torch.tensor([0., 0., 0.], device=self.device) * torch.pi,
+            torch.tensor([0., 0., 0.], device=self.device) * torch.pi
+        )
 
         self.target_pos = torch.tensor([[0.0, 0.0, 1.]], device=self.device)
         self.target_heading = torch.zeros(self.num_envs, 1, 3, device=self.device)
@@ -137,6 +151,8 @@ class Goto(IsaacEnv):
         self.last_angular_a = torch.zeros(self.num_envs, 1, device=self.device)
         self.last_linear_jerk = torch.zeros(self.num_envs, 1, device=self.device)
         self.last_angular_jerk = torch.zeros(self.num_envs, 1, device=self.device)
+
+        self.last_actions = torch.zeros(self.num_envs, 1, 4, device=self.device)
 
     def _design_scene(self):
         import omni_drones.utils.kit as kit_utils
@@ -222,6 +238,8 @@ class Goto(IsaacEnv):
             "episode_len": UnboundedContinuousTensorSpec(1),
             "pos_error": UnboundedContinuousTensorSpec(1),
             "head_error": UnboundedContinuousTensorSpec(1),
+            "action_error_mean": UnboundedContinuousTensorSpec(1),
+            "action_error_max": UnboundedContinuousTensorSpec(1),
             "action_smoothness_mean": UnboundedContinuousTensorSpec(1),
             "action_smoothness_max": UnboundedContinuousTensorSpec(1),
             "linear_v_max": UnboundedContinuousTensorSpec(1),
@@ -256,6 +274,8 @@ class Goto(IsaacEnv):
             pos + self.envs_positions[env_ids].unsqueeze(1), rot, env_ids
         )
         self.drone.set_velocities(self.init_vels[env_ids], env_ids)
+        
+        self.last_actions[env_ids] = 2.0 * torch.square(self.drone.throttle) - 1.0
 
         if self.has_payload:
             # TODO@btx0424: workout a better way 
@@ -293,6 +313,12 @@ class Goto(IsaacEnv):
             actions *= torch.randn(actions.shape, device=self.device) * 0.1 + 1
         
         self.effort = self.drone.apply_action(actions)
+        
+        # action difference
+        action_error = torch.norm(actions - self.last_actions, dim=-1)
+        self.stats['action_error_mean'].add_(action_error)
+        self.stats['action_error_max'].set_(torch.max(action_error, self.stats['action_error_max']))
+        self.last_actions = actions.clone()
         
     def _compute_state_and_obs(self):
         self.root_state = self.drone.get_state()

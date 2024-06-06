@@ -352,7 +352,7 @@ class Track(IsaacEnv):
 
         # action difference
         action_error = torch.norm(actions - self.last_actions, dim=-1)
-        self.action_error_list.append(torch.abs(actions - self.last_actions).to('cpu').numpy())
+        # self.action_error_list.append(torch.abs(actions - self.last_actions).to('cpu').numpy())
         self.stats['action_error_mean'].add_(action_error)
         self.stats['action_error_max'].set_(torch.max(action_error, self.stats['action_error_max']))
         self.last_actions = actions.clone()
