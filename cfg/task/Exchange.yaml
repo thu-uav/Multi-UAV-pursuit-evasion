@@ -6,7 +6,7 @@ defaults:
   - /base/sim_base@_here_
 
 env:
-  num_envs: 2048
+  num_envs: 4096
   max_episode_length: 500
 
 drone_model: crazyflie
@@ -15,7 +15,7 @@ num_drones: 2
 
 reward_action_smoothness_weight: 0.0
 reward_distance_scale: 10.0
-reward_time_scale: 1.0
+reward_time_scale: 0.0
 
 # observation options
 time_encoding: true

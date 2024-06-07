@@ -93,6 +93,16 @@ class Exchange(IsaacEnv):
             torch.tensor([0.2, 0.2, 0.5], device=self.device) * torch.pi
         )
 
+        # # eval
+        # self.init_pos_dist = D.Uniform(
+        #     torch.tensor([1.0, 1.0, 1.0], device=self.device),
+        #     torch.tensor([1.0, 1.0, 1.0], device=self.device)
+        # )
+        # self.init_rpy_dist = D.Uniform(
+        #     torch.tensor([0., 0., 0.], device=self.device) * torch.pi,
+        #     torch.tensor([0., 0., 0.], device=self.device) * torch.pi
+        # )
+
         self.alpha = 0.8
 
         self.last_linear_v = torch.zeros(self.num_envs, self.num_drones, device=self.device)
@@ -209,6 +219,7 @@ class Exchange(IsaacEnv):
             "reward_up": UnboundedContinuousTensorSpec(1),
             "reward_time": UnboundedContinuousTensorSpec(1),
             "reward_collision": UnboundedContinuousTensorSpec(1),
+            "reward_action_smoothness": UnboundedContinuousTensorSpec(1),
             "reach_time": UnboundedContinuousTensorSpec(1),
             "episode_len": UnboundedContinuousTensorSpec(1),
             "pos_error": UnboundedContinuousTensorSpec(1),
@@ -256,8 +267,8 @@ class Exchange(IsaacEnv):
         
         self.last_actions[env_ids] = 2.0 * torch.square(self.drone.throttle) - 1.0
 
-        self.target_vis0.set_world_poses(positions=pos0, env_indices=env_ids)
-        self.target_vis1.set_world_poses(positions=pos1, env_indices=env_ids)
+        self.target_vis0.set_world_poses(positions=pos0 + self.envs_positions[env_ids].unsqueeze(1), env_indices=env_ids)
+        self.target_vis1.set_world_poses(positions=pos1 + self.envs_positions[env_ids].unsqueeze(1), env_indices=env_ids)
 
         # set last values
         self.last_linear_v[env_ids] = torch.norm(self.init_vels[env_ids][..., :3], dim=-1)
@@ -374,6 +385,8 @@ class Exchange(IsaacEnv):
         
         reward_time = self.reward_time_scale * (-self.progress_buf / self.max_episode_length).unsqueeze(1) * (reward_pos_bonus <= 0)
         
+        reward_action_smoothness = self.reward_action_smoothness_weight * torch.exp(-self.drone.throttle_difference)
+        
         reward = (
             reward_pos
             + reward_pos_bonus
@@ -381,6 +394,7 @@ class Exchange(IsaacEnv):
             + reward_up
             + reward_time
             + reward_collision
+            + reward_action_smoothness
         )
 
         self.stats['reward_pos'].add_(reward_pos.mean(-1).unsqueeze(-1))
@@ -389,6 +403,7 @@ class Exchange(IsaacEnv):
         self.stats['reward_up'].add_(reward_up.mean(-1).unsqueeze(-1))
         self.stats['reward_time'].add_(reward_time.mean(-1).unsqueeze(-1))
         self.stats['reward_collision'].add_(reward_collision.mean(-1).unsqueeze(-1))
+        self.stats['reward_action_smoothness'].add_(reward_action_smoothness.mean(-1).unsqueeze(-1))
         reach_flag = (reward_pos_bonus > 0).float()
         current_reach = self.progress_buf.unsqueeze(1) * reach_flag + self.max_episode_length * (1.0 - reach_flag)
         self.stats['reach_time'].set_(torch.min(self.stats['reach_time'], torch.max(current_reach, dim=-1).values.unsqueeze(-1)))
@@ -445,6 +460,9 @@ class Exchange(IsaacEnv):
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
         self.stats['reward_collision'].div_(
+            torch.where(done, ep_len, torch.ones_like(ep_len))
+        )
+        self.stats['reward_action_smoothness'].div_(
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
         
