@@ -407,7 +407,7 @@ class PIDRateController(Transform):
             drone_state, 
             target_rate=target_rate * 180.0 * self.target_clip,
             target_thrust=target_thrust,
-            reset_pid=tensordict['done'][..., 0]
+            reset_pid=tensordict['done'].expand(-1, drone_state.shape[1]) # num_drones: drone_state.shape[1]
         )
         torch.nan_to_num_(cmds, 0.)
         tensordict.set(self.action_key, cmds)

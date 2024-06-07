@@ -490,15 +490,16 @@ class PIDRateController(nn.Module):
         root_state = root_state.reshape(-1, 13)
         target_rate = target_rate.reshape(-1, 3)
         target_thrust = target_thrust.reshape(-1, 1)
+        reset_pid = reset_pid.reshape(-1)
         device = root_state.device
         
         # pid reset
         if self.init_flag:
-            self.last_body_rate = torch.zeros(size=(batch_shape[0], 3)).to(device)
-            self.integ = torch.zeros(size=(batch_shape[0], 3)).to(device)
+            self.last_body_rate = torch.zeros(size=(*batch_shape, 3)).to(device).reshape(-1, 3)
+            self.integ = torch.zeros(size=(*batch_shape, 3)).to(device).reshape(-1, 3)
             self.init_flag = False
-        self.last_body_rate[reset_pid] = torch.zeros(size=(batch_shape[0], 3)).to(device)[reset_pid]
-        self.integ[reset_pid] = torch.zeros(size=(batch_shape[0], 3)).to(device)[reset_pid]
+        self.last_body_rate[reset_pid] = torch.zeros(size=(*batch_shape, 3)).to(device).reshape(-1, 3)[reset_pid]
+        self.integ[reset_pid] = torch.zeros(size=(*batch_shape, 3)).to(device).reshape(-1, 3).to(device)[reset_pid]
 
         pos, rot, linvel, angvel = root_state.split([3, 4, 3, 3], dim=1)
         body_rate = quat_rotate_inverse(rot, angvel) * 180.0 / torch.pi

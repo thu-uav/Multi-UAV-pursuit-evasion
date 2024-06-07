@@ -1,4 +1,4 @@
-name: Goto
+name: Exchange
 
 defaults:
   # see https://hydra.cc/docs/advanced/overriding_packages/
@@ -6,21 +6,21 @@ defaults:
   - /base/sim_base@_here_
 
 env:
-  num_envs: 4096
+  num_envs: 2048
   max_episode_length: 500
 
 drone_model: crazyflie
 force_sensor: false
+num_drones: 2
 
 reward_action_smoothness_weight: 0.0
 reward_distance_scale: 10.0
-reward_time_scale: 0.0
+reward_time_scale: 1.0
 
 # observation options
 time_encoding: true
 
 action_transform: PIDrate
-# action_transform: rate
 
 # sim2real options
 add_noise: false
