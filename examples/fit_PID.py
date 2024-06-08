@@ -21,10 +21,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 rosbags = [
-    # '/home/jiayu/OmniDrones/realdata/crazyflie/train_figure8.csv',
-    # '/home/jiayu/OmniDrones/realdata/crazyflie/cf1_figure8.csv',
-    '/home/jiayu/OmniDrones/realdata/crazyflie/cf7_figure8.csv',
-    # '/home/jiayu/OmniDrones/realdata/crazyflie/cf9_figure8.csv',
+    '/home/chenjy/OmniDrones/examples/real_data/rl_hover_1.csv',
 ]
 
 @hydra.main(version_base=None, config_path=".", config_name="real2sim")
@@ -48,7 +45,7 @@ def main(cfg):
     episode_length = min(1300, preprocess_df.shape[0])
     real_data = []
     # real_date: [episode_length, num_trajectory, dim]
-    T = 1
+    T = 20
     for i in range(0, episode_length-T):
         _slice = slice(i, i+T)
         real_data.append(preprocess_df[_slice])
@@ -70,15 +67,21 @@ def main(cfg):
         dtype='object')
     '''
 
-    # add real next_body_rate
-    next_body_rate = real_data[1:, :, 23:26]
-    # add real next motor_thrust
-    next_motor_thrust = real_data[1:, :, 33:37]
-    # add real next_vel
+    # add next_pos
+    next_pos = real_data[1:, :, 1:4]
+    # add next_quat
+    next_quat = real_data[1:, :, 5:9]
+    # add next_vel
     next_vel = real_data[1:, :, 10:13]
-    real_data = np.concatenate([real_data[:-1],next_body_rate], axis=-1)
-    real_data = np.concatenate([real_data, next_motor_thrust], axis=-1)
+    # add next_omega
+    next_omega = real_data[1:, :, 14:17]
+    real_data = np.concatenate([real_data[:-1], next_pos], axis=-1)
+    real_data = np.concatenate([real_data, next_quat], axis=-1)
     real_data = np.concatenate([real_data, next_vel], axis=-1)
+    real_data = np.concatenate([real_data, next_omega], axis=-1)
+    
+    # TODO
+    real_data = real_data[:100]
 
     # start sim
     OmegaConf.resolve(cfg)
@@ -101,17 +104,13 @@ def main(cfg):
         device=cfg.sim.device,
     )
     drone: MultirotorBase = MultirotorBase.REGISTRY[cfg.drone_model]()
-    n = real_data.shape[1] # parrallel envs, num_trajetories
+    n = real_data.shape[0] # parrallel envs
     translations = torch.zeros(n, 3)
     translations[:, 1] = torch.arange(n)
     translations[:, 2] = 0.5
     drone.spawn(translations=translations)
     scene_utils.design_scene()
     
-    # apply_action, if True, opt for rotor
-    # if False, opt for controller
-    use_real_action = True
-
     def evaluate(params, real_data):
         """
             evaluate in Omnidrones
@@ -147,7 +146,6 @@ def main(cfg):
         
         # shuffle index and split into batches
         shuffled_idx = torch.randperm(real_data.shape[0])
-        # shuffled_idx = np.arange(0,real_data.shape[0])
         shuffled_real_data = real_data[shuffled_idx]
         
         loss = torch.tensor(0.0, dtype=torch.float)
@@ -182,60 +180,36 @@ def main(cfg):
             'target_rate.time','target_rate.r', 'target_rate.p', 'target_rate.y', 
             'target_rate.thrust',[28:32] (degree)
             'motor.time', 'motor.m1', 'motor.m2', 'motor.m3', 'motor.m4'],[33:37]
-            'next_real_rate.r', 'next_real_rate.p', 'next_real_rate.y', (37:40)
-            'next_motor1', 'next_motor2', 'next_motor3', 'next_motor4', (40:44)
-            'next_vel.x', 'next_vel.y', 'next_vel.z', (44:47)]
+            'next_pos.x', 'next_pos.y', 'next_pos.z', [38:41]
+            'next_quat.w', 'next_quat.x','next_quat.y', 'next_quat.z', [41:45]
+            'next_vel.x', 'next_vel.y', 'next_vel.z', [45:48]
+            'next_omega.r', 'next_omega.p', 'next_omega.y', [48:51]
             dtype='object')
-        '''        
-        sim_action_list = []
-        real_action_list = []
+        '''
+        sim_pos_list = []
+        real_pos_list = []
         
-        sim_body_rate_list = []
-        real_body_rate_list = []
+        sim_quat_list = []
+        real_quat_list = []
 
         sim_vel_list = []
         real_vel_list = []
-        
-        for i in range(shuffled_real_data.shape[0]):
-            pos = torch.tensor(shuffled_real_data[i, :, 1:4])
-            quat = torch.tensor(shuffled_real_data[i, :, 5:9])
-            vel = torch.tensor(shuffled_real_data[i, :, 10:13])
-            real_rate = torch.tensor(shuffled_real_data[i, :, 23:26])
-            next_real_rate = torch.tensor(shuffled_real_data[i, :, 37:40])
-            next_real_motor_thrust = torch.tensor(shuffled_real_data[i, :, 40:44])
-            next_vel = torch.tensor(shuffled_real_data[i, :, 44:47])
-            # real_rate[:, 1] = -real_rate[:, 1]
-            # next_real_rate[:, 1] = -next_real_rate[:, 1]
-            # get angvel
-            ang_vel = quat_rotate(quat, real_rate)
-            # if i == 0 :
-            set_drone_state(pos, quat, vel, ang_vel)
 
-            drone_state = drone.get_state()[..., :13].reshape(-1, 13)
-            # get current_rate
-            current_pos, current_rot, current_linvel, current_angvel = drone_state.split([3, 4, 3, 3], dim=1)
-            target_thrust = torch.tensor(shuffled_real_data[i, :, 31]).to(device=sim.device).float()
-            target_rate = torch.tensor(shuffled_real_data[i, :, 28:31]).to(device=sim.device).float()
-            real_rate = real_rate.to(device=sim.device).float()
-            curret_body_rate = quat_rotate_inverse(current_rot, current_angvel)
+        sim_ang_vel_list = []
+        real_ang_vel_list = []
+        
+        for i in range(shuffled_real_data.shape[1]):
+            real_pos = torch.tensor(shuffled_real_data[:, i, 1:4])
+            real_quat = torch.tensor(shuffled_real_data[:, i, 5:9])
+            real_vel = torch.tensor(shuffled_real_data[:, i, 10:13])
+            real_rate = torch.tensor(shuffled_real_data[:, i, 23:26])
+            real_ang_vel = quat_rotate(real_quat, real_rate)
+            set_drone_state(real_pos, real_quat, real_vel, real_ang_vel)
+            real_motor_thrust = torch.tensor(real_data[i, :, 33:37])
             
-            # target_rate[:, 1] = -target_rate[:, 1]
-            action, cmd = controller.debug_step(
-                real_body_rate=curret_body_rate,
-                target_rate=target_rate,
-                target_thrust=target_thrust.unsqueeze(1)
-            )
-            sim_cmd_r, sim_cmd_p, sim_cmd_y, sim_cmd_thrust = cmd
-            
-            sim_action_list.append(action.detach().to('cpu').numpy())
-            
-            real_action = next_real_motor_thrust.to(sim.device) / (2**16) * 2 - 1
-            real_action_list.append(real_action.detach().to('cpu').numpy())
-            
-            if use_real_action:
-                drone.apply_action(real_action)
-            else:
-                drone.apply_action(action)
+            real_action = real_motor_thrust.to(sim.device) / (2**16) * 2 - 1    
+            drone.apply_action(real_action)
+
             sim.step(render=True)
             
             if sim.is_stopped():
@@ -243,21 +217,32 @@ def main(cfg):
             if not sim.is_playing():
                 sim.render()
                 continue
-            
-            # get simulated drone state
-            sim_state = drone.get_state().squeeze(0).cpu()
-            sim_pos = sim_state[..., :3]
-            sim_quat = sim_state[..., 3:7]
-            sim_vel = sim_state[..., 7:10]
-            sim_omega = sim_state[..., 10:13]
-            next_body_rate = quat_rotate_inverse(sim_quat, sim_omega)
 
-            sim_body_rate_list.append(next_body_rate.cpu().detach().numpy())
-            real_body_rate_list.append(next_real_rate.cpu().detach().numpy())
+            # get simulated drone state
+            next_sim_state = drone.get_state().squeeze(0).cpu()
+            next_sim_pos = next_sim_state[..., :3]
+            next_sim_quat = next_sim_state[..., 3:7]
+            next_sim_vel = next_sim_state[..., 7:10]
+            next_sim_ang_vel = next_sim_state[..., 10:13]
+
+            # next real states, ground truth
+            next_real_pos = torch.tensor(shuffled_real_data[:, i, 38:41])
+            next_real_quat = torch.tensor(shuffled_real_data[:, i, 41:45])
+            next_real_vel = torch.tensor(shuffled_real_data[:, i, 45:48])
+            next_real_rate = torch.tensor(shuffled_real_data[:, i, 48:51])
+            next_real_ang_vel = quat_rotate(next_real_quat, next_real_rate)
+
+            sim_pos_list.append(next_sim_pos.cpu().detach().numpy())
+            sim_quat_list.append(next_sim_quat.cpu().detach().numpy())
+            sim_vel_list.append(next_sim_vel.cpu().detach().numpy())
+            sim_ang_vel_list.append(next_sim_ang_vel.cpu().detach().numpy())
             
-            sim_vel_list.append(sim_vel.cpu().detach().numpy())
-            real_vel_list.append(next_vel.cpu().detach().numpy())
+            real_pos_list.append(next_real_pos.cpu().detach().numpy())
+            real_quat_list.append(next_real_quat.cpu().detach().numpy())
+            real_vel_list.append(next_real_vel.cpu().detach().numpy())
+            real_ang_vel_list.append(next_real_ang_vel.cpu().detach().numpy())
         
+        breakpoint()
         sim_action_list = np.array(sim_action_list).reshape(-1, 4)
         real_action_list = np.array(real_action_list).reshape(-1, 4)
         
