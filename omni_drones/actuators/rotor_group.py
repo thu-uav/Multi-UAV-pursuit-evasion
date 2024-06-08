@@ -58,7 +58,7 @@ class RotorGroup(nn.Module):
         tau = torch.where(target_throttle > self.throttle, self.tau_up, self.tau_down)
         tau = torch.clamp(tau, 0, 1)
         # jiayu: replace tau by dt / time_constant
-        # tau = 1.0 - torch.exp(- self.dt / tau)
+        tau = self.dt / tau
         # throttle(t + dt) = throttle(t) * (1 - tau) + target_throttle * tau
         self.throttle.add_(tau * (target_throttle - self.throttle))
 

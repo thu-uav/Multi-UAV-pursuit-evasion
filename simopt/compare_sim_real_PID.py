@@ -22,28 +22,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 rosbags = [
-    '/home/jiayu/OmniDrones/examples/real_data/rl_hover_2.csv',
-    # '/home/jiayu/OmniDrones/examples/real_data/rl_hover_1.csv',
-    # '/home/jingjie/Downloads/OmniDrones-sim2real_final/realdata/crazyflie/cf9_figure8.csv',
-    # '/home/jiayu/OmniDrones/realdata/crazyflie/cf9_figure8.csv',
+    '/home/jiayu/OmniDrones/simopt/real_data/rl_hover_1.csv',
 ]
-
-def quat_diff(quat_last, quat, dt):
-    omega_x = 0
-    omega_y = 0
-    omega_z = 0        
-    if quat_last is not None:
-        quat_err = quat_last.inverse() * quat
-        if quat_err.w >= 0:
-            scale = 2.0
-        else:
-            scale = -2.0
-        omega_x = scale * quat_err.x / dt
-        omega_y = scale * quat_err.y / dt
-        omega_z = scale * quat_err.z / dt
-    quat_last = quat
-
-    return omega_x, omega_y, omega_z
 
 @hydra.main(version_base=None, config_path=".", config_name="real2sim")
 def main(cfg):
@@ -113,25 +93,38 @@ def main(cfg):
         drone: crazyflie
         controller: the predefined controller
     """
-    # # origin
-    # params = [
-    #     0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
-    #     2.88e-8, 2315, 7.24e-10, 0.2, 0.43,
-    #     # controller
-    #     250.0, 250.0, 120.0, # kp
-    #     2.5, 2.5, 2.5, # kd
-    #     500.0, 500.0, 16.7, # ki
-    #     33.3, 33.3, 166.7 # ilimit
-    # ]
+    # origin
     params = [
         0.0321, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
-        2.350347298350041e-08, 2315, 7.24e-10, 0.2, 0.43,
+        2.350347298350041e-08, 2315, 7.24e-10, 0.2, 0.023255813953488372,
         # controller
         250.0, 250.0, 120.0, # kp
         2.5, 2.5, 2.5, # kd
         500.0, 500.0, 16.7, # ki
         33.3, 33.3, 166.7 # ilimit
     ]
+
+    # # pos loss opt
+    # params = [
+    #     0.0321, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
+    #     2.451963792045758e-08, 2315, 7.24e-10, 0.2, 0.011720322555695637,
+    #     # controller
+    #     250.0, 250.0, 120.0, # kp
+    #     2.5, 2.5, 2.5, # kd
+    #     500.0, 500.0, 16.7, # ki
+    #     33.3, 33.3, 166.7 # ilimit
+    # ]
+
+    # # pos + quat loss opt
+    # params = [
+    #     0.0321, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
+    #     3.672417653671939e-08, 2315, 7.24e-10, 0.2, 0.13145898446113796,
+    #     # controller
+    #     250.0, 250.0, 120.0, # kp
+    #     2.5, 2.5, 2.5, # kd
+    #     500.0, 500.0, 16.7, # ki
+    #     33.3, 33.3, 166.7 # ilimit
+    # ]
     
     tunable_parameters = {
         'mass': params[0],
@@ -217,7 +210,7 @@ def main(cfg):
     real_cmd_y_list = []
     real_cmd_thrust_list = []
 
-    use_real_action = False # sim和real_action的主要差别是有没有电池补偿
+    use_real_action = True # sim和real_action的主要差别是有没有电池补偿
     trajectory_len = real_data.shape[0] - 1
     
     for i in range(trajectory_len):
@@ -484,7 +477,7 @@ def main(cfg):
     axs[4, 2].set_title('sim/real_bodyratez')
     axs[4, 2].legend()
     bodyrate_error = np.square(sim_body_rate_list - real_body_rate_list)
-    print('sim_real/Bodyrate_error', np.mean(bodyrate_error))
+    # print('sim_real/Bodyrate_error', np.mean(bodyrate_error))
     # print('#'*55)
     
     # sim & target
@@ -510,7 +503,7 @@ def main(cfg):
     axs[5, 2].legend()
     target_body_rate_list[:, 0, 1] = -target_body_rate_list[:, 0, 1]
     target_bodyrate_error = np.square(sim_body_rate_list - target_body_rate_list)
-    print('sim_target/Bodyrate_error', np.mean(target_bodyrate_error))
+    # print('sim_target/Bodyrate_error', np.mean(target_bodyrate_error))
 
     # real & target
     axs[6, 0].scatter(steps[:], real_body_rate_list[:, 0, 0], s=5, c='red', label='real')
@@ -534,7 +527,7 @@ def main(cfg):
     axs[6, 2].set_title('real/target_bodyratez')
     axs[6, 2].legend()
     real_target_bodyrate_error = np.square(real_body_rate_list - target_body_rate_list)
-    print('real_target/Bodyrate_error', np.mean(real_target_bodyrate_error))
+    # print('real_target/Bodyrate_error', np.mean(real_target_bodyrate_error))
     # print('#'*55)
 
     plt.tight_layout()
@@ -574,7 +567,7 @@ def main(cfg):
     axs2[3, 0].legend()
    
     motor_thrust_error = np.square((sim_motor - real_motor))
-    print('sim_real/motor_error', np.mean(motor_thrust_error))
+    # print('sim_real/motor_error', np.mean(motor_thrust_error))
 
     # compute motor thrust error
     axs2[0, 1].scatter(steps[:], real_motor_compute[:, 0, 0], s=5, c='red', label='compute_real')
@@ -606,7 +599,7 @@ def main(cfg):
     axs2[3, 1].legend()
     
     motor_thrust_error = np.square((real_motor - real_motor_compute.transpose(0, 2, 1)))
-    print('real_compute_real/motor_error', np.mean(motor_thrust_error))
+    # print('real_compute_real/motor_error', np.mean(motor_thrust_error))
 
     # cmd error
     axs2[0, 2].scatter(steps[:], sim_cmd_r_list[:, 0], s=5, c='red', label='sim')
@@ -638,13 +631,13 @@ def main(cfg):
     axs2[3, 2].legend()
     
     cmd_r_error = np.square((sim_cmd_r_list - real_cmd_r_list) / 2**15)
-    print('sim_real/cmd_r_error', np.mean(cmd_r_error))
+    # print('sim_real/cmd_r_error', np.mean(cmd_r_error))
     cmd_p_error = np.square((sim_cmd_p_list - real_cmd_p_list) / 2**15)
-    print('sim_real/cmd_p_error', np.mean(cmd_p_error))
+    # print('sim_real/cmd_p_error', np.mean(cmd_p_error))
     cmd_y_error = np.square((sim_cmd_y_list - real_cmd_y_list) / 2**15)
-    print('sim_real/cmd_y_error', np.mean(cmd_y_error))
+    # print('sim_real/cmd_y_error', np.mean(cmd_y_error))
     cmd_thrust_error = np.square((sim_cmd_thrust_list[:, 0, 0] - real_cmd_r_list[:, 0]) / 2**16)
-    print('sim_real/cmd_thrust_error', np.mean(cmd_thrust_error))
+    # print('sim_real/cmd_thrust_error', np.mean(cmd_thrust_error))
 
     plt.tight_layout()
     plt.savefig('comparison_controller.png')

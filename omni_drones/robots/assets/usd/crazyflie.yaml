@@ -27,6 +27,8 @@ rotor_configuration:
   - 1.0
   force_constants:
   # 1/4mg = (mean_hover_pwm / 2**16) * omega_max^2 * force_constants
+  # force_constants = 1/4mg * kf / omega_max^2
+  # kf = 2**16 / mean_hover_pwm = 1.6
   - 2.350347298350041e-08
   - 2.350347298350041e-08
   - 2.350347298350041e-08
@@ -47,7 +49,8 @@ rotor_configuration:
   - 2.35619449
   - 3.92699082
   - 5.49778714
-  time_constant: 0.43 # 0.43
+  # time_constant: 0.43 # 0.43, tau = time_constant
+  time_constant: 0.023255813953488372 # 0.43, tau = dt / time_constant
 controller_configuration: # invalid
   gain:
   - 0.0052
