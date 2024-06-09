@@ -267,7 +267,7 @@ def main(cfg):
             real_quat_list.append(next_real_quat.cpu().detach().numpy())
             real_vel_list.append(next_real_vel.cpu().detach().numpy())
             real_ang_vel_list.append(next_real_ang_vel.cpu().detach().numpy())
-        
+                
         sim_pos_list = np.array(sim_pos_list)
         sim_quat_list = np.array(sim_quat_list)
         sim_vel_list = np.array(sim_vel_list)
@@ -278,32 +278,55 @@ def main(cfg):
         real_vel_list = np.array(real_vel_list)
         real_ang_vel_list = np.array(real_ang_vel_list)
         
-        pos_error = np.mean(np.linalg.norm(sim_pos_list - real_pos_list, axis=-1, ord=2), axis=-1)
-        vel_error = np.mean(np.linalg.norm(sim_vel_list - real_vel_list, axis=-1, ord=2), axis=-1)
-        quat_error = np.mean(np.linalg.norm(sim_quat_list - real_quat_list, axis=-1, ord=2), axis=-1)
-        ang_vel_error = np.mean(np.linalg.norm(sim_ang_vel_list - real_ang_vel_list, axis=-1, ord=2), axis=-1)
+        # normalization
+        min_pos_list = np.min(np.min(sim_pos_list, axis=0), axis=0)[np.newaxis, np.newaxis, :]
+        max_pos_list = np.max(np.max(sim_pos_list, axis=0), axis=0)[np.newaxis, np.newaxis, :]
+        sim_pos_list = (sim_pos_list - min_pos_list) / (max_pos_list - min_pos_list)
+        real_pos_list = (real_pos_list - min_pos_list) / (max_pos_list - min_pos_list)
+        min_vel_list = np.min(np.min(sim_vel_list, axis=0), axis=0)[np.newaxis, np.newaxis, :]
+        max_vel_list = np.max(np.max(sim_vel_list, axis=0), axis=0)[np.newaxis, np.newaxis, :]
+        sim_vel_list = (sim_vel_list - min_vel_list) / (max_vel_list - min_vel_list)
+        real_vel_list = (real_vel_list - min_vel_list) / (max_vel_list - min_vel_list)
+        min_quat_list = np.min(np.min(sim_quat_list, axis=0), axis=0)[np.newaxis, np.newaxis, :]
+        max_quat_list = np.max(np.max(sim_quat_list, axis=0), axis=0)[np.newaxis, np.newaxis, :]
+        sim_quat_list = (sim_quat_list - min_quat_list) / (max_quat_list - min_quat_list)
+        real_quat_list = (real_quat_list - min_quat_list) / (max_quat_list - min_quat_list)
+        min_ang_vel_list = np.min(np.min(sim_ang_vel_list, axis=0), axis=0)[np.newaxis, np.newaxis, :]
+        max_ang_vel_list = np.max(np.max(sim_ang_vel_list, axis=0), axis=0)[np.newaxis, np.newaxis, :]
+        sim_ang_vel_list = (sim_ang_vel_list - min_ang_vel_list) / (max_ang_vel_list - min_ang_vel_list)
+        real_ang_vel_list = (real_ang_vel_list - min_ang_vel_list) / (max_ang_vel_list - min_ang_vel_list)
+        
+        # concat
+        sim_states = np.concatenate([sim_pos_list, sim_vel_list, sim_quat_list, sim_ang_vel_list], axis=-1)
+        real_states = np.concatenate([real_pos_list, real_vel_list, real_quat_list, real_ang_vel_list], axis=-1)
+        error = np.mean(np.linalg.norm(sim_states - real_states, axis=-1, ord=2), axis=-1)
+        
+        # pos_error = np.mean(np.linalg.norm(sim_pos_list - real_pos_list, axis=-1, ord=2), axis=-1)
+        # vel_error = np.mean(np.linalg.norm(sim_vel_list - real_vel_list, axis=-1, ord=2), axis=-1)
+        # quat_error = np.mean(np.linalg.norm(sim_quat_list - real_quat_list, axis=-1, ord=2), axis=-1)
+        # ang_vel_error = np.mean(np.linalg.norm(sim_ang_vel_list - real_ang_vel_list, axis=-1, ord=2), axis=-1)
         
         loss = torch.tensor(0.0, dtype=torch.float)
-        pos_loss = torch.tensor(0.0, dtype=torch.float)
-        vel_loss = torch.tensor(0.0, dtype=torch.float)
-        quat_loss = torch.tensor(0.0, dtype=torch.float)
-        ang_vel_loss = torch.tensor(0.0, dtype=torch.float)
-        alpha = 1.0
-        beta = 1.0
+        # pos_loss = torch.tensor(0.0, dtype=torch.float)
+        # vel_loss = torch.tensor(0.0, dtype=torch.float)
+        # quat_loss = torch.tensor(0.0, dtype=torch.float)
+        # ang_vel_loss = torch.tensor(0.0, dtype=torch.float)
+        # alpha = 1.0
+        # beta = 1.0
         gamma = 0.95 # discounted factor
         for i in range(shuffled_real_data.shape[1]):
+            loss += error[i] * gamma**i
             # pos_loss += pos_error[i] * gamma**i
-            vel_loss += alpha * vel_error[i] * gamma**i
+            # vel_loss += alpha * vel_error[i] * gamma**i
             # quat_loss += quat_error[i] * gamma**i
-            ang_vel_loss += beta * ang_vel_error[i] * gamma**i
-        loss = pos_loss + vel_loss + quat_loss + ang_vel_loss
+            # ang_vel_loss += beta * ang_vel_error[i] * gamma**i
         return loss 
 
     # PID
     params = [
         0.0321, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
         2.350347298350041e-08, 2315, 7.24e-10, 0.2,
-        0.43,
+        0.023255813953488372, # Tm
         # controller
         250.0, 250.0, 120.0, # kp
         2.5, 2.5, 2.5, # kd
@@ -331,7 +354,7 @@ def main(cfg):
     params_mask = np.array([0] * len(params))
 
     # update rotor params
-    params_mask[5] = 1
+    # params_mask[5] = 1
     # params_mask[7] = 1
     params_mask[9] = 1
 
@@ -339,8 +362,8 @@ def main(cfg):
     count = 0
     for param, mask in zip(params, params_mask):
         if mask == 1:
-            if count == 5: # force_constant -> kf:[1.5, 2.5]
-                params_range.append((2.2034505922031636e-08, 3.672417653671939e-08))
+            if count == 5: # force_constant -> kf:[1.5, 2.0]
+                params_range.append((2.2034505922031636e-08, 2.9379341229375514e-08))
             elif count == 9: # Tm: [0.01, 0.5], v(t+\delta_t) = v(t) * (1 - \delta_t / Tm) + throttle_des * (\delta_t / Tm)
                 params_range.append((0.01, 0.5))
         count += 1

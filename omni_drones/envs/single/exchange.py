@@ -84,9 +84,13 @@ class Exchange(IsaacEnv):
         self.init_poses = self.drone.get_world_poses(clone=True)
         self.init_vels = torch.zeros_like(self.drone.get_velocities())
 
-        self.init_pos_dist = D.Uniform(
+        self.init_pos_dist0 = D.Uniform(
             torch.tensor([0.2, 0.2, 0.05], device=self.device),
             torch.tensor([1., 1., 2.0], device=self.device)
+        )
+        self.init_pos_dist1 = D.Uniform(
+            torch.tensor([-1.0, -1.0, 0.05], device=self.device),
+            torch.tensor([-0.2, -0.2, 2.0], device=self.device)
         )
         self.init_rpy_dist = D.Uniform(
             torch.tensor([-0.2, -0.2, 0.0], device=self.device) * torch.pi,
@@ -95,8 +99,8 @@ class Exchange(IsaacEnv):
 
         # # eval
         # self.init_pos_dist = D.Uniform(
-        #     torch.tensor([1.0, 1.0, 1.0], device=self.device),
-        #     torch.tensor([1.0, 1.0, 1.0], device=self.device)
+        #     torch.tensor([0.8, 0.8, 1.0], device=self.device),
+        #     torch.tensor([0.8, 0.8, 1.0], device=self.device)
         # )
         # self.init_rpy_dist = D.Uniform(
         #     torch.tensor([0., 0., 0.], device=self.device) * torch.pi,
@@ -252,9 +256,8 @@ class Exchange(IsaacEnv):
     def _reset_idx(self, env_ids: torch.Tensor):
         self.drone._reset_idx(env_ids, self.training)
         
-        pos0 = self.init_pos_dist.sample((*env_ids.shape, 1))
-        pos1 = pos0.clone()
-        pos1[..., 0:2] = - pos1[..., 0:2]
+        pos0 = self.init_pos_dist0.sample((*env_ids.shape, 1))
+        pos1 = self.init_pos_dist1.sample((*env_ids.shape, 1))
         pos = torch.concat([pos0, pos1], dim=1)
         rpy = self.init_rpy_dist.sample((*env_ids.shape, 2))
         rot = euler_to_quaternion(rpy)

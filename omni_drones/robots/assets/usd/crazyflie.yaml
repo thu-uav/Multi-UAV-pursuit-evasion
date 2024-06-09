@@ -28,8 +28,8 @@ rotor_configuration:
   force_constants:
   # 1/4mg = (mean_hover_pwm / 2**16) * omega_max^2 * force_constants
   # force_constants = 1/4mg * kf / omega_max^2
-  # kf = 2**16 / mean_hover_pwm = 1.6
-  - 2.350347298350041e-08
+  # kf = force_constants * omega_max^2 / 1/4mg
+  - 2.350347298350041e-08 # kf = 2**16 / mean_hover_pwm = 1.6
   - 2.350347298350041e-08
   - 2.350347298350041e-08
   - 2.350347298350041e-08
