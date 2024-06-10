@@ -406,7 +406,7 @@ class PIDRateController(Transform):
         prev_action = tensordict[("info", "prev_action")]
         
         # action smoothness
-        if self.use_action_smooth:
+        if not(self.epsilon is None) and self.use_action_smooth:
             action = prev_action + torch.clamp(action - prev_action, min = - self.epsilon, max = + self.epsilon)
         # action = torch.clamp()
         
