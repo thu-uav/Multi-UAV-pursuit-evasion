@@ -16,7 +16,7 @@ from omni_drones.utils.torch import euler_to_quaternion, quat_axis, quat_rotate_
 from tensordict.tensordict import TensorDict, TensorDictBase
 from torchrl.data import UnboundedContinuousTensorSpec, CompositeSpec
 import collections
-
+import cvxpy as cp
 
 class Exchange(IsaacEnv):
     r"""
@@ -62,6 +62,8 @@ class Exchange(IsaacEnv):
         self.reward_distance_scale = cfg.task.reward_distance_scale
         self.reward_time_scale = cfg.task.reward_time_scale
         self.time_encoding = cfg.task.time_encoding
+        self.action_delta = cfg.task.action_delta
+        self.use_cbf = cfg.task.use_cbf
         
         self.randomization = cfg.task.get("randomization", {})
 
@@ -98,13 +100,17 @@ class Exchange(IsaacEnv):
         )
 
         # # eval
-        # self.init_pos_dist = D.Uniform(
+        # self.init_pos_dist0 = D.Uniform(
         #     torch.tensor([0.8, 0.8, 1.0], device=self.device),
         #     torch.tensor([0.8, 0.8, 1.0], device=self.device)
         # )
+        # self.init_pos_dist1 = D.Uniform(
+        #     torch.tensor([-0.8, -0.8, 1.0], device=self.device),
+        #     torch.tensor([-0.8, -0.8, 1.0], device=self.device)
+        # )
         # self.init_rpy_dist = D.Uniform(
-        #     torch.tensor([0., 0., 0.], device=self.device) * torch.pi,
-        #     torch.tensor([0., 0., 0.], device=self.device) * torch.pi
+        #     torch.tensor([0., 0., 0.0], device=self.device) * torch.pi,
+        #     torch.tensor([0., 0., 0.0], device=self.device) * torch.pi
         # )
 
         self.alpha = 0.8
@@ -190,7 +196,6 @@ class Exchange(IsaacEnv):
 
         self.observation_spec = CompositeSpec({
             "agents": CompositeSpec({
-                #"observation": UnboundedContinuousTensorSpec((1, observation_dim-6), device=self.device),   remove throttle
                 "observation": UnboundedContinuousTensorSpec((self.drone.n, observation_dim), device=self.device),
                 "intrinsics": self.drone.intrinsics_spec.unsqueeze(0).to(self.device)
             })
@@ -227,6 +232,8 @@ class Exchange(IsaacEnv):
             "reach_time": UnboundedContinuousTensorSpec(1),
             "episode_len": UnboundedContinuousTensorSpec(1),
             "pos_error": UnboundedContinuousTensorSpec(1),
+            "raw_action_error_mean": UnboundedContinuousTensorSpec(1),
+            "raw_action_error_max": UnboundedContinuousTensorSpec(1),
             "action_error_mean": UnboundedContinuousTensorSpec(1),
             "action_error_max": UnboundedContinuousTensorSpec(1),
             "action_smoothness_mean": UnboundedContinuousTensorSpec(1),
@@ -283,9 +290,14 @@ class Exchange(IsaacEnv):
 
         self.stats[env_ids] = 0.
         self.stats['reach_time'][env_ids] = self.max_episode_length
+        # reset prev_action
+        self.info['prev_action'][env_ids, ...] = 0.0
         
     def _pre_sim_step(self, tensordict: TensorDictBase):
         actions = tensordict[("agents", "action")]
+        self.info["prev_action"] = tensordict[("info", "prev_action")]
+        self.stats["raw_action_error_mean"].add_(tensordict[("stats", "raw_action_error")].mean(dim=-1).unsqueeze(-1))
+        self.stats["raw_action_error_max"].set_(torch.max(self.stats["raw_action_error_max"], tensordict[("stats", "raw_action_error")].mean(dim=-1).unsqueeze(-1)))
         if self.cfg.task.action_noise:
             actions *= torch.randn(actions.shape, device=self.device) * 0.1 + 1
         
@@ -296,7 +308,31 @@ class Exchange(IsaacEnv):
         self.stats['action_error_mean'].add_(action_error.mean(-1).unsqueeze(-1))
         self.stats['action_error_max'].set_(torch.max(action_error.mean(-1).unsqueeze(-1), self.stats['action_error_max']))
         self.last_actions = actions.clone()
-        
+
+    # cbf
+    def solve_qp_batch(actions, prev_actions, delta):
+        batch_size, action_size = actions.shape
+
+        # define variable
+        a = cp.Variable((batch_size, action_size))
+
+        # define the objective
+        objective = cp.Minimize(cp.sum_squares(a - actions))
+
+        # define constraints
+        constraints = [cp.norm(a - prev_actions, 2, axis=1) <= delta]
+
+        # problem
+        prob = cp.Problem(objective, constraints)
+
+        # solve
+        prob.solve()
+
+        # get corrected_actions
+        corrected_actions = a.value
+
+        return corrected_actions
+   
     def _compute_state_and_obs(self):
         self.root_state = self.drone.get_state()
         self.info["drone_state"][:] = self.root_state[..., :13]
@@ -423,6 +459,9 @@ class Exchange(IsaacEnv):
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
         self.stats['action_error_mean'].div_(
+            torch.where(done, ep_len, torch.ones_like(ep_len))
+        )
+        self.stats['raw_action_error_mean'].div_(
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
         self.stats["linear_v_mean"].div_(

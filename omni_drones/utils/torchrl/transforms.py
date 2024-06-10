@@ -387,6 +387,9 @@ class PIDRateController(Transform):
         self.target_clip = self.controller.target_clip
         self.max_thrust_ratio = self.controller.max_thrust_ratio
         self.fixed_yaw = self.controller.fixed_yaw
+        # for action smooth
+        self.use_action_smooth = self.controller.use_action_smooth
+        self.epsilon = self.controller.epsilon
         # self.tanh = TanhTransform()
     
     def transform_input_spec(self, input_spec: TensorSpec) -> TensorSpec:
@@ -398,6 +401,20 @@ class PIDRateController(Transform):
     def _inv_call(self, tensordict: TensorDictBase) -> TensorDictBase:
         drone_state = tensordict[("info", "drone_state")][..., :13]
         action = tensordict[self.action_key]
+
+        # raw action error
+        prev_action = tensordict[("info", "prev_action")]
+        
+        # action smoothness
+        if self.use_action_smooth:
+            action = prev_action + torch.clamp(action - prev_action, min = - self.epsilon, max = + self.epsilon)
+        # action = torch.clamp()
+        
+        action_error = torch.norm(action - prev_action, dim = -1)
+        # set
+        tensordict.set(("stats", "raw_action_error"), action_error)
+        tensordict.set(("info", "prev_action"), action)
+
         action = torch.tanh(action)
         target_rate, target_thrust = action.split([3, 1], -1)
         target_thrust = torch.clamp((target_thrust + 1) / 2, min = 0.0, max = self.max_thrust_ratio) * 2**16

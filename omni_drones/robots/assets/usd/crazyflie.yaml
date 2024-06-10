@@ -4,6 +4,8 @@ name: crazyflie
 target_clip: 1.0
 max_thrust_ratio: 0.9
 fixed_yaw: 0
+use_action_smooth: 1
+epsilon: 0.0025 # action smooth
 inertia:
   xx: 1.4e-5
   xy: 0.0
