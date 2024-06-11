@@ -60,6 +60,7 @@ class Exchange(IsaacEnv):
         # self.reward_effort_weight = cfg.task.reward_effort_weight
         self.reward_action_smoothness_weight = cfg.task.reward_action_smoothness_weight
         self.reward_distance_scale = cfg.task.reward_distance_scale
+        self.reward_bonus_scale = cfg.task.reward_bonus_scale
         self.reward_time_scale = cfg.task.reward_time_scale
         # self.action_error_threshold = cfg.task.action_error_threshold
         self.time_encoding = cfg.task.time_encoding
@@ -290,7 +291,7 @@ class Exchange(IsaacEnv):
         self.stats[env_ids] = 0.
         self.stats['reach_time'][env_ids] = self.max_episode_length
         # reset prev_action
-        self.info['prev_action'][env_ids, ...] = 0.0
+        self.info['prev_action'][env_ids, ...] = 2.0 * torch.square(self.drone.throttle) - 1.0
         
     def _pre_sim_step(self, tensordict: TensorDictBase):
         actions = tensordict[("agents", "action")]
@@ -391,7 +392,7 @@ class Exchange(IsaacEnv):
         distance = torch.norm(torch.cat([self.rpos], dim=-1), dim=-1)
 
         reward_pos = - pos_error * self.reward_distance_scale
-        reward_pos_bonus = ((pos_error <= 0.02) * 10).float()
+        reward_pos_bonus = ((pos_error <= 0.05) * self.reward_bonus_scale).float()
         
         reward_up = torch.square((self.drone.up[..., 2] + 1) / 2)
 

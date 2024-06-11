@@ -27,11 +27,11 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: Exchange_cbf
+  run_name: Exchange_softsmooth_scale5_bonus30_resethover
   # run_name: debug
   job_type: train
   entity: chenjy
-  project: Goto
+  project: Exchange
   # mode: disabled
   mode: online # set to 'disabled' when debugging locally, online
   run_id: 
