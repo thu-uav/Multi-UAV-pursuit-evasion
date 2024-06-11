@@ -101,12 +101,12 @@ class Exchange(IsaacEnv):
 
         # # eval
         # self.init_pos_dist0 = D.Uniform(
-        #     torch.tensor([0.8, 0.8, 1.0], device=self.device),
-        #     torch.tensor([0.8, 0.8, 1.0], device=self.device)
+        #     torch.tensor([1.0, 1.0, 1.0], device=self.device),
+        #     torch.tensor([1.0, 1.0, 1.0], device=self.device)
         # )
         # self.init_pos_dist1 = D.Uniform(
-        #     torch.tensor([-0.8, -0.8, 1.0], device=self.device),
-        #     torch.tensor([-0.8, -0.8, 1.0], device=self.device)
+        #     torch.tensor([-1.0, -1.0, 1.0], device=self.device),
+        #     torch.tensor([-1.0, -1.0, 1.0], device=self.device)
         # )
         # self.init_rpy_dist = D.Uniform(
         #     torch.tensor([0., 0., 0.0], device=self.device) * torch.pi,
@@ -290,8 +290,7 @@ class Exchange(IsaacEnv):
 
         self.stats[env_ids] = 0.
         self.stats['reach_time'][env_ids] = self.max_episode_length
-        # reset prev_action
-        self.info['prev_action'][env_ids, ...] = 2.0 * torch.square(self.drone.throttle) - 1.0
+        self.info['prev_action'][env_ids] = 2.0 * torch.square(self.drone.throttle)[env_ids] - 1.0
         
     def _pre_sim_step(self, tensordict: TensorDictBase):
         actions = tensordict[("agents", "action")]

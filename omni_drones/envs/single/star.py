@@ -205,12 +205,13 @@ class Star(IsaacEnv):
             "episode_len": UnboundedContinuousTensorSpec(1),
             "tracking_error": UnboundedContinuousTensorSpec(1),
             "tracking_error_ema": UnboundedContinuousTensorSpec(1),
-            # "action_smoothness": UnboundedContinuousTensorSpec(1),
+            "raw_action_error_mean": UnboundedContinuousTensorSpec(1),
+            "raw_action_error_max": UnboundedContinuousTensorSpec(1),
             "action_smoothness_mean": UnboundedContinuousTensorSpec(1),
             "action_smoothness_max": UnboundedContinuousTensorSpec(1),
             "drone_state": UnboundedContinuousTensorSpec(13),
             "reward_pos": UnboundedContinuousTensorSpec(1),
-            "reward_smooth": UnboundedContinuousTensorSpec(1),
+            "reward_action_smoothness": UnboundedContinuousTensorSpec(1),
             "reward_up": UnboundedContinuousTensorSpec(1),
             "reward_spin": UnboundedContinuousTensorSpec(1),
             "linear_v_max": UnboundedContinuousTensorSpec(1),
@@ -227,9 +228,9 @@ class Star(IsaacEnv):
             "angular_jerk_mean": UnboundedContinuousTensorSpec(1),
         }).expand(self.num_envs).to(self.device)
         info_spec = CompositeSpec({
-            "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13)),
+            "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13), device=self.device),
+            "prev_action": torch.stack([self.drone.action_spec] * self.drone.n, 0).to(self.device),
         }).expand(self.num_envs).to(self.device)
-        # info_spec = self.drone.info_spec.to(self.device)
         self.observation_spec["info"] = info_spec
         self.observation_spec["stats"] = stats_spec
         self.info = info_spec.zero()
@@ -273,6 +274,7 @@ class Star(IsaacEnv):
         self.last_angular_jerk[env_ids] = torch.zeros_like(self.last_angular_a[env_ids])
 
         self.stats[env_ids] = 0.
+        self.info['prev_action'][env_ids] = 2.0 * torch.square(self.drone.throttle)[env_ids] - 1.0
 
         self.linear_v_episode = torch.zeros_like(self.stats["linear_v_mean"])
         self.angular_v_episode = torch.zeros_like(self.stats["angular_v_mean"])
@@ -299,6 +301,10 @@ class Star(IsaacEnv):
 
     def _pre_sim_step(self, tensordict: TensorDictBase):
         actions = tensordict[("agents", "action")]
+        self.info["prev_action"] = tensordict[("info", "prev_action")]
+        self.raw_action_error = tensordict[("stats", "raw_action_error")].clone()
+        self.stats["raw_action_error_mean"].add_(self.raw_action_error.mean(dim=-1).unsqueeze(-1))
+        self.stats["raw_action_error_max"].set_(torch.max(self.stats["raw_action_error_max"], self.raw_action_error.mean(dim=-1).unsqueeze(-1)))
         self.effort = self.drone.apply_action(actions)
 
         if self.wind:
@@ -386,8 +392,7 @@ class Star(IsaacEnv):
         self.stats["tracking_error"].add_(-distance)
         self.stats["tracking_error_ema"].lerp_(distance, (1-self.alpha))
         
-        reward_pose = torch.exp(-self.reward_distance_scale * distance)
-        # reward_pose = - distance
+        reward_pos = torch.exp(-self.reward_distance_scale * distance)
         
         # uprightness
         tiltage = torch.abs(1 - self.drone.up[..., 2])
@@ -403,17 +408,17 @@ class Star(IsaacEnv):
         # not_spin_bonus = torch.abs(torch.square(self.drone.vel[..., -1])) < 1e-5
 
         reward = (
-            reward_pose
-            # + reward_pose * reward_up
-            + reward_pose * reward_spin
+            reward_pos
+            + reward_pos * reward_up
+            + reward_pos * reward_spin
             # + reward_effort
             + reward_action_smoothness
         )
         
-        self.stats['reward_pos'].set_(reward_pose)
-        self.stats['reward_smooth'].set_(reward_action_smoothness)
-        self.stats['reward_up'].set_(reward_pose * reward_up)
-        self.stats['reward_spin'].set_(reward_pose * reward_spin)
+        self.stats['reward_pos'].add_(reward_pos.mean(-1).unsqueeze(-1))
+        self.stats['reward_action_smoothness'].add_(reward_action_smoothness.mean(-1).unsqueeze(-1))
+        self.stats['reward_up'].add_((reward_pos * reward_up).mean(-1).unsqueeze(-1))
+        self.stats['reward_spin'].add_((reward_pos * reward_spin).mean(-1).unsqueeze(-1))
 
         done = (
             (self.progress_buf >= self.max_episode_length).unsqueeze(-1)
@@ -422,10 +427,25 @@ class Star(IsaacEnv):
         ) 
 
         ep_len = self.progress_buf.unsqueeze(-1)
+        self.stats['reward_pos'].div_(
+            torch.where(done, ep_len, torch.ones_like(ep_len))
+        )
+        self.stats['reward_action_smoothness'].div_(
+            torch.where(done, ep_len, torch.ones_like(ep_len))
+        )
+        self.stats['reward_up'].div_(
+            torch.where(done, ep_len, torch.ones_like(ep_len))
+        )
+        self.stats['reward_spin'].div_(
+            torch.where(done, ep_len, torch.ones_like(ep_len))
+        )
         self.stats["tracking_error"].div_(
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
         self.stats['action_smoothness_mean'].div_(
+            torch.where(done, ep_len, torch.ones_like(ep_len))
+        )
+        self.stats['raw_action_error_mean'].div_(
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
         self.stats["return"] += reward
