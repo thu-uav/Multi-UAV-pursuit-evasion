@@ -392,14 +392,14 @@ class Star(IsaacEnv):
         self.stats["tracking_error"].add_(-distance)
         self.stats["tracking_error_ema"].lerp_(distance, (1-self.alpha))
         
-        reward_pos = torch.exp(-self.reward_distance_scale * distance)
+        reward_pos = self.reward_distance_scale * torch.exp(- distance)
         
         # uprightness
         tiltage = torch.abs(1 - self.drone.up[..., 2])
         reward_up = 0.5 / (1.0 + torch.square(tiltage))
 
         # smoothness
-        reward_action_smoothness = self.reward_action_smoothness_weight * torch.exp(-self.drone.throttle_difference)
+        reward_action_smoothness = self.reward_action_smoothness_weight * torch.exp(-self.raw_action_error)
 
         # spin reward, fixed z
         spin = torch.square(self.drone.vel[..., -1])

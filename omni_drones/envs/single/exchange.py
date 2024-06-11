@@ -400,8 +400,6 @@ class Exchange(IsaacEnv):
         
         reward_time = self.reward_time_scale * (-self.progress_buf / self.max_episode_length).unsqueeze(1) * (reward_pos_bonus <= 0)
         
-        # reward_action_smoothness = self.reward_action_smoothness_weight * torch.exp(-self.drone.throttle_difference)
-        # reward_action_smoothness = self.reward_action_smoothness_weight * (self.raw_action_error < self.action_error_threshold)
         reward_action_smoothness = self.reward_action_smoothness_weight * torch.exp(-self.raw_action_error)
         
         reward = (
