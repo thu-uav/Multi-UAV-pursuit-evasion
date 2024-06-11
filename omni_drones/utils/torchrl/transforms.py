@@ -47,6 +47,7 @@ from torchrl.data import (
 from .env import AgentSpec
 from dataclasses import replace
 from torch.distributions.transforms import TanhTransform
+import cvxpy as cp
 
 def _transform_agent_spec(self: Transform, agent_spec: AgentSpec) -> AgentSpec:
     return agent_spec
@@ -65,6 +66,33 @@ def _agent_spec(self: TransformedEnv) -> AgentSpec:
     return {name: replace(spec, _env=self) for name, spec in agent_spec.items()}
 TransformedEnv.agent_spec = property(_agent_spec)
 
+# cbf
+def solve_qp_batch(actions, prev_actions, delta):
+    tmp_batch, num_agents, action_size = actions.shape
+    batch_size = tmp_batch * num_agents
+    
+    actions = actions.reshape(-1, action_size)
+    prev_actions = prev_actions.reshape(-1, action_size)
+
+    # define variable
+    a = cp.Variable((batch_size, action_size))
+
+    # define the objective
+    objective = cp.Minimize(cp.sum_squares(a - actions))
+
+    # define constraints
+    constraints = [cp.norm(a - prev_actions, 2, axis=1) <= delta]
+
+    # problem
+    prob = cp.Problem(objective, constraints)
+
+    # solve
+    prob.solve()
+
+    # get corrected_actions
+    corrected_actions = a.value
+
+    return corrected_actions.reshape(-1, num_agents, action_size)
 
 class LogOnEpisode(Transform):
     def __init__(
@@ -389,6 +417,7 @@ class PIDRateController(Transform):
         self.fixed_yaw = self.controller.fixed_yaw
         # for action smooth
         self.use_action_smooth = self.controller.use_action_smooth
+        self.use_cbf = self.controller.use_cbf
         self.epsilon = self.controller.epsilon
         # self.tanh = TanhTransform()
     
@@ -401,6 +430,7 @@ class PIDRateController(Transform):
     def _inv_call(self, tensordict: TensorDictBase) -> TensorDictBase:
         drone_state = tensordict[("info", "drone_state")][..., :13]
         action = tensordict[self.action_key]
+        device = drone_state.device
 
         # raw action error
         prev_action = tensordict[("info", "prev_action")]
@@ -408,7 +438,10 @@ class PIDRateController(Transform):
         # action smoothness
         if not(self.epsilon is None) and self.use_action_smooth:
             action = prev_action + torch.clamp(action - prev_action, min = - self.epsilon, max = + self.epsilon)
-        # action = torch.clamp()
+        
+        if not(self.epsilon is None) and self.use_cbf:
+            action = solve_qp_batch(action.to('cpu').numpy(), prev_action.to('cpu').numpy(), self.epsilon)
+            action = torch.from_numpy(action).to(device).float()
         
         action_error = torch.norm(action - prev_action, dim = -1)
         # set

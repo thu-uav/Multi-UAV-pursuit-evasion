@@ -61,10 +61,8 @@ class Exchange(IsaacEnv):
         self.reward_action_smoothness_weight = cfg.task.reward_action_smoothness_weight
         self.reward_distance_scale = cfg.task.reward_distance_scale
         self.reward_time_scale = cfg.task.reward_time_scale
-        self.action_error_threshold = cfg.task.action_error_threshold
+        # self.action_error_threshold = cfg.task.action_error_threshold
         self.time_encoding = cfg.task.time_encoding
-        self.action_delta = cfg.task.action_delta
-        self.use_cbf = cfg.task.use_cbf
         
         self.randomization = cfg.task.get("randomization", {})
 
@@ -310,30 +308,6 @@ class Exchange(IsaacEnv):
         self.stats['action_error_mean'].add_(action_error.mean(-1).unsqueeze(-1))
         self.stats['action_error_max'].set_(torch.max(action_error.mean(-1).unsqueeze(-1), self.stats['action_error_max']))
         self.last_actions = actions.clone()
-
-    # cbf
-    def solve_qp_batch(actions, prev_actions, delta):
-        batch_size, action_size = actions.shape
-
-        # define variable
-        a = cp.Variable((batch_size, action_size))
-
-        # define the objective
-        objective = cp.Minimize(cp.sum_squares(a - actions))
-
-        # define constraints
-        constraints = [cp.norm(a - prev_actions, 2, axis=1) <= delta]
-
-        # problem
-        prob = cp.Problem(objective, constraints)
-
-        # solve
-        prob.solve()
-
-        # get corrected_actions
-        corrected_actions = a.value
-
-        return corrected_actions
    
     def _compute_state_and_obs(self):
         self.root_state = self.drone.get_state()
@@ -427,7 +401,8 @@ class Exchange(IsaacEnv):
         reward_time = self.reward_time_scale * (-self.progress_buf / self.max_episode_length).unsqueeze(1) * (reward_pos_bonus <= 0)
         
         # reward_action_smoothness = self.reward_action_smoothness_weight * torch.exp(-self.drone.throttle_difference)
-        reward_action_smoothness = self.reward_action_smoothness_weight * (self.raw_action_error < self.action_error_threshold)
+        # reward_action_smoothness = self.reward_action_smoothness_weight * (self.raw_action_error < self.action_error_threshold)
+        reward_action_smoothness = self.reward_action_smoothness_weight * torch.exp(-self.raw_action_error)
         
         reward = (
             reward_pos

@@ -459,6 +459,7 @@ class PIDRateController(nn.Module):
         
         # for action smooth
         self.use_action_smooth = uav_params['use_action_smooth']
+        self.use_cbf = uav_params['use_cbf']
         self.epsilon = uav_params['epsilon']
         
         self.init_flag = True # init last_body_rate and inte
