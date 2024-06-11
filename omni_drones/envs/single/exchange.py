@@ -61,6 +61,7 @@ class Exchange(IsaacEnv):
         self.reward_action_smoothness_weight = cfg.task.reward_action_smoothness_weight
         self.reward_distance_scale = cfg.task.reward_distance_scale
         self.reward_time_scale = cfg.task.reward_time_scale
+        self.action_error_threshold = cfg.task.action_error_threshold
         self.time_encoding = cfg.task.time_encoding
         self.action_delta = cfg.task.action_delta
         self.use_cbf = cfg.task.use_cbf
@@ -296,8 +297,9 @@ class Exchange(IsaacEnv):
     def _pre_sim_step(self, tensordict: TensorDictBase):
         actions = tensordict[("agents", "action")]
         self.info["prev_action"] = tensordict[("info", "prev_action")]
-        self.stats["raw_action_error_mean"].add_(tensordict[("stats", "raw_action_error")].mean(dim=-1).unsqueeze(-1))
-        self.stats["raw_action_error_max"].set_(torch.max(self.stats["raw_action_error_max"], tensordict[("stats", "raw_action_error")].mean(dim=-1).unsqueeze(-1)))
+        self.raw_action_error = tensordict[("stats", "raw_action_error")].clone()
+        self.stats["raw_action_error_mean"].add_(self.raw_action_error.mean(dim=-1).unsqueeze(-1))
+        self.stats["raw_action_error_max"].set_(torch.max(self.stats["raw_action_error_max"], self.raw_action_error.mean(dim=-1).unsqueeze(-1)))
         if self.cfg.task.action_noise:
             actions *= torch.randn(actions.shape, device=self.device) * 0.1 + 1
         
@@ -424,7 +426,8 @@ class Exchange(IsaacEnv):
         
         reward_time = self.reward_time_scale * (-self.progress_buf / self.max_episode_length).unsqueeze(1) * (reward_pos_bonus <= 0)
         
-        reward_action_smoothness = self.reward_action_smoothness_weight * torch.exp(-self.drone.throttle_difference)
+        # reward_action_smoothness = self.reward_action_smoothness_weight * torch.exp(-self.drone.throttle_difference)
+        reward_action_smoothness = self.reward_action_smoothness_weight * (self.raw_action_error < self.action_error_threshold)
         
         reward = (
             reward_pos
