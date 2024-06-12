@@ -7,7 +7,7 @@ env: ${task.env}
 
 # model_dir: /home/jiayu/OmniDrones/scripts/outputs/Track_size05to08_smooth0_reward_up_spin/05-28_10-28/wandb/run-20240528_102811-crgu03wi/files/checkpoint_603062272.pt
 # model_dir: /home/jiayu/OmniDrones/scripts/outputs/Track_star.pt
-# model_dir: /home/jiayu/OmniDrones/scripts/outputs/Star_smooth_scale1/06-11_21-47/wandb/run-20240611_214702-hc9uz2tq/files/checkpoint_final.pt
+# model_dir: /home/jiayu/OmniDrones/scripts/outputs/Exchange_smooth/06-12_19-28/wandb/run-20240612_192836-i9pepepf/files/checkpoint_1389625344.pt
 model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
@@ -27,7 +27,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: Exchange_smooth
+  run_name: Go_return
   # run_name: debug
   job_type: train
   entity: chenjy
@@ -39,8 +39,8 @@ wandb:
   tags: 
 
 defaults:
-  # - task: Goto
+  - task: Goto_return
   # - task: Star
-  - task: Exchange
+  # - task: Exchange
   - algo: mappo
   - _self_
