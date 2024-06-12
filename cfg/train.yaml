@@ -27,7 +27,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: Star_smooth
+  run_name: Exchange_smooth
   # run_name: debug
   job_type: train
   entity: chenjy
@@ -40,7 +40,7 @@ wandb:
 
 defaults:
   # - task: Goto
-  - task: Star
-  # - task: Exchange
+  # - task: Star
+  - task: Exchange
   - algo: mappo
   - _self_

@@ -290,10 +290,9 @@ class Exchange(IsaacEnv):
 
         self.stats[env_ids] = 0.
         self.stats['reach_time'][env_ids] = self.max_episode_length
-        self.info['prev_action'][env_ids][..., 0] = 0.0 # r = 0
-        self.info['prev_action'][env_ids][..., 1] = 0.0 # p = 0
-        self.info['prev_action'][env_ids][..., 2] = 0.0 # y = 0
-        self.info['prev_action'][env_ids][..., 3] = self.drone.gravity[env_ids][..., 0] # thrust = mg
+        cmd_init = 2.0 * (self.drone.throttle[env_ids]) ** 2 - 1.0
+        max_thrust_ratio = self.drone.params['max_thrust_ratio']
+        self.info['prev_action'][env_ids, :, 3] = (0.5 * (max_thrust_ratio + cmd_init)).mean(dim=-1)
         
     def _pre_sim_step(self, tensordict: TensorDictBase):
         actions = tensordict[("agents", "action")]

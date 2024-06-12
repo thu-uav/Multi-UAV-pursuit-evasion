@@ -431,38 +431,43 @@ class PIDRateController(Transform):
         drone_state = tensordict[("info", "drone_state")][..., :13]
         action = tensordict[self.action_key]
         device = drone_state.device
-
-        # raw action error
-        prev_action = tensordict[("info", "prev_action")]
         
-        # action smoothness
-        if not(self.epsilon is None) and self.use_action_smooth:
-            action = prev_action + torch.clamp(action - prev_action, min = - self.epsilon, max = + self.epsilon)
+        # # action smoothness
+        # if not(self.epsilon is None) and self.use_action_smooth:
+        #     action = prev_action + torch.clamp(action - prev_action, min = - self.epsilon, max = + self.epsilon)
         
-        if not(self.epsilon is None) and self.use_cbf:
-            action = solve_qp_batch(action.to('cpu').numpy(), prev_action.to('cpu').numpy(), self.epsilon)
-            action = torch.from_numpy(action).to(device).float()
-        
-        action_error = torch.norm(action - prev_action, dim = -1)
-        # set
-        tensordict.set(("stats", "raw_action_error"), action_error)
-        tensordict.set(("info", "prev_action"), action)
+        # if not(self.epsilon is None) and self.use_cbf:
+        #     action = solve_qp_batch(action.to('cpu').numpy(), prev_action.to('cpu').numpy(), self.epsilon)
+        #     action = torch.from_numpy(action).to(device).float()
 
         action = torch.tanh(action)
         target_rate, target_thrust = action.split([3, 1], -1)
-        target_thrust = torch.clamp((target_thrust + 1) / 2, min = 0.0, max = self.max_thrust_ratio) * 2**16 # 0 ~ max
+        # target_rate: [-1, 1], target_thrust: [0, max_thrust_ratio]
+        target_thrust = torch.clamp((target_thrust + 1) / 2, min = 0.0, max = self.max_thrust_ratio)
         if self.fixed_yaw:
             target_rate[..., 2] = 0.0
+
+        # raw action error
+        ctbr_action = torch.concat([target_rate, target_thrust], dim=-1)
+        prev_ctbr_action = tensordict[("info", "prev_action")]
+        action_error = torch.norm(ctbr_action - prev_ctbr_action, dim = -1)
+        tensordict.set(("stats", "raw_action_error"), action_error)
+        tensordict.set(("info", "prev_action"), ctbr_action)
+                
+        # scale
+        target_rate = target_rate * 180.0 * self.target_clip
+        target_thrust = target_thrust * 2**16
+
         cmds, ctbr = self.controller(
             drone_state, 
-            target_rate=target_rate * 180.0 * self.target_clip,
+            target_rate=target_rate,
             target_thrust=target_thrust,
             reset_pid=tensordict['done'].expand(-1, drone_state.shape[1]) # num_drones: drone_state.shape[1]
         )
         torch.nan_to_num_(cmds, 0.)
         tensordict.set(self.action_key, cmds)
         tensordict.set('ctbr', ctbr)
-        tensordict.set('target_rate', target_rate * 180.0 * self.target_clip)
+        tensordict.set('target_rate', target_rate)
         return tensordict
 
 class AttitudeController(Transform):

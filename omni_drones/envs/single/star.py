@@ -274,11 +274,10 @@ class Star(IsaacEnv):
         self.last_angular_jerk[env_ids] = torch.zeros_like(self.last_angular_a[env_ids])
 
         self.stats[env_ids] = 0.
-        self.info['prev_action'][env_ids][..., 0] = 0.0 # r = 0
-        self.info['prev_action'][env_ids][..., 1] = 0.0 # p = 0
-        self.info['prev_action'][env_ids][..., 2] = 0.0 # y = 0
-        self.info['prev_action'][env_ids][..., 3] = self.drone.gravity[env_ids][..., 0] # thrust = mg
-
+        cmd_init = 2.0 * (self.drone.throttle[env_ids]) ** 2 - 1.0
+        max_thrust_ratio = self.drone.params['max_thrust_ratio']
+        self.info['prev_action'][env_ids, :, 3] = (0.5 * (max_thrust_ratio + cmd_init)).mean(dim=-1)
+        
         self.linear_v_episode = torch.zeros_like(self.stats["linear_v_mean"])
         self.angular_v_episode = torch.zeros_like(self.stats["angular_v_mean"])
         self.linear_a_episode = torch.zeros_like(self.stats["linear_a_mean"])
