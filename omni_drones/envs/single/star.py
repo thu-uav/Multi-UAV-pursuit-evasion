@@ -126,14 +126,14 @@ class Star(IsaacEnv):
             torch.tensor([0.2, 0.2, 2.], device=self.device) * torch.pi
         )
         self.target_times_dist = D.Uniform(
-            torch.tensor(0.5, device=self.device),
-            torch.tensor(1.5, device=self.device)
+            torch.tensor(1.0, device=self.device),
+            torch.tensor(2.0, device=self.device)
         )
         
         # # eval
         # self.target_times_dist = D.Uniform(
-        #     torch.tensor(1.3, device=self.device),
-        #     torch.tensor(1.3, device=self.device)
+        #     torch.tensor(1.5, device=self.device),
+        #     torch.tensor(1.5, device=self.device)
         # )
         
         self.origin = torch.tensor([0., 0., 1.], device=self.device)
@@ -274,7 +274,10 @@ class Star(IsaacEnv):
         self.last_angular_jerk[env_ids] = torch.zeros_like(self.last_angular_a[env_ids])
 
         self.stats[env_ids] = 0.
-        self.info['prev_action'][env_ids] = 2.0 * torch.square(self.drone.throttle)[env_ids] - 1.0
+        self.info['prev_action'][env_ids][..., 0] = 0.0 # r = 0
+        self.info['prev_action'][env_ids][..., 1] = 0.0 # p = 0
+        self.info['prev_action'][env_ids][..., 2] = 0.0 # y = 0
+        self.info['prev_action'][env_ids][..., 3] = self.drone.gravity[env_ids][..., 0] # thrust = mg
 
         self.linear_v_episode = torch.zeros_like(self.stats["linear_v_mean"])
         self.angular_v_episode = torch.zeros_like(self.stats["angular_v_mean"])
@@ -409,16 +412,17 @@ class Star(IsaacEnv):
 
         reward = (
             reward_pos
-            + reward_pos * reward_up
-            + reward_pos * reward_spin
-            # + reward_effort
+            # + reward_pos * reward_up
+            # + reward_pos * reward_spin
+            + reward_up
+            + reward_spin
             + reward_action_smoothness
         )
         
         self.stats['reward_pos'].add_(reward_pos.mean(-1).unsqueeze(-1))
         self.stats['reward_action_smoothness'].add_(reward_action_smoothness.mean(-1).unsqueeze(-1))
-        self.stats['reward_up'].add_((reward_pos * reward_up).mean(-1).unsqueeze(-1))
-        self.stats['reward_spin'].add_((reward_pos * reward_spin).mean(-1).unsqueeze(-1))
+        self.stats['reward_up'].add_((reward_up).mean(-1).unsqueeze(-1))
+        self.stats['reward_spin'].add_((reward_spin).mean(-1).unsqueeze(-1))
 
         done = (
             (self.progress_buf >= self.max_episode_length).unsqueeze(-1)
