@@ -60,6 +60,7 @@ class Goto_return(IsaacEnv):
         self.reward_time_scale = cfg.task.reward_time_scale
         self.reward_bonus_scale = cfg.task.reward_bonus_scale
         self.time_encoding = cfg.task.time_encoding
+        self.reach_threshold = cfg.task.reach_threshold
         
         self.randomization = cfg.task.get("randomization", {})
 
@@ -262,7 +263,7 @@ class Goto_return(IsaacEnv):
         self.start_pos[env_ids] = pos.clone()
         
         # relative position and heading
-        rpos_idx = torch.norm(self.target_pos - pos, dim=-1) < 0.05
+        rpos_idx = torch.norm(self.target_pos - pos, dim=-1) < self.reach_threshold
         self.reach_flag[env_ids] = False
         self.reach_flag[env_ids][rpos_idx] = True
         self.return_flag[env_ids] = False
@@ -375,7 +376,7 @@ class Goto_return(IsaacEnv):
         self.stats["start_pos_error"].add_(start_pos_error)
 
         # reach flag
-        current_reach = (pos_error <= 0.05).float()
+        current_reach = (pos_error <= self.reach_threshold).float()
         self.reach_flag = (self.reach_flag + (current_reach > 0))
         self.stats['reach_ratio'].set_(self.reach_flag.float())
 
@@ -383,7 +384,7 @@ class Goto_return(IsaacEnv):
         reward_pos_bonus = self.reward_bonus_scale * self.reach_flag.float()
         
         reward_start_pos = self.reach_flag.float() * (- start_pos_error)
-        reward_start_pos_bonus = (self.reach_flag.float() * (start_pos_error <= 0.5) * self.reward_bonus_scale * 2.0).float()
+        reward_start_pos_bonus = (self.reach_flag.float() * (start_pos_error <= self.reach_threshold) * self.reward_bonus_scale * 10.0).float()
 
         # return flag
         current_return = (reward_start_pos_bonus > 0).float()
@@ -400,7 +401,7 @@ class Goto_return(IsaacEnv):
         reward_action_smoothness = self.reward_action_smoothness_weight * torch.exp(-self.raw_action_error)
         
         reward = (
-            reward_pos * (1.0 - self.reach_flag.float())
+            # reward_pos * (1.0 - self.reach_flag.float())
             + reward_pos_bonus
             # + reward_start_pos
             + reward_start_pos_bonus

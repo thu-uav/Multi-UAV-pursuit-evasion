@@ -6,7 +6,7 @@ defaults:
   - /base/sim_base@_here_
 
 env:
-  num_envs: 100
+  num_envs: 4096
   max_episode_length: 1000
 
 drone_model: Crazyflie
@@ -20,25 +20,8 @@ latency_step: 5
 reset_thres: 1.
 future_traj_steps: 4
 
-reward_effort_weight: 0.
 reward_action_smoothness_weight: 0.0
-reward_distance_scale: 1.6
-reward_acc_scale: 0.0
-reward_diff_scale: 0.0
-diff_threshold: 0.005
-
-# vel and acc constraint
-use_last_vel: false
-use_acc_reward: false
-use_vel_reward: false
-max_linear_v: 2.0
-max_angular_v: 2.0
-max_linear_a: 3.5
-max_angular_a: 20
-
-# use action filter
-use_action_filter: false
-window_size: 5
+reward_distance_scale: 2.0
 
 action_transform: PIDrate
 # history: true
