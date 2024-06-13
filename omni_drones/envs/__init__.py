@@ -30,6 +30,8 @@ from .formation_forward import FormationForward
 from .formation_dodging import FormationDodge
 from .formation_ball_forward import FormationBallForward
 from .formation_multi_ball_forward import FormationMultiBallForward
+from .multi_catch_old import MultiCatch_old
+from .multi_catch import MultiCatch
 from .spread import Spread
 from .forest import Forest
 from .payload import PayloadTrack, PayloadFlyThrough

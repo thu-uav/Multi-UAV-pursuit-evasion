@@ -453,7 +453,7 @@ class PIDRateController(Transform):
         action_error = torch.norm(ctbr_action - prev_ctbr_action, dim = -1)
         tensordict.set(("stats", "raw_action_error"), action_error)
         tensordict.set(("info", "prev_action"), ctbr_action)
-                
+        
         # scale
         target_rate = target_rate * 180.0 * self.target_clip
         target_thrust = target_thrust * 2**16
