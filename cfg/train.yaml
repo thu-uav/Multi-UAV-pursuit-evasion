@@ -27,8 +27,8 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: debug
-  run_name: Star
+  run_name: Star_fixed
+  # run_name: Star_smooth1
   job_type: train
   entity: chenjy
   project: sim2real

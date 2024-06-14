@@ -121,9 +121,20 @@ class Star(IsaacEnv):
             self.wind_w = torch.zeros(self.num_envs, 3, 8, device=self.device)
             self.wind_i = torch.zeros(self.num_envs, 1, device=self.device)
         
+        # unif dist
+        # self.init_rpy_dist = D.Uniform(
+        #     torch.tensor([-.2, -.2, 0.], device=self.device) * torch.pi,
+        #     torch.tensor([0.2, 0.2, 2.], device=self.device) * torch.pi
+        # )
+        # self.target_times_dist = D.Uniform(
+        #     torch.tensor(1.0, device=self.device),
+        #     torch.tensor(2.0, device=self.device)
+        # )
+
+        # fixed dist
         self.init_rpy_dist = D.Uniform(
-            torch.tensor([-.2, -.2, 0.], device=self.device) * torch.pi,
-            torch.tensor([0.2, 0.2, 2.], device=self.device) * torch.pi
+            torch.tensor([0.0, 0.0, 0.], device=self.device) * torch.pi,
+            torch.tensor([0.0, 0.0, 0.], device=self.device) * torch.pi
         )
         self.target_times_dist = D.Uniform(
             torch.tensor(1.0, device=self.device),
@@ -131,6 +142,10 @@ class Star(IsaacEnv):
         )
         
         # # eval
+        # self.init_rpy_dist = D.Uniform(
+        #     torch.tensor([0.0, 0.0, 0.], device=self.device) * torch.pi,
+        #     torch.tensor([0.0, 0.0, 0.], device=self.device) * torch.pi
+        # )
         # self.target_times_dist = D.Uniform(
         #     torch.tensor(1.5, device=self.device),
         #     torch.tensor(1.5, device=self.device)
