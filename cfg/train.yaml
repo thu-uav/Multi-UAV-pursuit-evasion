@@ -27,20 +27,21 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: Star_wosmooth_hardsmooth001
-  # run_name: debug
+  # run_name: Star_wosmooth_hardsmooth001
+  run_name: debug
   job_type: train
   entity: chenjy
   project: sim2real
-  # mode: disabled
-  mode: online # set to 'disabled' when debugging locally, online
+  mode: disabled
+  # mode: online # set to 'disabled' when debugging locally, online
   run_id: 
   monitor_gym: True
   tags: 
 
 defaults:
-  - task: Star
+  # - task: Star
   # - task: Track
   # - task: Exchange
+  - task: MultiGoto
   - algo: mappo
   - _self_
