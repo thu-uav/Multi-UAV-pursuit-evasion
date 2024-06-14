@@ -227,6 +227,7 @@ class Track(IsaacEnv):
             "action_smoothness_max": UnboundedContinuousTensorSpec(1),
             "drone_state": UnboundedContinuousTensorSpec(13),
             "reward_pos": UnboundedContinuousTensorSpec(1),
+            "reward_spin": UnboundedContinuousTensorSpec(1),
             "reward_action_smoothness": UnboundedContinuousTensorSpec(1),
             "linear_v_max": UnboundedContinuousTensorSpec(1),
             "angular_v_max": UnboundedContinuousTensorSpec(1),
@@ -260,9 +261,13 @@ class Track(IsaacEnv):
         self.traj_scale[env_ids] = self.traj_scale_dist.sample(env_ids.shape)
 
         t0 = torch.zeros(len(env_ids), device=self.device)
-        pos = lemniscate(t0 + self.traj_t0, self.traj_c[env_ids]) + self.origin
+        # pos = lemniscate(t0 + self.traj_t0, self.traj_c[env_ids]) + self.origin
+        pos, linear_v = lemniscate(t0 + self.traj_t0, self.traj_c[env_ids])
+        pos = pos + + self.origin
+        linear_v = linear_v * self.traj_scale[env_ids]
         rot = euler_to_quaternion(self.init_rpy_dist.sample(env_ids.shape))
         vel = torch.zeros(len(env_ids), 1, 6, device=self.device)
+        vel[..., :3] = linear_v.unsqueeze(1)
         self.drone.set_world_poses(
             pos + self.envs_positions[env_ids], rot, env_ids
         )
@@ -394,15 +399,18 @@ class Track(IsaacEnv):
         # spin reward, fixed z
         spin = torch.square(self.drone.vel[..., -1])
         reward_spin = 0.5 / (1.0 + torch.square(spin))
+        # reward_spin = torch.exp(-torch.square(spin))
 
         reward = (
             reward_pos
             + reward_pos * (reward_up + reward_spin)
+            # + reward_spin
             + reward_action_smoothness
         )
         
         self.stats['reward_pos'].add_(reward_pos)
         self.stats['reward_action_smoothness'].add_(reward_action_smoothness)
+        self.stats['reward_spin'].add_(reward_spin)
 
         done = (
             (self.progress_buf >= self.max_episode_length).unsqueeze(-1)
@@ -421,6 +429,9 @@ class Track(IsaacEnv):
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
         self.stats['reward_pos'].div_(
+            torch.where(done, ep_len, torch.ones_like(ep_len))
+        )
+        self.stats['reward_spin'].div_(
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
         self.stats['reward_action_smoothness'].div_(

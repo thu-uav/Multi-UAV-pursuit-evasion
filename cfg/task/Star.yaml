@@ -21,7 +21,7 @@ reset_thres: 1.
 future_traj_steps: 4
 future_traj_steps_size: 5
 
-reward_action_smoothness_weight: 1.0
+reward_action_smoothness_weight: 0.0
 reward_distance_scale: 6.0
 
 action_transform: PIDrate

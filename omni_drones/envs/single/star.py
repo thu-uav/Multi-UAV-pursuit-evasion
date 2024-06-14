@@ -257,9 +257,11 @@ class Star(IsaacEnv):
         self.target_points[env_ids] = star_points
 
         t0 = torch.zeros((len(env_ids), 1), device=self.device)
-        pos = vmap(zigzag)(t0 + self.traj_t0, self.target_times[env_ids], self.target_points[env_ids]) + self.origin
+        pos, linear_vel = vmap(zigzag)(t0 + self.traj_t0, self.target_times[env_ids], self.target_points[env_ids])
+        pos = self.origin + pos
         rot = euler_to_quaternion(self.init_rpy_dist.sample(env_ids.shape))
         vel = torch.zeros(len(env_ids), 1, 6, device=self.device)
+        vel[..., :3] = linear_vel
         self.drone.set_world_poses(
             pos.squeeze(1) + self.envs_positions[env_ids], rot, env_ids
         )
@@ -469,7 +471,7 @@ class Star(IsaacEnv):
             env_ids = ...
         t = self.progress_buf[env_ids].unsqueeze(1) + step_size * torch.arange(steps, device=self.device)
         t = self.traj_t0 + t * self.dt
-        target_pos = vmap(zigzag)(t, self.target_times[env_ids], self.target_points[env_ids])
+        target_pos, _ = vmap(zigzag)(t, self.target_times[env_ids], self.target_points[env_ids])
 
         return self.origin + target_pos
 

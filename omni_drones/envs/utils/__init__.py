@@ -147,8 +147,15 @@ def lemniscate(t, c):
     x = torch.stack([
         cos_t, sin_t * cos_t, c * sin_t
     ], dim=-1) / sin2p1.unsqueeze(-1)
-
-    return x
+    
+    v_x = - sin_t * (3 - torch.square(sin_t)) / (torch.square(sin_t) + 1)**2
+    v_y = (cos_t**2 - sin_t**2 - sin_t**4 - sin_t**2 * cos_t**2) / (torch.square(sin_t) + 1)**2
+    v_z = cos_t * (1 - torch.square(sin_t)) / (torch.square(sin_t) + 1)**2
+    v = torch.stack([
+        v_x, v_y, v_z
+    ], dim=-1)
+    
+    return x, v
 
 def line_acc(t, a, threshold, alpha):
     # Convert angle c from degrees to radians
@@ -274,8 +281,9 @@ def zigzag(t, target_times, target_points):
     x = prev_x + k_x * (t - prev_times) # [batch, future_step]
     y = prev_y + k_y * (t - prev_times)
     z = torch.zeros_like(x)
+    k_z = torch.zeros_like(k_x)
     
-    return torch.stack([x, y, z], dim=-1)
+    return torch.stack([x, y, z], dim=-1), torch.stack([k_x, k_y, k_z], dim=-1)
 
 def scale_time(t, a: float=1.0):
     return t / (1 + 1/(a*torch.abs(t)))
