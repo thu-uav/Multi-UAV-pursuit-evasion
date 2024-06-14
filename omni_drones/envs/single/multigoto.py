@@ -58,6 +58,7 @@ class MultiGoto(IsaacEnv):
         # self.reward_effort_weight = cfg.task.reward_effort_weight
         self.reward_action_smoothness_weight = cfg.task.reward_action_smoothness_weight
         self.reward_distance_scale = cfg.task.reward_distance_scale
+        self.reward_bonus_scale = cfg.task.reward_bonus_scale
         self.reward_time_scale = cfg.task.reward_time_scale
         self.time_encoding = cfg.task.time_encoding
         
@@ -69,32 +70,38 @@ class MultiGoto(IsaacEnv):
         if "drone" in self.randomization:
             self.drone.setup_randomization(self.randomization["drone"])
         
-        # self.target_vis = ArticulationView(
-        #     "/World/envs/env_*/target_*",
-        #     reset_xform_properties=False,
-        #     shape=(-1, self.num_points)
-        # )
         self.target_vis = ArticulationView(
-            "/World/envs/env_*/target_0",
+            "/World/envs/env_*/target_*",
             reset_xform_properties=False,
+            shape=(-1, self.num_points)
         )
         self.target_vis.initialize()
 
         self.init_poses = self.drone.get_world_poses(clone=True)
         self.init_vels = torch.zeros_like(self.drone.get_velocities())
 
+        # self.init_target_dist = D.Uniform(
+        #     torch.tensor([-1., -1., 0.05], device=self.device),
+        #     torch.tensor([1., 1., 2.0], device=self.device)
+        # )
+        # self.init_rpy_dist = D.Uniform(
+        #     torch.tensor([-0.2, -0.2, 0.0], device=self.device) * torch.pi,
+        #     torch.tensor([0.2, 0.2, 0.5], device=self.device) * torch.pi
+        # )
+
+        # eval
         self.init_target_dist = D.Uniform(
-            torch.tensor([-1., -1., 0.05], device=self.device),
-            torch.tensor([1., 1., 2.0], device=self.device)
+            torch.tensor([-1., -1., 1.0], device=self.device),
+            torch.tensor([1., 1., 1.0], device=self.device)
         )
         self.init_rpy_dist = D.Uniform(
-            torch.tensor([-0.2, -0.2, 0.0], device=self.device) * torch.pi,
-            torch.tensor([0.2, 0.2, 0.5], device=self.device) * torch.pi
+            torch.tensor([0., 0., 0.0], device=self.device) * torch.pi,
+            torch.tensor([0., 0., 0.0], device=self.device) * torch.pi
         )
         
         self.drone_init_pos = torch.tensor([[0.0, 0.0, 1.]], device=self.device)
         self.target_pos = torch.zeros(self.num_envs, self.num_points, 3, device=self.device)
-        self.target_count = torch.zeros(self.num_envs, device=self.device, dtype=torch.int64) # 0 ~ self.num_points - 1
+        self.target_id = torch.zeros(self.num_envs, device=self.device, dtype=torch.int64) # 0 ~ self.num_points - 1
         self.alpha = 0.8
 
         self.last_linear_v = torch.zeros(self.num_envs, 1, device=self.device)
@@ -114,35 +121,21 @@ class MultiGoto(IsaacEnv):
         self.drone: MultirotorBase = drone_model(cfg=cfg)
         drone_prim = self.drone.spawn(translations=[(0.0, 0.0, 1.0)])[0]
 
-        prim_utils.create_prim(
-            prim_path=f"/World/envs/env_0/target_0",
-            usd_path=self.drone.usd_path,
-            translation=(0.0, 0.0, 1.),
-        )
+        for idx in range(self.num_points):
+            prim_utils.create_prim(
+                prim_path=f"/World/envs/env_0/target_{idx}",
+                usd_path=self.drone.usd_path,
+                translation=(0.0, 0.0, 1.),
+            )
 
-        kit_utils.set_nested_collision_properties(
-            f"/World/envs/env_0/target_0", 
-            collision_enabled=False
-        )
-        kit_utils.set_nested_rigid_body_properties(
-            f"/World/envs/env_0/target_0",
-            disable_gravity=True
-        )
-        # for idx in range(self.num_points):
-        #     prim_utils.create_prim(
-        #         prim_path=f"/World/envs/env_0/target_{idx}",
-        #         usd_path=self.drone.usd_path,
-        #         translation=(0.0, 0.0, 1.),
-        #     )
-
-        #     kit_utils.set_nested_collision_properties(
-        #         f"/World/envs/env_0/target_{idx}", 
-        #         collision_enabled=False
-        #     )
-        #     kit_utils.set_nested_rigid_body_properties(
-        #         f"/World/envs/env_0/target_{idx}",
-        #         disable_gravity=True
-        #     )
+            kit_utils.set_nested_collision_properties(
+                f"/World/envs/env_0/target_{idx}", 
+                collision_enabled=False
+            )
+            kit_utils.set_nested_rigid_body_properties(
+                f"/World/envs/env_0/target_{idx}",
+                disable_gravity=True
+            )
 
         kit_utils.create_ground_plane(
             "/World/defaultGroundPlane",
@@ -156,7 +149,7 @@ class MultiGoto(IsaacEnv):
     def _set_specs(self):
         # drone_state_dim = self.drone.state_spec.shape[-1]
         observation_dim = 3 + 4 + 3 + 3 # velocity, quaternion, heading, up
-        observation_dim += 3 * self.num_points # all targets
+        observation_dim += 3 * self.num_points # all targets pos
         observation_dim += 1 # current target id
 
         if self.cfg.task.time_encoding:
@@ -203,6 +196,7 @@ class MultiGoto(IsaacEnv):
             "reward_up": UnboundedContinuousTensorSpec(1),
             "reward_time": UnboundedContinuousTensorSpec(1),
             "reach_time": UnboundedContinuousTensorSpec(1),
+            "reach_num": UnboundedContinuousTensorSpec(1),
             "episode_len": UnboundedContinuousTensorSpec(1),
             "pos_error": UnboundedContinuousTensorSpec(1),
             "action_error_mean": UnboundedContinuousTensorSpec(1),
@@ -241,10 +235,9 @@ class MultiGoto(IsaacEnv):
         )
         self.drone.set_velocities(self.init_vels[env_ids], env_ids)
         self.target_pos[env_ids] = self.init_target_dist.sample((*env_ids.shape, self.num_points))
-        self.target_count[env_ids] = 0 # reset count
+        self.target_id[env_ids] = 0 # reset count
         
-        current_target_pos = self.target_pos[torch.arange(self.target_pos.shape[0]), self.target_count].unsqueeze(1)
-        self.target_vis.set_world_poses(positions=current_target_pos[env_ids] + self.envs_positions[env_ids].unsqueeze(1), env_indices=env_ids)
+        self.target_vis.set_world_poses(positions=self.target_pos[env_ids] + self.envs_positions[env_ids].unsqueeze(1), env_indices=env_ids)
 
         # set last values
         self.last_linear_v[env_ids] = torch.norm(self.init_vels[env_ids][..., :3], dim=-1)
@@ -272,7 +265,7 @@ class MultiGoto(IsaacEnv):
         # relative position and heading
         self.rpos = self.target_pos - self.root_state[..., :3]
         
-        obs = [self.rpos.reshape(self.num_envs, -1).unsqueeze(1), self.target_count.unsqueeze(-1).unsqueeze(-1), self.root_state[..., 3:10], self.root_state[..., 13:19],]  # (relative) position, velocity, quaternion, heading, up
+        obs = [self.rpos.reshape(self.num_envs, -1).unsqueeze(1), self.target_id.unsqueeze(-1).unsqueeze(-1), self.root_state[..., 3:10], self.root_state[..., 13:19],]  # (relative) position, velocity, quaternion, heading, up
         if self.time_encoding:
             t = (self.progress_buf / self.max_episode_length).unsqueeze(-1)
             obs.append(t.expand(-1, self.time_encoding_dim).unsqueeze(1))
@@ -329,20 +322,18 @@ class MultiGoto(IsaacEnv):
 
     def _compute_reward_and_done(self):
         # pose reward
-        current_target_pos = self.rpos[torch.arange(self.rpos.shape[0]), self.target_count].unsqueeze(1)
+        current_target_pos = self.rpos[torch.arange(self.rpos.shape[0]), self.target_id].unsqueeze(1)
         pos_error = torch.norm(current_target_pos, dim=-1)
         
         self.stats["pos_error"].add_(pos_error)
 
         reward_pos = - pos_error * self.reward_distance_scale
-        reward_pos_bonus = ((pos_error <= 0.02) * 10).float()
         
         # next target
-        update_target_idx = (reward_pos_bonus > 0).squeeze()
-        self.target_count[update_target_idx] += 1
-        update_target_pos = self.rpos[torch.arange(self.rpos.shape[0]), self.target_count].unsqueeze(1)
-        self.target_vis.set_world_poses(positions=update_target_pos + self.envs_positions.unsqueeze(1), env_indices=torch.arange(self.num_envs))
-        
+        update_target_idx = (pos_error <= 0.02).squeeze()
+        self.target_id[update_target_idx] = torch.clamp(self.target_id[update_target_idx] + 1, max=self.num_points - 1)
+        reward_pos_bonus = self.target_id.unsqueeze(1).float() * self.reward_bonus_scale
+
         reward_up = torch.square((self.drone.up[..., 2] + 1) / 2)
 
         spin = torch.square(self.drone.vel[..., -1])
@@ -366,6 +357,7 @@ class MultiGoto(IsaacEnv):
         reach_flag = (reward_pos_bonus > 0).float()
         current_reach = self.progress_buf.unsqueeze(1) * reach_flag + self.max_episode_length * (1.0 - reach_flag)
         self.stats['reach_time'].set_(torch.min(self.stats['reach_time'], current_reach))
+        self.stats['reach_num'].set_(self.target_id.unsqueeze(1).float())
         
         # done_misbehave = (distance > 0.5)
 
