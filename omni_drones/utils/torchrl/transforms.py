@@ -432,10 +432,6 @@ class PIDRateController(Transform):
         action = tensordict[self.action_key]
         device = drone_state.device
         
-        # # action smoothness
-        # if not(self.epsilon is None) and self.use_action_smooth:
-        #     action = prev_action + torch.clamp(action - prev_action, min = - self.epsilon, max = + self.epsilon)
-        
         # if not(self.epsilon is None) and self.use_cbf:
         #     action = solve_qp_batch(action.to('cpu').numpy(), prev_action.to('cpu').numpy(), self.epsilon)
         #     action = torch.from_numpy(action).to(device).float()
@@ -450,6 +446,12 @@ class PIDRateController(Transform):
         # raw action error
         ctbr_action = torch.concat([target_rate, target_thrust], dim=-1)
         prev_ctbr_action = tensordict[("info", "prev_action")]
+
+        # action smoothness
+        if not(self.epsilon is None) and self.use_action_smooth:
+            ctbr_action = prev_ctbr_action + torch.clamp(ctbr_action - prev_ctbr_action, min = - self.epsilon, max = + self.epsilon)        
+            target_rate, target_thrust = ctbr_action.split([3, 1], -1)
+
         action_error = torch.norm(ctbr_action - prev_ctbr_action, dim = -1)
         tensordict.set(("stats", "raw_action_error"), action_error)
         tensordict.set(("info", "prev_action"), ctbr_action)

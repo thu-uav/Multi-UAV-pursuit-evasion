@@ -5,7 +5,7 @@ target_clip: 1.0
 max_thrust_ratio: 0.9
 fixed_yaw: 0
 use_cbf: 0
-use_action_smooth: 0
+use_action_smooth: 1
 epsilon: 0.01 # action smooth
 # epsilon: null
 inertia:

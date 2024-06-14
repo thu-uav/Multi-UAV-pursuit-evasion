@@ -7,7 +7,7 @@ env: ${task.env}
 
 # model_dir: /home/jiayu/OmniDrones/scripts/outputs/Track_size05to08_smooth0_reward_up_spin/05-28_10-28/wandb/run-20240528_102811-crgu03wi/files/checkpoint_603062272.pt
 # model_dir: /home/jiayu/OmniDrones/scripts/outputs/Go_return_reach_and_return_load/06-13_16-05/wandb/run-20240613_160544-yvlac912/files/checkpoint_943980544.pt
-# model_dir: /home/jiayu/OmniDrones/scripts/outputs/Go_return_reach_and_return_threshold07_load/06-13_18-14/wandb/run-20240613_181424-mi31crvc/files/checkpoint_812908544.pt
+# model_dir: /home/jiayu/OmniDrones/scripts/outputs/Star_fixed_smooth05/06-14_13-53/wandb/run-20240614_135321-2v0phmyv/files/checkpoint_891551744.pt
 model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
@@ -27,8 +27,8 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: Star_fixed
-  # run_name: Star_smooth1
+  run_name: Star_wosmooth_hardsmooth001
+  # run_name: debug
   job_type: train
   entity: chenjy
   project: sim2real

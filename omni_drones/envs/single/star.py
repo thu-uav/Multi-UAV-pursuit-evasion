@@ -147,8 +147,8 @@ class Star(IsaacEnv):
         #     torch.tensor([0.0, 0.0, 0.], device=self.device) * torch.pi
         # )
         # self.target_times_dist = D.Uniform(
-        #     torch.tensor(1.5, device=self.device),
-        #     torch.tensor(1.5, device=self.device)
+        #     torch.tensor(1.3, device=self.device),
+        #     torch.tensor(1.3, device=self.device)
         # )
         
         self.origin = torch.tensor([0., 0., 1.], device=self.device)
@@ -428,8 +428,6 @@ class Star(IsaacEnv):
 
         reward = (
             reward_pos
-            # + reward_pos * reward_up
-            # + reward_pos * reward_spin
             + reward_up
             + reward_spin
             + reward_action_smoothness
