@@ -7,8 +7,8 @@ env: ${task.env}
 
 # model_dir: /home/jiayu/OmniDrones/scripts/outputs/Track_size05to08_smooth0_reward_up_spin/05-28_10-28/wandb/run-20240528_102811-crgu03wi/files/checkpoint_603062272.pt
 # model_dir: /home/jiayu/OmniDrones/scripts/outputs/Go_return_reach_and_return_load/06-13_16-05/wandb/run-20240613_160544-yvlac912/files/checkpoint_943980544.pt
-# model_dir: /home/jiayu/OmniDrones/scripts/outputs/star_Tm0023_smooth1_distance10.pt
-model_dir: null
+model_dir: /home/jiayu/OmniDrones/scripts/outputs/Star_Tm043_smooth05_easyunifdist_useinitvel/06-15_17-09/wandb/run-20240615_170916-f8zpqns6/files/checkpoint_final.pt
+# model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
 max_iters: -1
@@ -27,7 +27,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: Star_Tm0024_smooth05
+  run_name: Star_Tm043_smooth05_easyunifdist_useinitvel_eval
   # run_name: debug
   job_type: train
   entity: chenjy
