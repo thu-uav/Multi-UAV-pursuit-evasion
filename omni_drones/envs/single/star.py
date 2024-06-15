@@ -121,7 +121,7 @@ class Star(IsaacEnv):
             self.wind_w = torch.zeros(self.num_envs, 3, 8, device=self.device)
             self.wind_i = torch.zeros(self.num_envs, 1, device=self.device)
         
-        # unif dist
+        # # unif dist
         # self.init_rpy_dist = D.Uniform(
         #     torch.tensor([-.2, -.2, 0.], device=self.device) * torch.pi,
         #     torch.tensor([0.2, 0.2, 2.], device=self.device) * torch.pi
@@ -147,8 +147,8 @@ class Star(IsaacEnv):
         #     torch.tensor([0.0, 0.0, 0.], device=self.device) * torch.pi
         # )
         # self.target_times_dist = D.Uniform(
-        #     torch.tensor(1.3, device=self.device),
-        #     torch.tensor(1.3, device=self.device)
+        #     torch.tensor(1.5, device=self.device),
+        #     torch.tensor(1.5, device=self.device)
         # )
         
         self.origin = torch.tensor([0., 0., 1.], device=self.device)
@@ -272,11 +272,12 @@ class Star(IsaacEnv):
         self.target_points[env_ids] = star_points
 
         t0 = torch.zeros((len(env_ids), 1), device=self.device)
-        pos, linear_vel = vmap(zigzag)(t0 + self.traj_t0, self.target_times[env_ids], self.target_points[env_ids])
+        # pos, linear_vel = vmap(zigzag)(t0 + self.traj_t0, self.target_times[env_ids], self.target_points[env_ids])
+        pos, _ = vmap(zigzag)(t0 + self.traj_t0, self.target_times[env_ids], self.target_points[env_ids])
         pos = self.origin + pos
         rot = euler_to_quaternion(self.init_rpy_dist.sample(env_ids.shape))
         vel = torch.zeros(len(env_ids), 1, 6, device=self.device)
-        vel[..., :3] = linear_vel
+        # vel[..., :3] = linear_vel
         self.drone.set_world_poses(
             pos.squeeze(1) + self.envs_positions[env_ids], rot, env_ids
         )

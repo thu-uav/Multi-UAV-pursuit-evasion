@@ -60,6 +60,7 @@ class MultiGoto(IsaacEnv):
         self.reward_distance_scale = cfg.task.reward_distance_scale
         self.reward_bonus_scale = cfg.task.reward_bonus_scale
         self.reward_time_scale = cfg.task.reward_time_scale
+        self.reach_threshold = cfg.task.reach_threshold
         self.time_encoding = cfg.task.time_encoding
         
         self.randomization = cfg.task.get("randomization", {})
@@ -91,8 +92,8 @@ class MultiGoto(IsaacEnv):
 
         # eval
         self.init_target_dist = D.Uniform(
-            torch.tensor([-1., -1., 1.0], device=self.device),
-            torch.tensor([1., 1., 1.0], device=self.device)
+            torch.tensor([-0.5, -0.5, 1.0], device=self.device),
+            torch.tensor([0.5, 0.5, 1.0], device=self.device)
         )
         self.init_rpy_dist = D.Uniform(
             torch.tensor([0., 0., 0.0], device=self.device) * torch.pi,
@@ -102,6 +103,7 @@ class MultiGoto(IsaacEnv):
         self.drone_init_pos = torch.tensor([[0.0, 0.0, 1.]], device=self.device)
         self.target_pos = torch.zeros(self.num_envs, self.num_points, 3, device=self.device)
         self.target_id = torch.zeros(self.num_envs, device=self.device, dtype=torch.int64) # 0 ~ self.num_points - 1
+        self.reach = torch.zeros(self.num_envs, self.num_points, device=self.device) # 1: reach
         self.alpha = 0.8
 
         self.last_linear_v = torch.zeros(self.num_envs, 1, device=self.device)
@@ -150,7 +152,8 @@ class MultiGoto(IsaacEnv):
         # drone_state_dim = self.drone.state_spec.shape[-1]
         observation_dim = 3 + 4 + 3 + 3 # velocity, quaternion, heading, up
         observation_dim += 3 * self.num_points # all targets pos
-        observation_dim += 1 # current target id
+        # observation_dim += 1 # current target id
+        observation_dim += self.num_points # current target id
 
         if self.cfg.task.time_encoding:
             self.time_encoding_dim = 4
@@ -191,8 +194,6 @@ class MultiGoto(IsaacEnv):
             "reward_pos": UnboundedContinuousTensorSpec(1),
             "reward_pos_bonus": UnboundedContinuousTensorSpec(1),
             "reward_spin": UnboundedContinuousTensorSpec(1),
-            "reward_head": UnboundedContinuousTensorSpec(1),
-            "reward_head_bonus": UnboundedContinuousTensorSpec(1),
             "reward_up": UnboundedContinuousTensorSpec(1),
             "reward_time": UnboundedContinuousTensorSpec(1),
             "reach_time": UnboundedContinuousTensorSpec(1),
@@ -236,6 +237,7 @@ class MultiGoto(IsaacEnv):
         self.drone.set_velocities(self.init_vels[env_ids], env_ids)
         self.target_pos[env_ids] = self.init_target_dist.sample((*env_ids.shape, self.num_points))
         self.target_id[env_ids] = 0 # reset count
+        self.reach[env_ids] = 0.0
         
         self.target_vis.set_world_poses(positions=self.target_pos[env_ids] + self.envs_positions[env_ids].unsqueeze(1), env_indices=env_ids)
 
@@ -264,8 +266,19 @@ class MultiGoto(IsaacEnv):
 
         # relative position and heading
         self.rpos = self.target_pos - self.root_state[..., :3]
+
+        # update reach num
+        current_target_pos = self.rpos[torch.arange(self.rpos.shape[0]), self.target_id].unsqueeze(1)
+        self.pos_error = torch.norm(current_target_pos, dim=-1)
         
-        obs = [self.rpos.reshape(self.num_envs, -1).unsqueeze(1), self.target_id.unsqueeze(-1).unsqueeze(-1), self.root_state[..., 3:10], self.root_state[..., 13:19],]  # (relative) position, velocity, quaternion, heading, up
+        # next target
+        update_target_idx = (self.pos_error <= self.reach_threshold).squeeze()
+        # reach
+        self.reach[update_target_idx, self.target_id[update_target_idx]] = 1.0
+        self.target_id[update_target_idx] = torch.clamp(self.target_id[update_target_idx] + 1, max=self.num_points - 1)
+        
+        # obs = [self.rpos.reshape(self.num_envs, -1).unsqueeze(1), self.target_id.unsqueeze(-1).unsqueeze(-1), self.root_state[..., 3:10], self.root_state[..., 13:19],]  # (relative) position, velocity, quaternion, heading, up
+        obs = [self.rpos.reshape(self.num_envs, -1).unsqueeze(1), self.reach.unsqueeze(1), self.root_state[..., 3:10], self.root_state[..., 13:19],]  # (relative) position, velocity, quaternion, heading, up
         if self.time_encoding:
             t = (self.progress_buf / self.max_episode_length).unsqueeze(-1)
             obs.append(t.expand(-1, self.time_encoding_dim).unsqueeze(1))
@@ -321,18 +334,16 @@ class MultiGoto(IsaacEnv):
         }, self.batch_size)
 
     def _compute_reward_and_done(self):
-        # pose reward
-        current_target_pos = self.rpos[torch.arange(self.rpos.shape[0]), self.target_id].unsqueeze(1)
-        pos_error = torch.norm(current_target_pos, dim=-1)
+        # # pose reward
+        # current_target_pos = self.rpos[torch.arange(self.rpos.shape[0]), self.target_id].unsqueeze(1)
+        # pos_error = torch.norm(current_target_pos, dim=-1)
         
-        self.stats["pos_error"].add_(pos_error)
+        self.stats["pos_error"].add_(self.pos_error)
 
-        reward_pos = - pos_error * self.reward_distance_scale
+        reward_pos = - self.pos_error * self.reward_distance_scale
         
         # next target
-        update_target_idx = (pos_error <= 0.02).squeeze()
-        self.target_id[update_target_idx] = torch.clamp(self.target_id[update_target_idx] + 1, max=self.num_points - 1)
-        reward_pos_bonus = self.target_id.unsqueeze(1).float() * self.reward_bonus_scale
+        reward_pos_bonus = self.reach.sum(dim=-1).unsqueeze(1) * self.reward_bonus_scale
 
         reward_up = torch.square((self.drone.up[..., 2] + 1) / 2)
 
@@ -402,12 +413,6 @@ class MultiGoto(IsaacEnv):
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
         self.stats['reward_pos_bonus'].div_(
-            torch.where(done, ep_len, torch.ones_like(ep_len))
-        )
-        self.stats['reward_head'].div_(
-            torch.where(done, ep_len, torch.ones_like(ep_len))
-        )
-        self.stats['reward_head_bonus'].div_(
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
         self.stats['reward_up'].div_(
