@@ -20,7 +20,7 @@ latency_step: 5
 reset_thres: 1.
 future_traj_steps: 4
 
-reward_action_smoothness_weight: 0.0
+reward_action_smoothness_weight: 0.5
 reward_distance_scale: 5.0
 
 action_transform: PIDrate

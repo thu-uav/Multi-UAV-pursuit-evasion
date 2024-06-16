@@ -27,7 +27,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: Track_Tm04_smooth05
+  run_name: Multigoto_wosmooth
   # run_name: debug
   job_type: train
   entity: chenjy
@@ -40,8 +40,8 @@ wandb:
 
 defaults:
   # - task: Star
-  - task: Track
+  # - task: Track
   # - task: Exchange
-  # - task: MultiGoto
+  - task: MultiGoto
   - algo: mappo
   - _self_
