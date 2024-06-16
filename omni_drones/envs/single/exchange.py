@@ -16,7 +16,6 @@ from omni_drones.utils.torch import euler_to_quaternion, quat_axis, quat_rotate_
 from tensordict.tensordict import TensorDict, TensorDictBase
 from torchrl.data import UnboundedContinuousTensorSpec, CompositeSpec
 import collections
-import cvxpy as cp
 
 class Exchange(IsaacEnv):
     r"""

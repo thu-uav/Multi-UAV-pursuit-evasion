@@ -47,7 +47,6 @@ from torchrl.data import (
 from .env import AgentSpec
 from dataclasses import replace
 from torch.distributions.transforms import TanhTransform
-import cvxpy as cp
 
 def _transform_agent_spec(self: Transform, agent_spec: AgentSpec) -> AgentSpec:
     return agent_spec
@@ -66,33 +65,33 @@ def _agent_spec(self: TransformedEnv) -> AgentSpec:
     return {name: replace(spec, _env=self) for name, spec in agent_spec.items()}
 TransformedEnv.agent_spec = property(_agent_spec)
 
-# cbf
-def solve_qp_batch(actions, prev_actions, delta):
-    tmp_batch, num_agents, action_size = actions.shape
-    batch_size = tmp_batch * num_agents
+# # cbf
+# def solve_qp_batch(actions, prev_actions, delta):
+#     tmp_batch, num_agents, action_size = actions.shape
+#     batch_size = tmp_batch * num_agents
     
-    actions = actions.reshape(-1, action_size)
-    prev_actions = prev_actions.reshape(-1, action_size)
+#     actions = actions.reshape(-1, action_size)
+#     prev_actions = prev_actions.reshape(-1, action_size)
 
-    # define variable
-    a = cp.Variable((batch_size, action_size))
+#     # define variable
+#     a = cp.Variable((batch_size, action_size))
 
-    # define the objective
-    objective = cp.Minimize(cp.sum_squares(a - actions))
+#     # define the objective
+#     objective = cp.Minimize(cp.sum_squares(a - actions))
 
-    # define constraints
-    constraints = [cp.norm(a - prev_actions, 2, axis=1) <= delta]
+#     # define constraints
+#     constraints = [cp.norm(a - prev_actions, 2, axis=1) <= delta]
 
-    # problem
-    prob = cp.Problem(objective, constraints)
+#     # problem
+#     prob = cp.Problem(objective, constraints)
 
-    # solve
-    prob.solve()
+#     # solve
+#     prob.solve()
 
-    # get corrected_actions
-    corrected_actions = a.value
+#     # get corrected_actions
+#     corrected_actions = a.value
 
-    return corrected_actions.reshape(-1, num_agents, action_size)
+#     return corrected_actions.reshape(-1, num_agents, action_size)
 
 class LogOnEpisode(Transform):
     def __init__(

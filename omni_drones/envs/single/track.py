@@ -457,7 +457,7 @@ class Track(IsaacEnv):
         t = self.traj_t0 + scale_time(t * self.dt)
         traj_rot = self.traj_rot[env_ids].unsqueeze(1).expand(-1, t.shape[1], 4)
         
-        target_pos = vmap(lemniscate)(t, self.traj_c[env_ids])
+        target_pos, _ = vmap(lemniscate)(t, self.traj_c[env_ids])
         target_pos = vmap(torch_utils.quat_rotate)(traj_rot, target_pos) * self.traj_scale[env_ids].unsqueeze(1)
 
         return self.origin + target_pos
