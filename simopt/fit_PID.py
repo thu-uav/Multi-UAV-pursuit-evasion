@@ -21,8 +21,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 rosbags = [
-    '/home/jiayu/OmniDrones/simopt/real_data/rl_hover_1.csv',
+    # '/home/jiayu/OmniDrones/simopt/real_data/rl_hover_1.csv',
+    # '/home/jiayu/OmniDrones/simopt/real_data/size0_8.csv',
+    '/home/jiayu/OmniDrones/simopt/real_data/size1_0.csv',
+    # '/home/jiayu/OmniDrones/simopt/real_data/size1_2.csv',
 ]
+# shape [-1, 37]
 
 @hydra.main(version_base=None, config_path=".", config_name="real2sim")
 def main(cfg):
@@ -30,39 +34,39 @@ def main(cfg):
         preprocess real data
         real_data: [batch_size, T, dimension]
     """
-    df = pd.read_csv(rosbags[0], skip_blank_lines=True)
-    df = np.array(df)
-    # preprocess, motor > 0
-    use_preprocess = True
-    if use_preprocess:
+    real_data = []
+    for idx in range(len(rosbags)):
+        df = pd.read_csv(rosbags[idx], skip_blank_lines=True)
+        df = np.array(df)
+        # preprocess, motor > 0
         preprocess_df = []
         for df_one in df:
             if df_one[-1] > 0:
                 preprocess_df.append(df_one)
         preprocess_df = np.array(preprocess_df)
-    else:
-        preprocess_df = df
-    episode_length = min(1300, preprocess_df.shape[0])
-    real_data = []
-    # real_date: [episode_length, num_trajectory, dim]
-    T = 20
-    for i in range(0, episode_length-T):
-        _slice = slice(i, i+T)
-        real_data.append(preprocess_df[_slice])
-    real_data = np.array(real_data)
-
-    # add next_pos
-    next_pos = real_data[1:, :, 1:4]
-    # add next_quat
-    next_quat = real_data[1:, :, 5:9]
-    # add next_vel
-    next_vel = real_data[1:, :, 10:13]
-    # add next_body_rate
-    next_body_rate = real_data[1:, :, 23:26]
-    real_data = np.concatenate([real_data[:-1], next_pos], axis=-1)
-    real_data = np.concatenate([real_data, next_quat], axis=-1)
-    real_data = np.concatenate([real_data, next_vel], axis=-1)
-    real_data = np.concatenate([real_data, next_body_rate], axis=-1)
+        episode_length = min(1300, preprocess_df.shape[0])
+        data_one = []
+        # real_date: [episode_length, num_trajectory, dim]
+        T = 20
+        for i in range(0, episode_length-T):
+            _slice = slice(i, i+T)
+            data_one.append(preprocess_df[_slice])
+        data_one = np.array(data_one)
+        
+        # add next_pos
+        next_pos = data_one[1:, :, 1:4]
+        # add next_quat
+        next_quat = data_one[1:, :, 5:9]
+        # add next_vel
+        next_vel = data_one[1:, :, 10:13]
+        # add next_body_rate
+        next_body_rate = data_one[1:, :, 23:26]
+        data_one = np.concatenate([data_one[:-1], next_pos], axis=-1)
+        data_one = np.concatenate([data_one, next_quat], axis=-1)
+        data_one = np.concatenate([data_one, next_vel], axis=-1)
+        data_one = np.concatenate([data_one, next_body_rate], axis=-1)
+        real_data.append(data_one)
+    real_data = np.concatenate(real_data, axis=0)
 
     num_envs = real_data.shape[0]
 
@@ -364,8 +368,8 @@ def main(cfg):
         if mask == 1:
             if count == 5: # force_constant -> kf:[1.5, 2.0]
                 params_range.append((2.2034505922031636e-08, 2.9379341229375514e-08))
-            elif count == 9: # Tm: [0.01, 0.5], v(t+\delta_t) = v(t) * (1 - \delta_t / Tm) + throttle_des * (\delta_t / Tm)
-                params_range.append((0.01, 0.5))
+            elif count == 9: # Tm: [0.01, 0.05], v(t+\delta_t) = v(t) * (1 - \delta_t / Tm) + throttle_des * (\delta_t / Tm)
+                params_range.append((0.01, 0.05))
         count += 1
     opt = Optimizer(
         dimensions=params_range,

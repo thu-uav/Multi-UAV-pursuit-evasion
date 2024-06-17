@@ -22,7 +22,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 rosbags = [
-    '/home/jiayu/OmniDrones/simopt/real_data/rl_hover_1.csv',
+    '/home/jiayu/OmniDrones/simopt/real_data/size0_8.csv',
+    # '/home/jiayu/OmniDrones/simopt/real_data/size1_0.csv',
+    # '/home/jiayu/OmniDrones/simopt/real_data/size1_2.csv',
 ]
 
 @hydra.main(version_base=None, config_path=".", config_name="real2sim")
@@ -44,12 +46,11 @@ def main(cfg):
     else:
         preprocess_df = df
     # episode_len = preprocess_df.shape[0] # contains land
-    start_idx = 10
+    start_idx = 0
+    # episode_len = min(1300, preprocess_df.shape[0])
     episode_len = min(1300, preprocess_df.shape[0])
     # episode_len = -1 # TODO, apply to all trajectories
     real_data = []
-    # T = 20
-    # skip = 5
     T = 1
     skip = 1
     for i in range(start_idx, episode_len-T, skip):
