@@ -98,6 +98,7 @@ class Track(IsaacEnv):
         assert self.future_traj_steps > 0
         self.intrinsics = cfg.task.intrinsics
         self.wind = cfg.task.wind
+        self.use_eval = cfg.task.use_eval
 
         super().__init__(cfg, headless)
 
@@ -138,19 +139,24 @@ class Track(IsaacEnv):
             torch.tensor([0.8, 0.8, 0.25], device=self.device)
         )
         
-        # # eval
-        # self.init_rpy_dist = D.Uniform(
-        #     torch.tensor([-.0, -.0, 0.], device=self.device) * torch.pi,
-        #     torch.tensor([0., 0., 0.], device=self.device) * torch.pi
-        # )
-        # self.traj_rpy_dist = D.Uniform(
-        #     torch.tensor([0., 0., 0.], device=self.device) * torch.pi,
-        #     torch.tensor([0., 0., 0.], device=self.device) * torch.pi
-        # )
-        # self.traj_scale_dist = D.Uniform(
-        #     torch.tensor([0.5, 0.5, 0.25], device=self.device),
-        #     torch.tensor([0.5, 0.5, 0.25], device=self.device)
-        # )
+        # eval
+        if self.use_eval:
+            self.init_rpy_dist = D.Uniform(
+                torch.tensor([-.0, -.0, 0.], device=self.device) * torch.pi,
+                torch.tensor([0., 0., 0.], device=self.device) * torch.pi
+            )
+            self.traj_rpy_dist = D.Uniform(
+                torch.tensor([0., 0., 0.], device=self.device) * torch.pi,
+                torch.tensor([0., 0., 0.], device=self.device) * torch.pi
+            )
+            self.traj_scale_dist = D.Uniform(
+                torch.tensor([0.8, 0.8, 0.25], device=self.device),
+                torch.tensor([0.8, 0.8, 0.25], device=self.device)
+            )
+            self.traj_c_dist = D.Uniform(
+                torch.tensor(0.0, device=self.device),
+                torch.tensor(0.0, device=self.device)
+            )
         
         self.origin = torch.tensor([0., 0., 1.], device=self.device)
 
@@ -252,6 +258,7 @@ class Track(IsaacEnv):
         self.info = info_spec.zero()
         self.stats = stats_spec.zero()
 
+        self.random_latency = self.cfg.task.random_latency
         self.latency = self.cfg.task.latency_step if self.cfg.task.latency else 0
         self.obs_buffer = collections.deque(maxlen=self.latency)
 
@@ -263,11 +270,14 @@ class Track(IsaacEnv):
         t0 = torch.zeros(len(env_ids), device=self.device)
         # pos = lemniscate(t0 + self.traj_t0, self.traj_c[env_ids]) + self.origin
         pos, linear_v = lemniscate(t0 + self.traj_t0, self.traj_c[env_ids])
-        pos = pos + + self.origin
-        linear_v = linear_v * self.traj_scale[env_ids]
+        pos = pos + self.origin
+        if self.use_eval:
+            pos = torch.zeros(len(env_ids), 3, device=self.device)
+            pos = pos + self.origin
+        # linear_v = linear_v * self.traj_scale[env_ids]
         rot = euler_to_quaternion(self.init_rpy_dist.sample(env_ids.shape))
         vel = torch.zeros(len(env_ids), 1, 6, device=self.device)
-        vel[..., :3] = linear_v.unsqueeze(1)
+        # vel[..., :3] = linear_v.unsqueeze(1)
         self.drone.set_world_poses(
             pos + self.envs_positions[env_ids], rot, env_ids
         )

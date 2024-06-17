@@ -12,7 +12,7 @@ env:
 drone_model: crazyflie
 force_sensor: false
 
-reward_action_smoothness_weight: 0.0
+reward_action_smoothness_weight: 1.0
 reward_distance_scale: 10.0
 reward_time_scale: 0.0
 reward_collision: 100.0
