@@ -32,7 +32,7 @@ wandb:
   group: ${oc.select:..task.name}
   # run_name: Goto_static_smooth1
   # run_name: debug
-  run_name: Track_Tm04_wosmooth_eval # w.o. initvel, large training dist
+  run_name: Track_smooth_latency3
   job_type: train
   entity: chenjy
   project: sim2real

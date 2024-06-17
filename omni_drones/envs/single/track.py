@@ -379,9 +379,13 @@ class Track(IsaacEnv):
         
         obs = torch.cat(obs, dim=-1)
         
-        if self.latency:
+        if self.cfg.task.latency:
             self.obs_buffer.append(obs)
-            obs = self.obs_buffer[0]
+            if self.random_latency:
+                random_indices = torch.randint(0, len(self.obs_buffer), (obs.shape[0],), device=self.device)
+                obs = torch.stack(list(self.obs_buffer))[random_indices, torch.arange(obs.shape[0])]
+            else:
+                obs = self.obs_buffer[0]
 
         return TensorDict({
             "agents": {

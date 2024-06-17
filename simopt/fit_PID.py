@@ -22,9 +22,9 @@ import numpy as np
 
 rosbags = [
     # '/home/jiayu/OmniDrones/simopt/real_data/rl_hover_1.csv',
-    # '/home/jiayu/OmniDrones/simopt/real_data/size0_8.csv',
+    '/home/jiayu/OmniDrones/simopt/real_data/size0_8.csv',
     '/home/jiayu/OmniDrones/simopt/real_data/size1_0.csv',
-    # '/home/jiayu/OmniDrones/simopt/real_data/size1_2.csv',
+    '/home/jiayu/OmniDrones/simopt/real_data/size1_2.csv',
 ]
 # shape [-1, 37]
 
@@ -47,7 +47,7 @@ def main(cfg):
         episode_length = min(1300, preprocess_df.shape[0])
         data_one = []
         # real_date: [episode_length, num_trajectory, dim]
-        T = 20
+        T = 10
         for i in range(0, episode_length-T):
             _slice = slice(i, i+T)
             data_one.append(preprocess_df[_slice])
@@ -303,7 +303,8 @@ def main(cfg):
         # concat
         sim_states = np.concatenate([sim_pos_list, sim_vel_list, sim_quat_list, sim_ang_vel_list], axis=-1)
         real_states = np.concatenate([real_pos_list, real_vel_list, real_quat_list, real_ang_vel_list], axis=-1)
-        error = np.mean(np.linalg.norm(sim_states - real_states, axis=-1, ord=2), axis=-1)
+        error2 = np.mean(np.linalg.norm(sim_states - real_states, axis=-1, ord=2), axis=-1)
+        error1 = np.mean(np.linalg.norm(sim_states - real_states, axis=-1, ord=1), axis=-1)
         
         # pos_error = np.mean(np.linalg.norm(sim_pos_list - real_pos_list, axis=-1, ord=2), axis=-1)
         # vel_error = np.mean(np.linalg.norm(sim_vel_list - real_vel_list, axis=-1, ord=2), axis=-1)
@@ -319,7 +320,8 @@ def main(cfg):
         # beta = 1.0
         gamma = 0.95 # discounted factor
         for i in range(shuffled_real_data.shape[1]):
-            loss += error[i] * gamma**i
+            loss += error1[i] * gamma**i
+            loss += error2[i] * gamma**i
             # pos_loss += pos_error[i] * gamma**i
             # vel_loss += alpha * vel_error[i] * gamma**i
             # quat_loss += quat_error[i] * gamma**i
