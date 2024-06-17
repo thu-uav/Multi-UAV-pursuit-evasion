@@ -60,6 +60,7 @@ class Goto_static(IsaacEnv):
         self.reward_time_scale = cfg.task.reward_time_scale
         self.reward_collision = cfg.task.reward_collision
         self.time_encoding = cfg.task.time_encoding
+        self.reach_threshold = cfg.task.reach_threshold
         
         self.randomization = cfg.task.get("randomization", {})
 
@@ -358,7 +359,7 @@ class Goto_static(IsaacEnv):
         cylinder_pos_error = torch.norm(self.rpos_cylinder[..., :2], dim=-1)
 
         reward_pos = - pos_error * self.reward_distance_scale
-        reward_pos_bonus = ((pos_error <= 0.05) * 10).float()
+        reward_pos_bonus = ((pos_error <= self.reach_threshold) * 10).float()
         
         reward_collision = - self.reward_collision * (cylinder_pos_error <= self.cylinder_radius + 0.05).float()
         

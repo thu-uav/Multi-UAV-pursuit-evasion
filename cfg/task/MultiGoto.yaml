@@ -14,9 +14,9 @@ force_sensor: false
 
 reward_action_smoothness_weight: 0.0
 reward_distance_scale: 10.0
-reward_bonus_scale: 30.0
+reward_bonus_scale: 10.0
 reward_time_scale: 0.0
-reach_threshold: 0.3
+reach_threshold: 0.05
 
 # observation options
 time_encoding: true

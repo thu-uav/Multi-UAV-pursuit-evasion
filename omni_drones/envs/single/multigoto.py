@@ -117,7 +117,7 @@ class MultiGoto(IsaacEnv):
         import omni_drones.utils.kit as kit_utils
         import omni.isaac.core.utils.prims as prim_utils
 
-        self.num_points = 5
+        self.num_points = 3
         drone_model = MultirotorBase.REGISTRY[self.cfg.task.drone_model]
         cfg = drone_model.cfg_cls(force_sensor=self.cfg.task.force_sensor)
         self.drone: MultirotorBase = drone_model(cfg=cfg)
