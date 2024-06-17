@@ -11,7 +11,7 @@ env: ${task.env}
 # model_dir: /home/jiayu/OmniDrones/scripts/outputs/Track_Tm04_wosmooth.pt
 # model_dir: /home/jiayu/OmniDrones/scripts/outputs/Track_Tm043_smooth05.pt
 # model_dir: /home/jiayu/OmniDrones/scripts/outputs/Track_Tm043_wosmooth.pt
-# model_dir: null
+model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
 max_iters: -1
@@ -32,7 +32,7 @@ wandb:
   group: ${oc.select:..task.name}
   # run_name: Goto_static_smooth1
   # run_name: debug
-  run_name: Track_Tm043_wosmooth_eval
+  run_name: Track_Tm04_wosmooth # w.o. initvel, large training dist
   job_type: train
   entity: chenjy
   project: sim2real

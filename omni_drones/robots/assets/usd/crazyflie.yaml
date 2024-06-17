@@ -54,9 +54,9 @@ rotor_configuration:
   - 3.92699082
   - 5.49778714
   # time_constant: 0.43 # 0.43, tau = time_constant
-  time_constant: 0.023255813953488372 # 0.43, tau = dt / time_constant
+  # time_constant: 0.023255813953488372 # 0.43, tau = dt / time_constant
   # time_constant: 0.028585119515659244 # 0.349, simopt
-  # time_constant: 0.025 # 0.4, DATT
+  time_constant: 0.025 # 0.4, DATT
 controller_configuration: # invalid
   gain:
   - 0.0052
