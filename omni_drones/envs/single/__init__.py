@@ -24,6 +24,7 @@
 from .hover import Hover
 from .goto import Goto
 from .goto_return import Goto_return
+from .goto_static import Goto_static
 from .multigoto import MultiGoto
 from .exchange import Exchange
 from .takeoff import Takeoff
