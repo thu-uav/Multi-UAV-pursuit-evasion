@@ -5,12 +5,7 @@ headless: true
 sim: ${task.sim}
 env: ${task.env}
 
-# model_dir: /home/jiayu/OmniDrones/scripts/outputs/Track_Tm0349_smooth05.pt
-# model_dir: /home/jiayu/OmniDrones/scripts/outputs/Track_Tm0349_wosmooth.pt
-# model_dir: /home/jiayu/OmniDrones/scripts/outputs/Track_Tm04_smooth05.pt
-# model_dir: /home/jiayu/OmniDrones/scripts/outputs/Track_Tm04_wosmooth.pt
-# model_dir: /home/jiayu/OmniDrones/scripts/outputs/Track_Tm043_smooth05.pt
-# model_dir: /home/jiayu/OmniDrones/scripts/outputs/Track_Tm04_wosmooth_new.pt
+# model_dir: /home/jiayu/OmniDrones/scripts/outputs/Track_Tm04_wosmooth_wolatency.pt
 model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
@@ -32,7 +27,7 @@ wandb:
   group: ${oc.select:..task.name}
   # run_name: Goto_static_smooth1
   # run_name: debug
-  run_name: Track_smooth_latency3
+  run_name: Track_Tm04_wosmooth_latency2
   job_type: train
   entity: chenjy
   project: sim2real
