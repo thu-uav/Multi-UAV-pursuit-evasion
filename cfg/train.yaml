@@ -30,8 +30,8 @@ wandb:
   job_type: train
   entity: chenjy
   project: sim2real
-  mode: disabled
-  # mode: online # set to 'disabled' when debugging locally, online
+  # mode: disabled
+  mode: online # set to 'disabled' when debugging locally, online
   run_id: 
   monitor_gym: True
   tags: 
