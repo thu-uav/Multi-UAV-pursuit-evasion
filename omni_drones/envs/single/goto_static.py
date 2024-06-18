@@ -61,6 +61,7 @@ class Goto_static(IsaacEnv):
         self.reward_collision = cfg.task.reward_collision
         self.time_encoding = cfg.task.time_encoding
         self.reach_threshold = cfg.task.reach_threshold
+        self.use_eval = cfg.task.use_eval
         
         self.randomization = cfg.task.get("randomization", {})
 
@@ -101,6 +102,20 @@ class Goto_static(IsaacEnv):
             torch.tensor([-0.2, -0.2, 0.0], device=self.device) * torch.pi,
             torch.tensor([0.2, 0.2, 0.5], device=self.device) * torch.pi
         )
+
+        if self.use_eval:
+            self.init_drone_pos_dist = D.Uniform(
+                torch.tensor([0.0, 1.0, 1.0], device=self.device),
+                torch.tensor([0.0, 1.0, 1.0], device=self.device)
+            )
+            self.init_target_pos_dist = D.Uniform(
+                torch.tensor([0.0, - 1.0, 1.0], device=self.device),
+                torch.tensor([0.0, - 1.0, 1.0], device=self.device)
+            )
+            self.init_rpy_dist = D.Uniform(
+                torch.tensor([0., 0., 0.0], device=self.device) * torch.pi,
+                torch.tensor([0., 0., 0.0], device=self.device) * torch.pi
+            )
 
         self.alpha = 0.8
         self.all_cylinder_height = torch.ones(self.num_envs, 1, 1, device=self.device) * self.cylinder_height
