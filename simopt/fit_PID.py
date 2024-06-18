@@ -21,10 +21,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 rosbags = [
-    # '/home/jiayu/OmniDrones/simopt/real_data/rl_hover_1.csv',
-    '/home/jiayu/OmniDrones/simopt/real_data/size0_8.csv',
-    '/home/jiayu/OmniDrones/simopt/real_data/size1_0.csv',
-    '/home/jiayu/OmniDrones/simopt/real_data/size1_2.csv',
+    '/home/jiayu/OmniDrones/simopt/real_data/rl_hover_1.csv',
+    # '/home/jiayu/OmniDrones/simopt/real_data/size0_8.csv',
+    # '/home/jiayu/OmniDrones/simopt/real_data/size1_0.csv',
+    # '/home/jiayu/OmniDrones/simopt/real_data/size1_2.csv',
 ]
 # shape [-1, 37]
 
@@ -300,39 +300,30 @@ def main(cfg):
         sim_ang_vel_list = (sim_ang_vel_list - min_ang_vel_list) / (max_ang_vel_list - min_ang_vel_list)
         real_ang_vel_list = (real_ang_vel_list - min_ang_vel_list) / (max_ang_vel_list - min_ang_vel_list)
         
-        # concat
-        sim_states = np.concatenate([sim_pos_list, sim_vel_list, sim_quat_list, sim_ang_vel_list], axis=-1)
-        real_states = np.concatenate([real_pos_list, real_vel_list, real_quat_list, real_ang_vel_list], axis=-1)
-        error2 = np.mean(np.linalg.norm(sim_states - real_states, axis=-1, ord=2), axis=-1)
-        error1 = np.mean(np.linalg.norm(sim_states - real_states, axis=-1, ord=1), axis=-1)
+        # debug
+        error_rpy = sim_quat_list - real_quat_list
+        error_rpy_dot = sim_ang_vel_list - real_ang_vel_list
+        error_xyz = sim_pos_list - real_pos_list
+        error_xyz_dot = sim_vel_list - real_vel_list
         
-        # pos_error = np.mean(np.linalg.norm(sim_pos_list - real_pos_list, axis=-1, ord=2), axis=-1)
-        # vel_error = np.mean(np.linalg.norm(sim_vel_list - real_vel_list, axis=-1, ord=2), axis=-1)
-        # quat_error = np.mean(np.linalg.norm(sim_quat_list - real_quat_list, axis=-1, ord=2), axis=-1)
-        # ang_vel_error = np.mean(np.linalg.norm(sim_ang_vel_list - real_ang_vel_list, axis=-1, ord=2), axis=-1)
+        error = np.concatenate([error_rpy, error_rpy_dot, error_xyz, error_xyz_dot], axis=-1)
+        # error = np.concatenate([error_rpy_dot], axis=-1)
+        
+        L1_loss = np.linalg.norm(error, axis=-1, ord=1)
+        L2_loss = np.linalg.norm(error, axis=-1, ord=2)
+        L = np.mean(L1_loss + L2_loss, axis=-1)
         
         loss = torch.tensor(0.0, dtype=torch.float)
-        # pos_loss = torch.tensor(0.0, dtype=torch.float)
-        # vel_loss = torch.tensor(0.0, dtype=torch.float)
-        # quat_loss = torch.tensor(0.0, dtype=torch.float)
-        # ang_vel_loss = torch.tensor(0.0, dtype=torch.float)
-        # alpha = 1.0
-        # beta = 1.0
         gamma = 0.95 # discounted factor
         for i in range(shuffled_real_data.shape[1]):
-            loss += error1[i] * gamma**i
-            loss += error2[i] * gamma**i
-            # pos_loss += pos_error[i] * gamma**i
-            # vel_loss += alpha * vel_error[i] * gamma**i
-            # quat_loss += quat_error[i] * gamma**i
-            # ang_vel_loss += beta * ang_vel_error[i] * gamma**i
+            loss += L[i] * gamma**i
         return loss 
 
     # PID
     params = [
         0.0321, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
         2.350347298350041e-08, 2315, 7.24e-10, 0.2,
-        0.023255813953488372, # Tm
+        0.025, # Tm
         # controller
         250.0, 250.0, 120.0, # kp
         2.5, 2.5, 2.5, # kd
@@ -371,7 +362,7 @@ def main(cfg):
             if count == 5: # force_constant -> kf:[1.5, 2.0]
                 params_range.append((2.2034505922031636e-08, 2.9379341229375514e-08))
             elif count == 9: # Tm: [0.01, 0.05], v(t+\delta_t) = v(t) * (1 - \delta_t / Tm) + throttle_des * (\delta_t / Tm)
-                params_range.append((0.01, 0.05))
+                params_range.append((0.02, 0.03))
         count += 1
     opt = Optimizer(
         dimensions=params_range,
