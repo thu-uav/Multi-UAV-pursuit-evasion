@@ -82,15 +82,6 @@ class MultiGoto(IsaacEnv):
         self.init_poses = self.drone.get_world_poses(clone=True)
         self.init_vels = torch.zeros_like(self.drone.get_velocities())
 
-        # self.init_target_dist = D.Uniform(
-        #     torch.tensor([-1., -1., 0.05], device=self.device),
-        #     torch.tensor([1., 1., 2.0], device=self.device)
-        # )
-        # self.init_rpy_dist = D.Uniform(
-        #     torch.tensor([-0.2, -0.2, 0.0], device=self.device) * torch.pi,
-        #     torch.tensor([0.2, 0.2, 2.0], device=self.device) * torch.pi
-        # )
-
         self.init_target_dist = D.Uniform(
             torch.tensor([-0.5, -0.5, 0.05], device=self.device),
             torch.tensor([0.5, 0.5, 2.0], device=self.device)
@@ -99,7 +90,13 @@ class MultiGoto(IsaacEnv):
             torch.tensor([-0.2, -0.2, 0.0], device=self.device) * torch.pi,
             torch.tensor([0.2, 0.2, 0.5], device=self.device) * torch.pi
         )
-        
+
+        if self.use_eval:
+            self.init_rpy_dist = D.Uniform(
+                torch.tensor([0.0, 0.0, 0.0], device=self.device) * torch.pi,
+                torch.tensor([0.0, 0.0, 0.0], device=self.device) * torch.pi
+            )
+
         self.drone_init_pos = torch.tensor([[0.0, 0.0, 1.]], device=self.device)
         self.target_pos = torch.zeros(self.num_envs, self.num_points, 3, device=self.device)
         self.target_id = torch.zeros(self.num_envs, device=self.device, dtype=torch.int64) # 0 ~ self.num_points - 1
@@ -239,11 +236,22 @@ class MultiGoto(IsaacEnv):
         )
         self.drone.set_velocities(self.init_vels[env_ids], env_ids)
         
-        if self.use_eval:
-            pass
-        
         self.target_pos[env_ids] = self.init_target_dist.sample((*env_ids.shape, self.num_points))
-        breakpoint()
+        
+        if self.use_eval:
+            # [-0.5, -0.5, 1.0]
+            self.target_pos[env_ids, 0, 0] = -0.5
+            self.target_pos[env_ids, 0, 1] = -0.5
+            self.target_pos[env_ids, 0, 2] = 1.0
+            # [0.5, 0.5, 1.0]
+            self.target_pos[env_ids, 1, 0] = 0.5
+            self.target_pos[env_ids, 1, 1] = 0.5
+            self.target_pos[env_ids, 1, 2] = 1.0
+            # [-0.5, -0.5, 2.0]
+            self.target_pos[env_ids, 2, 0] = -0.5
+            self.target_pos[env_ids, 2, 1] = -0.5
+            self.target_pos[env_ids, 2, 2] = 2.0
+        
         self.target_id[env_ids] = 0 # reset count
         self.reach[env_ids] = 0.0
         

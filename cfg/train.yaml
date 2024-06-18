@@ -5,7 +5,8 @@ headless: true
 sim: ${task.sim}
 env: ${task.env}
 
-# model_dir: /home/jiayu/OmniDrones/scripts/outputs/Track_Tm04_smooth05_latency2.pt
+# model_dir: /home/jiayu/OmniDrones/scripts/outputs/multigoto_smooth02_Tm04.pt
+# model_dir: /home/jiayu/OmniDrones/scripts/outputs/multigoto_wosmooth_Tm04.pt
 model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
@@ -20,13 +21,13 @@ viewer:
   # eye: [0.005, 0., 6.]
   # lookat: [0., 0., 1.]
   # front
-  eye: [1.0, 0., 4.]
+  eye: [1., 0., 4.]
   lookat: [0., 0., 1.]
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: Track_smooth01_wolatency
-  run_name: debug
+  run_name: multigo_wosmooth
+  # run_name: debug
   job_type: train
   entity: chenjy
   project: sim2real
@@ -39,7 +40,7 @@ wandb:
 defaults:
   # - task: Star
   # - task: Track
-  - task: Goto_static
-  # - task: MultiGoto
+  # - task: Goto_static
+  - task: MultiGoto
   - algo: mappo
   - _self_
