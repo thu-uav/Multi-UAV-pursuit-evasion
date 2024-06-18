@@ -78,19 +78,21 @@ class Goto_static(IsaacEnv):
         )
         self.target_vis.initialize()
 
-        # self.cylinder = RigidPrimView(
-        #     "/World/envs/env_*/cylinder",
-        #     reset_xform_properties=False,
-        #     track_contact_forces=False,
-        #     shape=[self.num_envs, -1],
-        # )
-        # self.cylinder.initialize()
-        self.cylinder = GeometryPrimView(
-            "/World/envs/env_*/cube",
+        self.cylinder = RigidPrimView(
+            "/World/envs/env_*/cylinder",
             reset_xform_properties=False,
+            track_contact_forces=False,
+            shape=[self.num_envs, -1],
         )
         self.cylinder.initialize()
-        self.cylinders_pos = torch.zeros(self.num_envs, 3, device=self.device)
+        
+        # self.cylinder = GeometryPrimView(
+        #     "/World/envs/env_*/cube",
+        #     reset_xform_properties=False,
+        # )
+        # self.cylinder.initialize()
+        
+        self.cylinders_pos = torch.zeros(self.num_envs, 1, 3, device=self.device)
         self.cylinders_pos[..., 2] = self.cylinder_height / 2.0
 
         self.init_poses = self.drone.get_world_poses(clone=True)
@@ -151,25 +153,6 @@ class Goto_static(IsaacEnv):
             translation=(0.0, 0.0, 1.),
         )
 
-        self.cylinder_height = 2.0
-        self.cylinder_radius = 0.2
-        
-        # attributes = {'axis': 'Z', 'radius': self.cylinder_radius, 'height': self.cylinder_height}
-        # self.cylinders_prims = create_obstacle(
-        #     "/World/envs/env_0/cylinder", 
-        #     prim_type="Cylinder",
-        #     translation=[0.0, 0.0, self.cylinder_height / 2.0],
-        #     attributes=attributes
-        # ) # Use 'self.cylinders_prims[0].GetAttribute('radius').Get()' to get attributes
-
-        objects.VisualCylinder(
-            prim_path=f"/World/envs/env_0/cube",  
-            position=torch.tensor([0.0, 0.0, self.cylinder_height / 2.0]),
-            radius=self.cylinder_radius,
-            height=self.cylinder_height, 
-            color=torch.tensor([0., 0.8, 0.8]),
-        )
-
         kit_utils.set_nested_collision_properties(
             target_vis_prim.GetPath(), 
             collision_enabled=False
@@ -178,6 +161,16 @@ class Goto_static(IsaacEnv):
             target_vis_prim.GetPath(),
             disable_gravity=True
         )
+
+        self.cylinder_height = 2.0
+        self.cylinder_radius = 0.2
+        attributes = {'axis': 'Z', 'radius': self.cylinder_radius, 'height': self.cylinder_height}
+        cylinder_prims = create_obstacle(
+            "/World/envs/env_0/cylinder", 
+            prim_type="Cylinder",
+            translation=[0.0, 0.0, self.cylinder_height / 2.0],
+            attributes=attributes
+        ) # Use 'self.cylinders_prims[0].GetAttribute('radius').Get()' to get attributes
 
         kit_utils.create_ground_plane(
             "/World/defaultGroundPlane",
@@ -284,7 +277,7 @@ class Goto_static(IsaacEnv):
 
         # cylinder
         self.cylinder.set_world_poses(
-            self.cylinders_pos + self.envs_positions[env_ids], indices=env_ids
+            self.cylinders_pos[env_ids] + self.envs_positions[env_ids].unsqueeze(1), env_indices=env_ids
         )
 
         # set last values
@@ -321,7 +314,7 @@ class Goto_static(IsaacEnv):
         obs = [self.rpos, self.root_state[..., 3:10], self.root_state[..., 13:19],]  # (relative) position, velocity, quaternion, heading, up
         
         cylinder_pos, _ = self.get_env_poses(self.cylinder.get_world_poses())
-        self.rpos_cylinder = cylinder_pos.unsqueeze(1) - self.root_state[..., :3]
+        self.rpos_cylinder = cylinder_pos - self.root_state[..., :3]
         obs.append(self.rpos_cylinder)
         obs.append(self.all_cylinder_height)
         obs.append(self.all_cylinder_radius)

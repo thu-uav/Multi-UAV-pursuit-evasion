@@ -20,7 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-
+import typing
 from typing import Dict, Any, Sequence, Union
 import omni.isaac.core.utils.prims as prim_utils
 import omni.physx.scripts.utils as script_utils
@@ -33,21 +33,51 @@ import omni_drones.utils.kit as kit_utils
 
 def create_obstacle(
     prim_path: str,
-    prim_type: str,
-    translation: Sequence[float],
-    attributes: Dict,
+    prim_type: str = "Xform",
+    position: typing.Optional[typing.Sequence[float]] = None,
+    translation: typing.Optional[typing.Sequence[float]] = None,
+    orientation: typing.Optional[typing.Sequence[float]] = None,
+    scale: typing.Optional[typing.Sequence[float]] = None,
+    usd_path: typing.Optional[str] = None,
+    semantic_label: typing.Optional[str] = None,
+    semantic_type: str = "class",
+    attributes: typing.Optional[dict] = None,
 ):
+    """
+    Create an obstacle object using omni function create_prim:
+
+    Args:
+        prim_path (str): The path of the new prim.
+        prim_type (str): Prim type name
+        position (typing.Sequence[float], optional): prim position (applied last)
+        translation (typing.Sequence[float], optional): prim translation (applied last)
+        orientation (typing.Sequence[float], optional): prim rotation as quaternion
+        scale (np.ndarray (3), optional): scaling factor in x, y, z.
+        usd_path (str, optional): Path to the USD that this prim will reference.
+        semantic_label (str, optional): Semantic label.
+        semantic_type (str, optional): set to "class" unless otherwise specified.
+        attributes (dict, optional): Key-value pairs of prim attributes to set.
+    """
     prim = prim_utils.create_prim(
         prim_path=prim_path,
         prim_type=prim_type,
+        position=position,
         translation=translation,
-        attributes=attributes
+        orientation=orientation,
+        scale=scale,
+        usd_path=usd_path,
+        semantic_label=semantic_label,
+        semantic_type=semantic_type,
+        attributes=attributes,
     )
     UsdPhysics.RigidBodyAPI.Apply(prim)
     UsdPhysics.CollisionAPI.Apply(prim)
     prim.GetAttribute("physics:kinematicEnabled").Set(True)
-    kit_utils.set_collision_properties(
-        prim_path, contact_offset=0.02, rest_offset=0
+    # kit_utils.set_collision_properties(
+    #     prim_path, contact_offset=0.02, rest_offset=0
+    # )
+    kit_utils.set_rigid_body_properties(
+        prim_path, rigid_body_enabled=True
     )
 
     return prim
