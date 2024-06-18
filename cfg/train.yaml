@@ -25,7 +25,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: Goto_static_smooth2
+  run_name: multigoto_wosmooth_Tm04
   # run_name: debug
   # run_name: Track_Tm04_wosmooth_latency2
   job_type: train
@@ -40,7 +40,7 @@ wandb:
 defaults:
   # - task: Star
   # - task: Track
-  - task: Goto_static
-  # - task: MultiGoto
+  # - task: Goto_static
+  - task: MultiGoto
   - algo: mappo
   - _self_
