@@ -62,6 +62,7 @@ class MultiGoto(IsaacEnv):
         self.reward_time_scale = cfg.task.reward_time_scale
         self.reach_threshold = cfg.task.reach_threshold
         self.time_encoding = cfg.task.time_encoding
+        self.use_eval = cfg.task.use_eval
         
         self.randomization = cfg.task.get("randomization", {})
 
@@ -90,7 +91,6 @@ class MultiGoto(IsaacEnv):
         #     torch.tensor([0.2, 0.2, 2.0], device=self.device) * torch.pi
         # )
 
-        # eval
         self.init_target_dist = D.Uniform(
             torch.tensor([-0.5, -0.5, 0.05], device=self.device),
             torch.tensor([0.5, 0.5, 2.0], device=self.device)
@@ -238,7 +238,12 @@ class MultiGoto(IsaacEnv):
             self.drone_init_pos + self.envs_positions[env_ids].unsqueeze(1), rot, env_ids
         )
         self.drone.set_velocities(self.init_vels[env_ids], env_ids)
+        
+        if self.use_eval:
+            pass
+        
         self.target_pos[env_ids] = self.init_target_dist.sample((*env_ids.shape, self.num_points))
+        breakpoint()
         self.target_id[env_ids] = 0 # reset count
         self.reach[env_ids] = 0.0
         

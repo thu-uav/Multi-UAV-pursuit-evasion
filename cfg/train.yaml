@@ -25,21 +25,21 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: Track_smooth05_latency2
-  # run_name: Track_smooth01_latency2
+  # run_name: Track_smooth01_wolatency
+  run_name: debug
   job_type: train
   entity: chenjy
   project: sim2real
-  # mode: disabled
-  mode: online # set to 'disabled' when debugging locally, online
+  mode: disabled
+  # mode: online # set to 'disabled' when debugging locally, online
   run_id: 
   monitor_gym: True
   tags: 
 
 defaults:
   # - task: Star
-  - task: Track
-  # - task: Goto_static
+  # - task: Track
+  - task: Goto_static
   # - task: MultiGoto
   - algo: mappo
   - _self_
