@@ -248,10 +248,10 @@ class MultiGoto(IsaacEnv):
             self.target_pos[env_ids, 1, 0] = 0.5
             self.target_pos[env_ids, 1, 1] = 0.5
             self.target_pos[env_ids, 1, 2] = 1.0
-            # [-0.5, -0.5, 2.0]
-            self.target_pos[env_ids, 2, 0] = -0.5
-            self.target_pos[env_ids, 2, 1] = -0.5
-            self.target_pos[env_ids, 2, 2] = 2.0
+            # # [-0.5, -0.5, 2.0]
+            # self.target_pos[env_ids, 2, 0] = -0.5
+            # self.target_pos[env_ids, 2, 1] = -0.5
+            # self.target_pos[env_ids, 2, 2] = 2.0
         
         self.target_id[env_ids] = 0 # reset count
         self.reach[env_ids] = 0.0
