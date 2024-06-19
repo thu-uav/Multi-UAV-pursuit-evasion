@@ -27,7 +27,7 @@ viewer:
 wandb:
   group: ${oc.select:..task.name}
   # run_name: multigo_wosmooth_point2
-  run_name: Goto_static_large_wosmooth
+  run_name: Goto_static_large_cylidner_wosmooth
   # run_name: debug
   job_type: train
   entity: chenjy
