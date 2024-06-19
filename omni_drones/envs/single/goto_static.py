@@ -230,6 +230,8 @@ class Goto_static(IsaacEnv):
             "action_error_max": UnboundedContinuousTensorSpec(1),
             "action_smoothness_mean": UnboundedContinuousTensorSpec(1),
             "action_smoothness_max": UnboundedContinuousTensorSpec(1),
+            "raw_action_error_mean": UnboundedContinuousTensorSpec(1),
+            "raw_action_error_max": UnboundedContinuousTensorSpec(1),
             "linear_v_max": UnboundedContinuousTensorSpec(1),
             "angular_v_max": UnboundedContinuousTensorSpec(1),
             "linear_a_max": UnboundedContinuousTensorSpec(1),
