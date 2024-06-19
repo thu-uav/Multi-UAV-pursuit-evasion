@@ -58,10 +58,10 @@ class Goto_static(IsaacEnv):
         # self.reward_effort_weight = cfg.task.reward_effort_weight
         self.reward_action_smoothness_weight = cfg.task.reward_action_smoothness_weight
         self.reward_distance_scale = cfg.task.reward_distance_scale
-        self.reward_time_scale = cfg.task.reward_time_scale
         self.reward_collision = cfg.task.reward_collision
         self.time_encoding = cfg.task.time_encoding
         self.reach_threshold = cfg.task.reach_threshold
+        self.reward_bonus_scale = cfg.task.reward_bonus_scale
         self.use_eval = cfg.task.use_eval
         
         self.randomization = cfg.task.get("randomization", {})
@@ -77,38 +77,24 @@ class Goto_static(IsaacEnv):
             reset_xform_properties=False
         )
         self.target_vis.initialize()
-
-        self.cylinder = RigidPrimView(
-            "/World/envs/env_*/cylinder",
-            reset_xform_properties=False,
-            track_contact_forces=False,
-            shape=[self.num_envs, -1],
-        )
-        self.cylinder.initialize()
         
-        # self.cylinder = GeometryPrimView(
-        #     "/World/envs/env_*/cube",
-        #     reset_xform_properties=False,
-        # )
-        # self.cylinder.initialize()
-        
-        self.cylinders_pos = torch.zeros(self.num_envs, 1, 3, device=self.device)
-        self.cylinders_pos[..., 2] = self.cylinder_height / 2.0
+        self.cylinder_pos = torch.zeros(self.num_envs, 1, 3, device=self.device)
+        self.cylinder_pos[..., 2] = self.cylinder_height / 2.0
 
         self.init_poses = self.drone.get_world_poses(clone=True)
         self.init_vels = torch.zeros_like(self.drone.get_velocities())
 
         self.init_drone_pos_dist = D.Uniform(
-            torch.tensor([-self.cylinder_radius, 0.5, 0.05], device=self.device),
-            torch.tensor([self.cylinder_radius, 1.0, self.cylinder_height - 0.5], device=self.device)
+            torch.tensor([-self.cylinder_radius, 0.5, 0.5], device=self.device),
+            torch.tensor([self.cylinder_radius, 1.0, 1.5], device=self.device)
         )
         self.init_target_pos_dist = D.Uniform(
-            torch.tensor([-self.cylinder_radius, - 1.0, 0.05], device=self.device),
-            torch.tensor([self.cylinder_radius, - 0.5, self.cylinder_height - 0.5], device=self.device)
+            torch.tensor([-self.cylinder_radius, - 1.0, 0.5], device=self.device),
+            torch.tensor([self.cylinder_radius, - 0.5, 1.5], device=self.device)
         )
         self.init_rpy_dist = D.Uniform(
             torch.tensor([-0.2, -0.2, 0.0], device=self.device) * torch.pi,
-            torch.tensor([0.2, 0.2, 0.5], device=self.device) * torch.pi
+            torch.tensor([0.2, 0.2, 0.2], device=self.device) * torch.pi
         )
         
         if self.use_eval:
@@ -164,13 +150,21 @@ class Goto_static(IsaacEnv):
 
         self.cylinder_height = 2.0
         self.cylinder_radius = 0.2
-        attributes = {'axis': 'Z', 'radius': self.cylinder_radius, 'height': self.cylinder_height}
-        cylinder_prims = create_obstacle(
-            "/World/envs/env_0/cylinder", 
-            prim_type="Cylinder",
-            translation=[0.0, 0.0, self.cylinder_height / 2.0],
-            attributes=attributes
-        ) # Use 'self.cylinders_prims[0].GetAttribute('radius').Get()' to get attributes
+        # attributes = {'axis': 'Z', 'radius': self.cylinder_radius, 'height': self.cylinder_height}
+        # cylinder_prims = create_obstacle(
+        #     "/World/envs/env_0/cylinder", 
+        #     prim_type="Cylinder",
+        #     translation=[0.0, 0.0, self.cylinder_height / 2.0],
+        #     attributes=attributes
+        # ) # Use 'self.cylinders_prims[0].GetAttribute('radius').Get()' to get attributes
+
+        objects.VisualCylinder(
+            prim_path="/World/envs/env_0/Cylinder",
+            name="ground",
+            translation= torch.tensor([0., 0., self.cylinder_height / 2.0], device=self.device),
+            radius=self.cylinder_radius,
+            height=self.cylinder_height,
+        )
 
         kit_utils.create_ground_plane(
             "/World/defaultGroundPlane",
@@ -227,7 +221,6 @@ class Goto_static(IsaacEnv):
             "reward_pos_bonus": UnboundedContinuousTensorSpec(1),
             "reward_spin": UnboundedContinuousTensorSpec(1),
             "reward_up": UnboundedContinuousTensorSpec(1),
-            "reward_time": UnboundedContinuousTensorSpec(1),
             "reward_collision": UnboundedContinuousTensorSpec(1),
             "reach_time": UnboundedContinuousTensorSpec(1),
             "episode_len": UnboundedContinuousTensorSpec(1),
@@ -275,10 +268,10 @@ class Goto_static(IsaacEnv):
         # self.target_pos = torch.tensor([0.0, 0.0, 1.0], device=self.device)
         self.target_vis.set_world_poses(positions=self.target_pos + self.envs_positions[env_ids].unsqueeze(1), env_indices=env_ids)
 
-        # cylinder
-        self.cylinder.set_world_poses(
-            self.cylinders_pos[env_ids] + self.envs_positions[env_ids].unsqueeze(1), env_indices=env_ids
-        )
+        # # cylinder
+        # self.cylinder.set_world_poses(
+        #     self.cylinders_pos[env_ids] + self.envs_positions[env_ids].unsqueeze(1), env_indices=env_ids
+        # )
 
         # set last values
         self.last_linear_v[env_ids] = torch.norm(self.init_vels[env_ids][..., :3], dim=-1)
@@ -313,8 +306,8 @@ class Goto_static(IsaacEnv):
         
         obs = [self.rpos, self.root_state[..., 3:10], self.root_state[..., 13:19],]  # (relative) position, velocity, quaternion, heading, up
         
-        cylinder_pos, _ = self.get_env_poses(self.cylinder.get_world_poses())
-        self.rpos_cylinder = cylinder_pos - self.root_state[..., :3]
+        # cylinder_pos, _ = self.get_env_poses(self.cylinder.get_world_poses())
+        self.rpos_cylinder = self.cylinder_pos - self.root_state[..., :3]
         obs.append(self.rpos_cylinder)
         obs.append(self.all_cylinder_height)
         obs.append(self.all_cylinder_radius)
@@ -382,7 +375,7 @@ class Goto_static(IsaacEnv):
         cylinder_pos_error = torch.norm(self.rpos_cylinder[..., :2], dim=-1)
 
         reward_pos = - pos_error * self.reward_distance_scale
-        reward_pos_bonus = ((pos_error <= self.reach_threshold) * 10).float()
+        reward_pos_bonus = ((pos_error <= self.reach_threshold) * self.reward_bonus_scale).float()
         
         reward_collision = - self.reward_collision * (cylinder_pos_error <= self.cylinder_radius + 0.05).float()
         
@@ -391,14 +384,11 @@ class Goto_static(IsaacEnv):
         spin = torch.square(self.drone.vel[..., -1])
         reward_spin = 0.5 / (1.0 + torch.square(spin))
         
-        reward_time = self.reward_time_scale * (-self.progress_buf / self.max_episode_length).unsqueeze(1) * (reward_pos_bonus <= 0)
-        
         reward = (
             reward_pos
             + reward_pos_bonus
             + reward_spin
             + reward_up
-            + reward_time
             + reward_collision
         )
 
@@ -406,7 +396,6 @@ class Goto_static(IsaacEnv):
         self.stats['reward_pos_bonus'].add_(reward_pos_bonus)
         self.stats['reward_spin'].add_(reward_spin)
         self.stats['reward_up'].add_(reward_up)
-        self.stats['reward_time'].add_(reward_time)
         self.stats['reward_collision'].add_(reward_collision)
         reach_flag = (reward_pos_bonus > 0).float()
         current_reach = self.progress_buf.unsqueeze(1) * reach_flag + self.max_episode_length * (1.0 - reach_flag)
@@ -458,9 +447,6 @@ class Goto_static(IsaacEnv):
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
         self.stats['reward_up'].div_(
-            torch.where(done, ep_len, torch.ones_like(ep_len))
-        )
-        self.stats['reward_time'].div_(
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
         self.stats['reward_collision'].div_(

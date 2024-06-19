@@ -83,12 +83,12 @@ class MultiGoto(IsaacEnv):
         self.init_vels = torch.zeros_like(self.drone.get_velocities())
 
         self.init_target_dist = D.Uniform(
-            torch.tensor([-0.5, -0.5, 0.05], device=self.device),
-            torch.tensor([0.5, 0.5, 2.0], device=self.device)
+            torch.tensor([-0.5, -0.5, 0.5], device=self.device),
+            torch.tensor([0.5, 0.5, 1.5], device=self.device)
         )
         self.init_rpy_dist = D.Uniform(
             torch.tensor([-0.2, -0.2, 0.0], device=self.device) * torch.pi,
-            torch.tensor([0.2, 0.2, 0.5], device=self.device) * torch.pi
+            torch.tensor([0.2, 0.2, 0.2], device=self.device) * torch.pi
         )
 
         if self.use_eval:
@@ -114,7 +114,7 @@ class MultiGoto(IsaacEnv):
         import omni_drones.utils.kit as kit_utils
         import omni.isaac.core.utils.prims as prim_utils
 
-        self.num_points = 3
+        self.num_points = 2
         drone_model = MultirotorBase.REGISTRY[self.cfg.task.drone_model]
         cfg = drone_model.cfg_cls(force_sensor=self.cfg.task.force_sensor)
         self.drone: MultirotorBase = drone_model(cfg=cfg)
@@ -190,6 +190,7 @@ class MultiGoto(IsaacEnv):
             "head_bonus": UnboundedContinuousTensorSpec(1),
             "reward_pos": UnboundedContinuousTensorSpec(1),
             "reward_pos_bonus": UnboundedContinuousTensorSpec(1),
+            "reward_success_bonus": UnboundedContinuousTensorSpec(1),
             "reward_spin": UnboundedContinuousTensorSpec(1),
             "reward_up": UnboundedContinuousTensorSpec(1),
             "reward_time": UnboundedContinuousTensorSpec(1),
@@ -366,6 +367,9 @@ class MultiGoto(IsaacEnv):
         # next target
         reward_pos_bonus = self.reach.sum(dim=-1).unsqueeze(1) * self.reward_bonus_scale
 
+        hover_end = (self.pos_error <= self.reach_threshold)
+        reward_success_bonus = (hover_end * (self.reach.sum(dim=-1) >= self.num_points).unsqueeze(1)).float() * self.reward_bonus_scale
+
         reward_up = torch.square((self.drone.up[..., 2] + 1) / 2)
 
         spin = torch.square(self.drone.vel[..., -1])
@@ -378,6 +382,7 @@ class MultiGoto(IsaacEnv):
         reward = (
             reward_pos
             + reward_pos_bonus
+            + reward_success_bonus
             + reward_spin
             + reward_up
             + reward_time
@@ -386,6 +391,7 @@ class MultiGoto(IsaacEnv):
 
         self.stats['reward_pos'].add_(reward_pos)
         self.stats['reward_pos_bonus'].add_(reward_pos_bonus)
+        self.stats['reward_success_bonus'].add_(reward_success_bonus)
         self.stats['reward_spin'].add_(reward_spin)
         self.stats['reward_up'].add_(reward_up)
         self.stats['reward_time'].add_(reward_time)
@@ -441,6 +447,9 @@ class MultiGoto(IsaacEnv):
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
         self.stats['reward_pos_bonus'].div_(
+            torch.where(done, ep_len, torch.ones_like(ep_len))
+        )
+        self.stats['reward_success_bonus'].div_(
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
         self.stats['reward_up'].div_(
