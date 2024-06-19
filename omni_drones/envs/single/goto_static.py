@@ -222,6 +222,7 @@ class Goto_static(IsaacEnv):
             "reward_spin": UnboundedContinuousTensorSpec(1),
             "reward_up": UnboundedContinuousTensorSpec(1),
             "reward_collision": UnboundedContinuousTensorSpec(1),
+            "reward_action_smoothness": UnboundedContinuousTensorSpec(1),
             "reach_time": UnboundedContinuousTensorSpec(1),
             "episode_len": UnboundedContinuousTensorSpec(1),
             "pos_error": UnboundedContinuousTensorSpec(1),
@@ -286,6 +287,10 @@ class Goto_static(IsaacEnv):
         
     def _pre_sim_step(self, tensordict: TensorDictBase):
         actions = tensordict[("agents", "action")]
+        self.info["prev_action"] = tensordict[("info", "prev_action")]
+        self.raw_action_error = tensordict[("stats", "raw_action_error")].clone()
+        self.stats["raw_action_error_mean"].add_(self.raw_action_error.mean(dim=-1).unsqueeze(-1))
+        self.stats["raw_action_error_max"].set_(torch.max(self.stats["raw_action_error_max"], self.raw_action_error.mean(dim=-1).unsqueeze(-1)))
         if self.cfg.task.action_noise:
             actions *= torch.randn(actions.shape, device=self.device) * 0.1 + 1
         
@@ -380,6 +385,8 @@ class Goto_static(IsaacEnv):
         reward_collision = - self.reward_collision * (cylinder_pos_error <= self.cylinder_radius + 0.05).float()
         
         reward_up = torch.square((self.drone.up[..., 2] + 1) / 2)
+        
+        reward_action_smoothness = self.reward_action_smoothness_weight * torch.exp(-self.raw_action_error)
 
         spin = torch.square(self.drone.vel[..., -1])
         reward_spin = 0.5 / (1.0 + torch.square(spin))
@@ -390,6 +397,7 @@ class Goto_static(IsaacEnv):
             + reward_spin
             + reward_up
             + reward_collision
+            + reward_action_smoothness
         )
 
         self.stats['reward_pos'].add_(reward_pos)
@@ -397,6 +405,7 @@ class Goto_static(IsaacEnv):
         self.stats['reward_spin'].add_(reward_spin)
         self.stats['reward_up'].add_(reward_up)
         self.stats['reward_collision'].add_(reward_collision)
+        self.stats['reward_action_smoothness'].add_(reward_action_smoothness)
         reach_flag = (reward_pos_bonus > 0).float()
         current_reach = self.progress_buf.unsqueeze(1) * reach_flag + self.max_episode_length * (1.0 - reach_flag)
         self.stats['reach_time'].set_(torch.min(self.stats['reach_time'], current_reach))
@@ -450,6 +459,9 @@ class Goto_static(IsaacEnv):
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
         self.stats['reward_collision'].div_(
+            torch.where(done, ep_len, torch.ones_like(ep_len))
+        )
+        self.stats['reward_action_smoothness'].div_(
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
         
