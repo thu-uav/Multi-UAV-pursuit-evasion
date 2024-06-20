@@ -82,9 +82,13 @@ class MultiGoto(IsaacEnv):
         self.init_poses = self.drone.get_world_poses(clone=True)
         self.init_vels = torch.zeros_like(self.drone.get_velocities())
 
+        # self.init_target_dist = D.Uniform(
+        #     torch.tensor([-0.5, -0.5, 0.5], device=self.device),
+        #     torch.tensor([0.5, 0.5, 1.5], device=self.device)
+        # )
         self.init_target_dist = D.Uniform(
-            torch.tensor([-0.5, -0.5, 0.5], device=self.device),
-            torch.tensor([0.5, 0.5, 1.5], device=self.device)
+            torch.tensor([-1.0, -1.0, 0.5], device=self.device),
+            torch.tensor([1.0, 1.0, 1.5], device=self.device)
         )
         self.init_rpy_dist = D.Uniform(
             torch.tensor([-0.2, -0.2, 0.0], device=self.device) * torch.pi,
@@ -114,7 +118,7 @@ class MultiGoto(IsaacEnv):
         import omni_drones.utils.kit as kit_utils
         import omni.isaac.core.utils.prims as prim_utils
 
-        self.num_points = 2
+        self.num_points = self.cfg.task.num_points
         drone_model = MultirotorBase.REGISTRY[self.cfg.task.drone_model]
         cfg = drone_model.cfg_cls(force_sensor=self.cfg.task.force_sensor)
         self.drone: MultirotorBase = drone_model(cfg=cfg)
@@ -248,10 +252,11 @@ class MultiGoto(IsaacEnv):
             self.target_pos[env_ids, 1, 0] = 0.5
             self.target_pos[env_ids, 1, 1] = 0.5
             self.target_pos[env_ids, 1, 2] = 1.0
-            # # [-0.5, -0.5, 2.0]
-            # self.target_pos[env_ids, 2, 0] = -0.5
-            # self.target_pos[env_ids, 2, 1] = -0.5
-            # self.target_pos[env_ids, 2, 2] = 2.0
+            if self.use_eval:
+                # [-0.5, -0.5, 2.0]
+                self.target_pos[env_ids, 2, 0] = -0.5
+                self.target_pos[env_ids, 2, 1] = -0.5
+                self.target_pos[env_ids, 2, 2] = 2.0
         
         self.target_id[env_ids] = 0 # reset count
         self.reach[env_ids] = 0.0

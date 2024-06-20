@@ -11,6 +11,7 @@ env:
 
 drone_model: crazyflie
 force_sensor: false
+num_points: 2
 
 use_eval: 0
 reward_action_smoothness_weight: 0.0

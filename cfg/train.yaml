@@ -6,7 +6,7 @@ sim: ${task.sim}
 env: ${task.env}
 
 # model_dir: /home/jiayu/OmniDrones/scripts/outputs/multigoto_smooth02_Tm04.pt
-# model_dir: /home/jiayu/OmniDrones/scripts/outputs/multigo_smooth05_point2/06-19_17-28/wandb/run-20240619_172833-6wuzhh5i/files/checkpoint_1795817472.pt
+# model_dir: /home/jiayu/OmniDrones/scripts/outputs/multigo_wosmooth_point3/06-19_22-33/wandb/run-20240619_223352-rtx5hsw1/files/checkpoint_final.pt
 model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
@@ -26,8 +26,8 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: multigo_wosmooth_point2
-  run_name: Goto_static_large_cylidner_wosmooth
+  # run_name: multigo_wosmooth_point2_large
+  run_name: exchange_wosmooth
   # run_name: debug
   job_type: train
   entity: chenjy
@@ -41,7 +41,7 @@ wandb:
 defaults:
   # - task: Star
   # - task: Track
-  - task: Goto_static
+  - task: Exchange
   # - task: MultiGoto
   - algo: mappo
   - _self_

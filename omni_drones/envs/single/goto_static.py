@@ -85,12 +85,12 @@ class Goto_static(IsaacEnv):
         self.init_vels = torch.zeros_like(self.drone.get_velocities())
 
         self.init_drone_pos_dist = D.Uniform(
-            torch.tensor([-self.cylinder_radius, self.cylinder_radius + 0.1, 0.2], device=self.device),
+            torch.tensor([-self.cylinder_radius, 0.5, 0.2], device=self.device),
             torch.tensor([self.cylinder_radius, 1.0, 2.0], device=self.device)
         )
         self.init_target_pos_dist = D.Uniform(
             torch.tensor([-self.cylinder_radius, - 1.0, 0.2], device=self.device),
-            torch.tensor([self.cylinder_radius, - self.cylinder_radius - 0.1, 2.0], device=self.device)
+            torch.tensor([self.cylinder_radius, - 0.5, 2.0], device=self.device)
         )
         self.init_rpy_dist = D.Uniform(
             torch.tensor([-0.2, -0.2, 0.0], device=self.device) * torch.pi,
@@ -103,8 +103,8 @@ class Goto_static(IsaacEnv):
                 torch.tensor([0.0, 1.0, 1.0], device=self.device)
             )
             self.init_target_pos_dist = D.Uniform(
-                torch.tensor([0.0, - 1.0, 1.0], device=self.device),
-                torch.tensor([0.0, - 1.0, 1.0], device=self.device)
+                torch.tensor([0.0, -1.0, 1.0], device=self.device),
+                torch.tensor([0.0, -1.0, 1.0], device=self.device)
             )
             self.init_rpy_dist = D.Uniform(
                 torch.tensor([0.0, 0.0, 0.0], device=self.device) * torch.pi,
@@ -149,7 +149,7 @@ class Goto_static(IsaacEnv):
         )
 
         self.cylinder_height = 2.0
-        self.cylinder_radius = 0.5
+        self.cylinder_radius = 0.2
         # attributes = {'axis': 'Z', 'radius': self.cylinder_radius, 'height': self.cylinder_height}
         # cylinder_prims = create_obstacle(
         #     "/World/envs/env_0/cylinder", 
@@ -222,7 +222,6 @@ class Goto_static(IsaacEnv):
             "reward_spin": UnboundedContinuousTensorSpec(1),
             "reward_up": UnboundedContinuousTensorSpec(1),
             "reward_collision": UnboundedContinuousTensorSpec(1),
-            "reward_action_smoothness": UnboundedContinuousTensorSpec(1),
             "reach_time": UnboundedContinuousTensorSpec(1),
             "episode_len": UnboundedContinuousTensorSpec(1),
             "pos_error": UnboundedContinuousTensorSpec(1),
@@ -230,8 +229,6 @@ class Goto_static(IsaacEnv):
             "action_error_max": UnboundedContinuousTensorSpec(1),
             "action_smoothness_mean": UnboundedContinuousTensorSpec(1),
             "action_smoothness_max": UnboundedContinuousTensorSpec(1),
-            "raw_action_error_mean": UnboundedContinuousTensorSpec(1),
-            "raw_action_error_max": UnboundedContinuousTensorSpec(1),
             "linear_v_max": UnboundedContinuousTensorSpec(1),
             "angular_v_max": UnboundedContinuousTensorSpec(1),
             "linear_a_max": UnboundedContinuousTensorSpec(1),
@@ -289,10 +286,6 @@ class Goto_static(IsaacEnv):
         
     def _pre_sim_step(self, tensordict: TensorDictBase):
         actions = tensordict[("agents", "action")]
-        self.info["prev_action"] = tensordict[("info", "prev_action")]
-        self.raw_action_error = tensordict[("stats", "raw_action_error")].clone()
-        self.stats["raw_action_error_mean"].add_(self.raw_action_error.mean(dim=-1).unsqueeze(-1))
-        self.stats["raw_action_error_max"].set_(torch.max(self.stats["raw_action_error_max"], self.raw_action_error.mean(dim=-1).unsqueeze(-1)))
         if self.cfg.task.action_noise:
             actions *= torch.randn(actions.shape, device=self.device) * 0.1 + 1
         
@@ -391,15 +384,12 @@ class Goto_static(IsaacEnv):
         spin = torch.square(self.drone.vel[..., -1])
         reward_spin = 0.5 / (1.0 + torch.square(spin))
         
-        reward_action_smoothness = self.reward_action_smoothness_weight * torch.exp(-self.raw_action_error)
-        
         reward = (
             reward_pos
             + reward_pos_bonus
             + reward_spin
             + reward_up
             + reward_collision
-            + reward_action_smoothness
         )
 
         self.stats['reward_pos'].add_(reward_pos)
@@ -407,7 +397,6 @@ class Goto_static(IsaacEnv):
         self.stats['reward_spin'].add_(reward_spin)
         self.stats['reward_up'].add_(reward_up)
         self.stats['reward_collision'].add_(reward_collision)
-        self.stats['reward_action_smoothness'].add_(reward_action_smoothness)
         reach_flag = (reward_pos_bonus > 0).float()
         current_reach = self.progress_buf.unsqueeze(1) * reach_flag + self.max_episode_length * (1.0 - reach_flag)
         self.stats['reach_time'].set_(torch.min(self.stats['reach_time'], current_reach))
@@ -461,12 +450,6 @@ class Goto_static(IsaacEnv):
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
         self.stats['reward_collision'].div_(
-            torch.where(done, ep_len, torch.ones_like(ep_len))
-        )
-        self.stats['reward_action_smoothness'].div_(
-            torch.where(done, ep_len, torch.ones_like(ep_len))
-        )
-        self.stats['raw_action_error_mean'].div_(
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
         

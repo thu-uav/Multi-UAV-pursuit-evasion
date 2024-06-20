@@ -63,6 +63,7 @@ class Exchange(IsaacEnv):
         self.reward_time_scale = cfg.task.reward_time_scale
         # self.action_error_threshold = cfg.task.action_error_threshold
         self.time_encoding = cfg.task.time_encoding
+        self.use_eval = cfg.task.use_eval
         
         self.randomization = cfg.task.get("randomization", {})
 
@@ -98,19 +99,20 @@ class Exchange(IsaacEnv):
             torch.tensor([0.2, 0.2, 0.5], device=self.device) * torch.pi
         )
 
-        # # eval
-        # self.init_pos_dist0 = D.Uniform(
-        #     torch.tensor([1.0, 1.0, 1.0], device=self.device),
-        #     torch.tensor([1.0, 1.0, 1.0], device=self.device)
-        # )
-        # self.init_pos_dist1 = D.Uniform(
-        #     torch.tensor([-1.0, -1.0, 1.0], device=self.device),
-        #     torch.tensor([-1.0, -1.0, 1.0], device=self.device)
-        # )
-        # self.init_rpy_dist = D.Uniform(
-        #     torch.tensor([0., 0., 0.0], device=self.device) * torch.pi,
-        #     torch.tensor([0., 0., 0.0], device=self.device) * torch.pi
-        # )
+        # eval
+        if self.use_eval:
+            self.init_pos_dist0 = D.Uniform(
+                torch.tensor([1.0, 1.0, 1.0], device=self.device),
+                torch.tensor([1.0, 1.0, 1.0], device=self.device)
+            )
+            self.init_pos_dist1 = D.Uniform(
+                torch.tensor([-1.0, -1.0, 1.0], device=self.device),
+                torch.tensor([-1.0, -1.0, 1.0], device=self.device)
+            )
+            self.init_rpy_dist = D.Uniform(
+                torch.tensor([0., 0., 0.0], device=self.device) * torch.pi,
+                torch.tensor([0., 0., 0.0], device=self.device) * torch.pi
+            )
 
         self.alpha = 0.8
 
