@@ -6,15 +6,15 @@ defaults:
   - /base/sim_base@_here_
 
 env:
-  num_envs: 2048
+  num_envs: 100
   max_episode_length: 500
 
 drone_model: crazyflie
 force_sensor: false
 num_points: 2
 
-use_eval: 0
-reward_action_smoothness_weight: 0.0
+use_eval: 1
+reward_action_smoothness_weight: 1.0
 reward_distance_scale: 10.0
 reward_bonus_scale: 10.0
 reward_time_scale: 0.0

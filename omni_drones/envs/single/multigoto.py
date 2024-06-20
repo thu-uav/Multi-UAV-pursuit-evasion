@@ -252,7 +252,17 @@ class MultiGoto(IsaacEnv):
             self.target_pos[env_ids, 1, 0] = 0.5
             self.target_pos[env_ids, 1, 1] = 0.5
             self.target_pos[env_ids, 1, 2] = 1.0
-            if self.use_eval:
+
+            # # [-0.5, -0.5, 1.0]
+            # self.target_pos[env_ids, 0, 0] = -1.0
+            # self.target_pos[env_ids, 0, 1] = -1.0
+            # self.target_pos[env_ids, 0, 2] = 1.0
+            # # [0.5, 0.5, 1.0]
+            # self.target_pos[env_ids, 1, 0] = 1.0
+            # self.target_pos[env_ids, 1, 1] = 1.0
+            # self.target_pos[env_ids, 1, 2] = 1.0
+
+            if self.num_points >= 3:
                 # [-0.5, -0.5, 2.0]
                 self.target_pos[env_ids, 2, 0] = -0.5
                 self.target_pos[env_ids, 2, 1] = -0.5

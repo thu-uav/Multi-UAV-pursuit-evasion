@@ -78,19 +78,29 @@ class Goto_static(IsaacEnv):
         )
         self.target_vis.initialize()
         
-        self.cylinder_pos = torch.zeros(self.num_envs, 1, 3, device=self.device)
-        self.cylinder_pos[..., 2] = self.cylinder_height / 2.0
+        self.cylinder_pos = torch.zeros(self.num_envs, 2, 3, device=self.device)
+        # 2 cylinders
+        self.cylinder_pos[:, 0, 0] = - 0.5 * self.cylinder_radius
+        self.cylinder_pos[:, 0, 1] = 1.5 * self.cylinder_radius
+        self.cylinder_pos[:, 0, 2] = 0.5 * self.cylinder_height
+        self.cylinder_pos[:, 1, 0] = 0.5 * self.cylinder_radius
+        self.cylinder_pos[:, 1, 1] = - 1.5 * self.cylinder_radius
+        self.cylinder_pos[:, 1, 2] = 0.5 * self.cylinder_height
+        # wall
+        self.wall_pos = torch.zeros(self.num_envs, 1, 2, device=self.device)
+        self.wall_pos[..., 0] = self.narrow_width * 0.5
+        self.wall_pos[..., 1] = - self.narrow_width * 0.5
 
         self.init_poses = self.drone.get_world_poses(clone=True)
         self.init_vels = torch.zeros_like(self.drone.get_velocities())
 
         self.init_drone_pos_dist = D.Uniform(
-            torch.tensor([-self.cylinder_radius, 0.5, 0.2], device=self.device),
-            torch.tensor([self.cylinder_radius, 1.0, 2.0], device=self.device)
+            torch.tensor([-self.cylinder_radius, 0.8, 0.2], device=self.device),
+            torch.tensor([self.cylinder_radius, 1.2, 2.0], device=self.device)
         )
         self.init_target_pos_dist = D.Uniform(
-            torch.tensor([-self.cylinder_radius, - 1.0, 0.2], device=self.device),
-            torch.tensor([self.cylinder_radius, - 0.5, 2.0], device=self.device)
+            torch.tensor([-self.cylinder_radius, - 1.2, 0.2], device=self.device),
+            torch.tensor([self.cylinder_radius, - 0.8, 2.0], device=self.device)
         )
         self.init_rpy_dist = D.Uniform(
             torch.tensor([-0.2, -0.2, 0.0], device=self.device) * torch.pi,
@@ -150,20 +160,32 @@ class Goto_static(IsaacEnv):
 
         self.cylinder_height = 2.0
         self.cylinder_radius = 0.2
-        # attributes = {'axis': 'Z', 'radius': self.cylinder_radius, 'height': self.cylinder_height}
-        # cylinder_prims = create_obstacle(
-        #     "/World/envs/env_0/cylinder", 
-        #     prim_type="Cylinder",
-        #     translation=[0.0, 0.0, self.cylinder_height / 2.0],
-        #     attributes=attributes
-        # ) # Use 'self.cylinders_prims[0].GetAttribute('radius').Get()' to get attributes
-
+        self.narrow_width = 0.8
         objects.VisualCylinder(
-            prim_path="/World/envs/env_0/Cylinder",
-            name="ground",
-            translation= torch.tensor([0., 0., self.cylinder_height / 2.0], device=self.device),
+            prim_path="/World/envs/env_0/Cylinder0",
+            name="cylinder0",
+            translation= torch.tensor([-0.2, 0.5, self.cylinder_height / 2.0], device=self.device),
             radius=self.cylinder_radius,
             height=self.cylinder_height,
+        )
+        objects.VisualCylinder(
+            prim_path="/World/envs/env_0/Cylinder1",
+            name="cylinder1",
+            translation= torch.tensor([0.2, -0.5, self.cylinder_height / 2.0], device=self.device),
+            radius=self.cylinder_radius,
+            height=self.cylinder_height,
+        )
+        objects.VisualCuboid(
+            prim_path="/World/envs/env_0/wall0",
+            name="wall0",
+            translation= torch.tensor([0.5 * self.narrow_width, 0.0, self.cylinder_height / 2.0], device=self.device),
+            scale=[0.01, 5.0, self.cylinder_height]
+        )
+        objects.VisualCuboid(
+            prim_path="/World/envs/env_0/wall1",
+            name="wall1",
+            translation= torch.tensor([-0.5 * self.narrow_width, 0.0, self.cylinder_height / 2.0], device=self.device),
+            scale=[0.01, 5.0, self.cylinder_height]
         )
 
         kit_utils.create_ground_plane(
@@ -179,7 +201,9 @@ class Goto_static(IsaacEnv):
         # drone_state_dim = self.drone.state_spec.shape[-1]
         observation_dim = 3 + 3 + 4 + 3 + 3 # position, velocity, quaternion, heading, up
 
-        observation_dim += 3 + 1 + 1 # cylinder pos, radius and height
+        observation_dim += 3 * 2 + 1 + 1 # cylinder pos, radius and height
+        
+        observation_dim += 2 # wall
 
         if self.cfg.task.time_encoding:
             self.time_encoding_dim = 4
@@ -222,6 +246,7 @@ class Goto_static(IsaacEnv):
             "reward_spin": UnboundedContinuousTensorSpec(1),
             "reward_up": UnboundedContinuousTensorSpec(1),
             "reward_collision": UnboundedContinuousTensorSpec(1),
+            "reward_collision_wall": UnboundedContinuousTensorSpec(1),
             "reach_time": UnboundedContinuousTensorSpec(1),
             "episode_len": UnboundedContinuousTensorSpec(1),
             "pos_error": UnboundedContinuousTensorSpec(1),
@@ -308,9 +333,11 @@ class Goto_static(IsaacEnv):
         
         # cylinder_pos, _ = self.get_env_poses(self.cylinder.get_world_poses())
         self.rpos_cylinder = self.cylinder_pos - self.root_state[..., :3]
-        obs.append(self.rpos_cylinder)
+        obs.append(self.rpos_cylinder.reshape(self.num_envs, -1).unsqueeze(1))
         obs.append(self.all_cylinder_height)
         obs.append(self.all_cylinder_radius)
+        self.rpos_wall = self.wall_pos - self.root_state[..., 0].unsqueeze(-1)
+        obs.append(self.rpos_wall)
         
         if self.time_encoding:
             t = (self.progress_buf / self.max_episode_length).unsqueeze(-1)
@@ -377,7 +404,10 @@ class Goto_static(IsaacEnv):
         reward_pos = - pos_error * self.reward_distance_scale
         reward_pos_bonus = ((pos_error <= self.reach_threshold) * self.reward_bonus_scale).float()
         
-        reward_collision = - self.reward_collision * (cylinder_pos_error <= self.cylinder_radius + 0.05).float()
+        reward_collision = - self.reward_collision * (cylinder_pos_error <= self.cylinder_radius + 0.05).float().sum(-1).unsqueeze(1)
+        
+        wall_pos_error = torch.abs(self.rpos_wall)
+        reward_collision_wall = - self.reward_collision * (wall_pos_error <= 0.05).float().sum(-1)
         
         reward_up = torch.square((self.drone.up[..., 2] + 1) / 2)
 
@@ -390,6 +420,7 @@ class Goto_static(IsaacEnv):
             + reward_spin
             + reward_up
             + reward_collision
+            + reward_collision_wall
         )
 
         self.stats['reward_pos'].add_(reward_pos)
@@ -397,6 +428,7 @@ class Goto_static(IsaacEnv):
         self.stats['reward_spin'].add_(reward_spin)
         self.stats['reward_up'].add_(reward_up)
         self.stats['reward_collision'].add_(reward_collision)
+        self.stats['reward_collision_wall'].add_(reward_collision_wall)
         reach_flag = (reward_pos_bonus > 0).float()
         current_reach = self.progress_buf.unsqueeze(1) * reach_flag + self.max_episode_length * (1.0 - reach_flag)
         self.stats['reach_time'].set_(torch.min(self.stats['reach_time'], current_reach))
@@ -450,6 +482,9 @@ class Goto_static(IsaacEnv):
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
         self.stats['reward_collision'].div_(
+            torch.where(done, ep_len, torch.ones_like(ep_len))
+        )
+        self.stats['reward_collision_wall'].div_(
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
         

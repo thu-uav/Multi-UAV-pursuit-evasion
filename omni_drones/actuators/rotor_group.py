@@ -64,6 +64,7 @@ class RotorGroup(nn.Module):
 
         noise = torch.randn_like(self.throttle) * self.noise_scale * 0.
         t = torch.clamp(self.f(self.throttle) + noise, 0., 1.)
+        # breakpoint()
         thrusts = t * self.KF
         moments = (t * self.KM) * -self.directions
 

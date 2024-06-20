@@ -22,7 +22,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 rosbags = [
-    '/home/jiayu/OmniDrones/simopt/real_data/size0_8.csv',
+    '/home/jiayu/OmniDrones/simopt/real_data/rl_hover_1.csv'
+    # '/home/jiayu/OmniDrones/simopt/real_data/size0_8.csv',
     # '/home/jiayu/OmniDrones/simopt/real_data/size1_0.csv',
     # '/home/jiayu/OmniDrones/simopt/real_data/size1_2.csv',
 ]
@@ -104,13 +105,19 @@ def main(cfg):
         500.0, 500.0, 16.7, # ki
         33.3, 33.3, 166.7 # ilimit
     ]
-    # # current best
+    # Tm = 0.349
+    params[5] = 2.350347298350041e-08
+    params[9] = 0.028585119515659244
+    
+    # # Tm = 0.43
     # params[5] = 2.350347298350041e-08
     # params[9] = 0.023255813953488372
 
-    # opt for Tm
-    params[5] = 2.350347298350041e-08
-    params[9] = 0.030975018547385984
+    # # Tm = 0.4
+    # params[5] = 2.350347298350041e-08
+    # params[9] = 0.025
+    
+    chunk_length = 1
     
     tunable_parameters = {
         'mass': params[0],
@@ -210,7 +217,8 @@ def main(cfg):
         real_rate = torch.tensor(real_data[i, :, 23:26])
         real_motor_thrust = torch.tensor(real_data[i, :, 33:37])
         real_ang_vel = quat_rotate(real_quat, real_rate)
-        set_drone_state(real_pos, real_quat, real_vel, real_ang_vel)
+        if i % chunk_length == 0:
+            set_drone_state(real_pos, real_quat, real_vel, real_ang_vel)
         # if i == 0:
         #     set_drone_state(real_pos, real_quat, real_vel, real_ang_vel)
         
@@ -267,11 +275,15 @@ def main(cfg):
         m4 = real_cmd_thrust + r + p - y
         real_motor_thrust_compute = np.array([m1.numpy(), m2.numpy(), m3.numpy(), m4.numpy()]) / (2**16) * 2 - 1
         real_motor_compute.append(real_motor_thrust_compute)
+        breakpoint()
         
-        if use_real_action:
-            drone.apply_action(real_action)
-        else:
-            drone.apply_action(action)
+        drone.apply_action(torch.from_numpy(real_motor_thrust_compute).to(sim.device))
+        
+        # if use_real_action:
+        #     drone.apply_action(real_action)
+        # else:
+        #     drone.apply_action(action)
+        
         # _, thrust, torques = drone.apply_action_foropt(action)
         sim.step(render=True)
 
