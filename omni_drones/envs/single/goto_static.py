@@ -98,10 +98,10 @@ class Goto_static(IsaacEnv):
             torch.tensor([-self.cylinder_radius, 0.8, 0.2], device=self.device),
             torch.tensor([self.cylinder_radius, 1.2, 2.0], device=self.device)
         )
-        self.init_target_pos_dist = D.Uniform(
-            torch.tensor([-self.cylinder_radius, - 1.2, 0.2], device=self.device),
-            torch.tensor([self.cylinder_radius, - 0.8, 2.0], device=self.device)
-        )
+        # self.init_target_pos_dist = D.Uniform(
+        #     torch.tensor([-self.cylinder_radius, - 1.2, 0.2], device=self.device),
+        #     torch.tensor([self.cylinder_radius, - 0.8, 2.0], device=self.device)
+        # )
         self.init_rpy_dist = D.Uniform(
             torch.tensor([-0.2, -0.2, 0.0], device=self.device) * torch.pi,
             torch.tensor([0.2, 0.2, 0.2], device=self.device) * torch.pi
@@ -112,10 +112,10 @@ class Goto_static(IsaacEnv):
                 torch.tensor([0.0, 1.0, 1.0], device=self.device),
                 torch.tensor([0.0, 1.0, 1.0], device=self.device)
             )
-            self.init_target_pos_dist = D.Uniform(
-                torch.tensor([0.0, -1.0, 1.0], device=self.device),
-                torch.tensor([0.0, -1.0, 1.0], device=self.device)
-            )
+            # self.init_target_pos_dist = D.Uniform(
+            #     torch.tensor([0.0, -1.0, 1.0], device=self.device),
+            #     torch.tensor([0.0, -1.0, 1.0], device=self.device)
+            # )
             self.init_rpy_dist = D.Uniform(
                 torch.tensor([0.0, 0.0, 0.0], device=self.device) * torch.pi,
                 torch.tensor([0.0, 0.0, 0.0], device=self.device) * torch.pi
@@ -160,18 +160,19 @@ class Goto_static(IsaacEnv):
 
         self.cylinder_height = 2.0
         self.cylinder_radius = 0.2
+        self.cylinder_y_init = 0.5
         self.narrow_width = 0.8
         objects.VisualCylinder(
             prim_path="/World/envs/env_0/Cylinder0",
             name="cylinder0",
-            translation= torch.tensor([-0.2, 0.5, self.cylinder_height / 2.0], device=self.device),
+            translation= torch.tensor([-0.2, self.cylinder_y_init, self.cylinder_height / 2.0], device=self.device),
             radius=self.cylinder_radius,
             height=self.cylinder_height,
         )
         objects.VisualCylinder(
             prim_path="/World/envs/env_0/Cylinder1",
             name="cylinder1",
-            translation= torch.tensor([0.2, -0.5, self.cylinder_height / 2.0], device=self.device),
+            translation= torch.tensor([0.2, -self.cylinder_y_init, self.cylinder_height / 2.0], device=self.device),
             radius=self.cylinder_radius,
             height=self.cylinder_height,
         )
@@ -291,8 +292,8 @@ class Goto_static(IsaacEnv):
         
         self.last_actions[env_ids] = 2.0 * torch.square(self.drone.throttle) - 1.0
 
-        self.target_pos = self.init_target_pos_dist.sample((*env_ids.shape, 1))
-        # self.target_pos = torch.tensor([0.0, 0.0, 1.0], device=self.device)
+        # self.target_pos = self.init_target_pos_dist.sample((*env_ids.shape, 1))
+        self.target_pos = torch.tensor([0.0, -1.0, 1.0], device=self.device)
         self.target_vis.set_world_poses(positions=self.target_pos + self.envs_positions[env_ids].unsqueeze(1), env_indices=env_ids)
 
         # # cylinder
