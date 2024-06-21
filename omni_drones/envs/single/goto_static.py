@@ -406,8 +406,7 @@ class Goto_static(IsaacEnv):
         
         reward_collision = - self.reward_collision * (cylinder_pos_error <= self.cylinder_radius + 0.05).float().sum(-1).unsqueeze(1)
         
-        wall_pos_error = torch.abs(self.rpos_wall)
-        reward_collision_wall = - self.reward_collision * (wall_pos_error <= 0.05).float().sum(-1)
+        reward_collision_wall = - self.reward_collision * ((self.rpos_wall[..., 0] > 0.05).float() + (self.rpos_wall[..., 1] < -0.05).float())
         
         reward_up = torch.square((self.drone.up[..., 2] + 1) / 2)
 
