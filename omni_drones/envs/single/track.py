@@ -260,7 +260,8 @@ class Track(IsaacEnv):
 
         self.random_latency = self.cfg.task.random_latency
         self.latency = self.cfg.task.latency_step if self.cfg.task.latency else 0
-        self.obs_buffer = collections.deque(maxlen=self.latency)
+        # self.obs_buffer = collections.deque(maxlen=self.latency)
+        self.root_state_buffer = collections.deque(maxlen=self.latency)
 
     def _reset_idx(self, env_ids: torch.Tensor):
         self.drone._reset_idx(env_ids)
@@ -330,15 +331,24 @@ class Track(IsaacEnv):
     def _compute_state_and_obs(self):
         self.root_state = self.drone.get_state()
         self.info["drone_state"][:] = self.root_state[..., :13]
-        
+
+        if self.cfg.task.latency:
+            self.root_state_buffer.append(self.root_state)
+            # set t and target pos to the real values
+            if self.random_latency:
+                random_indices = torch.randint(0, len(self.root_state_buffer), (self.num_envs,), device=self.device)
+                root_state = torch.stack(list(self.root_state_buffer))[random_indices, torch.arange(self.num_envs)]
+            else:
+                root_state = self.root_state_buffer[0]
+
         self.target_pos[:] = self._compute_traj(self.future_traj_steps, step_size=5)
         
-        self.rpos = self.target_pos - self.root_state[..., :3]
+        self.rpos = self.target_pos - root_state[..., :3]
         obs = [
             self.rpos.flatten(1).unsqueeze(1),
-            self.root_state[..., 3:10], self.root_state[..., 13:19],
+            root_state[..., 3:10], root_state[..., 13:19],
         ]
-        self.stats['drone_state'] = self.root_state[..., :13].squeeze(1).clone()
+        self.stats['drone_state'] = root_state[..., :13].squeeze(1).clone()
         if self.time_encoding:
             t = (self.progress_buf / self.max_episode_length).unsqueeze(-1)
             obs.append(t.expand(-1, self.time_encoding_dim).unsqueeze(1))
@@ -378,14 +388,6 @@ class Track(IsaacEnv):
         self.last_angular_jerk = self.angular_jerk.clone()
         
         obs = torch.cat(obs, dim=-1)
-        
-        if self.cfg.task.latency:
-            self.obs_buffer.append(obs)
-            if self.random_latency:
-                random_indices = torch.randint(0, len(self.obs_buffer), (obs.shape[0],), device=self.device)
-                obs = torch.stack(list(self.obs_buffer))[random_indices, torch.arange(obs.shape[0])]
-            else:
-                obs = self.obs_buffer[0]
 
         return TensorDict({
             "agents": {

@@ -14,7 +14,7 @@ force_sensor: false
 time_encoding: true
 intrinsics: false
 wind: false
-latency: false
+latency: true
 latency_step: 2
 random_latency: true
 
@@ -22,7 +22,7 @@ reset_thres: 1.
 future_traj_steps: 4
 
 use_eval: 0
-reward_action_smoothness_weight: 0.1
+reward_action_smoothness_weight: 0.0
 reward_distance_scale: 5.0
 
 action_transform: PIDrate
