@@ -175,17 +175,19 @@ class Goto_static(IsaacEnv):
             radius=self.cylinder_radius,
             height=self.cylinder_height,
         )
-        objects.VisualCuboid(
+        objects.DynamicCuboid(
             prim_path="/World/envs/env_0/wall0",
             name="wall0",
             translation= torch.tensor([0.5 * self.narrow_width, 0.0, self.cylinder_height / 2.0], device=self.device),
-            scale=[0.01, 5.0, self.cylinder_height]
+            scale=[0.01, 5.0, self.cylinder_height],
+            mass=1000000.0
         )
-        objects.VisualCuboid(
+        objects.DynamicCuboid(
             prim_path="/World/envs/env_0/wall1",
             name="wall1",
             translation= torch.tensor([-0.5 * self.narrow_width, 0.0, self.cylinder_height / 2.0], device=self.device),
-            scale=[0.01, 5.0, self.cylinder_height]
+            scale=[0.01, 5.0, self.cylinder_height],
+            mass=1000000.0
         )
 
         kit_utils.create_ground_plane(
@@ -406,7 +408,7 @@ class Goto_static(IsaacEnv):
         
         reward_collision = - self.reward_collision * (cylinder_pos_error <= self.cylinder_radius + 0.05).float().sum(-1).unsqueeze(1)
         
-        reward_collision_wall = - self.reward_collision * ((self.rpos_wall[..., 0] > 0.05).float() + (self.rpos_wall[..., 1] < -0.05).float())
+        reward_collision_wall = - self.reward_collision * ((self.rpos_wall[..., 0] <= 0.05).float() + (self.rpos_wall[..., 1] >= -0.05).float())
         
         reward_up = torch.square((self.drone.up[..., 2] + 1) / 2)
 
