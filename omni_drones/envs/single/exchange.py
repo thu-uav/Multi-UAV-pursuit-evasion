@@ -64,7 +64,8 @@ class Exchange(IsaacEnv):
         # self.action_error_threshold = cfg.task.action_error_threshold
         self.time_encoding = cfg.task.time_encoding
         self.use_eval = cfg.task.use_eval
-        self.use_last_action = cfg.task.use_last_action
+        self.use_prev_action = cfg.task.use_prev_action
+        self.use_prev_prev_action = cfg.task.use_prev_prev_action
         
         self.randomization = cfg.task.get("randomization", {})
 
@@ -124,7 +125,8 @@ class Exchange(IsaacEnv):
         self.last_linear_jerk = torch.zeros(self.num_envs, self.num_drones, device=self.device)
         self.last_angular_jerk = torch.zeros(self.num_envs, self.num_drones, device=self.device)
 
-        self.last_actions = torch.zeros(self.num_envs, self.num_drones, 4, device=self.device)
+        self.prev_actions = torch.zeros(self.num_envs, self.num_drones, 4, device=self.device)
+        self.prev_prev_actions = torch.zeros(self.num_envs, self.num_drones, 4, device=self.device)
 
     def _design_scene(self):
         import omni_drones.utils.kit as kit_utils
@@ -190,7 +192,11 @@ class Exchange(IsaacEnv):
         observation_dim += 3
         
         # prev_action
-        if self.use_last_action:
+        if self.use_prev_action:
+            observation_dim += 4
+
+        # prev_prev_action
+        if self.use_prev_prev_action:
             observation_dim += 4
 
         if self.cfg.task.time_encoding:
@@ -238,10 +244,12 @@ class Exchange(IsaacEnv):
             "reach_time": UnboundedContinuousTensorSpec(1),
             "episode_len": UnboundedContinuousTensorSpec(1),
             "pos_error": UnboundedContinuousTensorSpec(1),
-            "raw_action_error_mean": UnboundedContinuousTensorSpec(1),
-            "raw_action_error_max": UnboundedContinuousTensorSpec(1),
-            "action_smoothness_mean": UnboundedContinuousTensorSpec(1),
-            "action_smoothness_max": UnboundedContinuousTensorSpec(1),
+            "action_error_order1_mean": UnboundedContinuousTensorSpec(1),
+            "action_error_order1_max": UnboundedContinuousTensorSpec(1),
+            "action_error_order2_mean": UnboundedContinuousTensorSpec(1),
+            "action_error_order2_max": UnboundedContinuousTensorSpec(1),
+            "smoothness_mean": UnboundedContinuousTensorSpec(1),
+            "smoothness_max": UnboundedContinuousTensorSpec(1),
             "linear_v_max": UnboundedContinuousTensorSpec(1),
             "angular_v_max": UnboundedContinuousTensorSpec(1),
             "linear_a_max": UnboundedContinuousTensorSpec(1),
@@ -258,6 +266,7 @@ class Exchange(IsaacEnv):
         info_spec = CompositeSpec({
             "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13), device=self.device),
             "prev_action": torch.stack([self.drone.action_spec] * self.drone.n, 0).to(self.device),
+            "prev_prev_action": torch.stack([self.drone.action_spec] * self.drone.n, 0).to(self.device),
         }).expand(self.num_envs).to(self.device)
         self.observation_spec["stats"] = stats_spec
         self.observation_spec["info"] = info_spec
@@ -295,15 +304,25 @@ class Exchange(IsaacEnv):
         cmd_init = 2.0 * (self.drone.throttle[env_ids]) ** 2 - 1.0
         max_thrust_ratio = self.drone.params['max_thrust_ratio']
         self.info['prev_action'][env_ids, :, 3] = (0.5 * (max_thrust_ratio + cmd_init)).mean(dim=-1)
-        self.last_actions[env_ids] = self.info['prev_action'][env_ids]
+        self.info['prev_prev_action'][env_ids, :, 3] = (0.5 * (max_thrust_ratio + cmd_init)).mean(dim=-1)
+        self.prev_actions[env_ids] = self.info['prev_action'][env_ids]
+        self.prev_prev_actions[env_ids] = self.info['prev_prev_action'][env_ids]
         
     def _pre_sim_step(self, tensordict: TensorDictBase):
         actions = tensordict[("agents", "action")]
         self.info["prev_action"] = tensordict[("info", "prev_action")]
-        self.last_actions = self.info["prev_action"].clone()
-        self.raw_action_error = tensordict[("stats", "raw_action_error")].clone()
-        self.stats["raw_action_error_mean"].add_(self.raw_action_error.mean(dim=-1).unsqueeze(-1))
-        self.stats["raw_action_error_max"].set_(torch.max(self.stats["raw_action_error_max"], self.raw_action_error.mean(dim=-1).unsqueeze(-1)))
+        self.info["prev_prev_action"] = tensordict[("info", "prev_prev_action")]
+        self.prev_actions = self.info["prev_action"].clone()
+        self.prev_prev_actions = self.info["prev_prev_action"].clone()
+        
+        self.action_error_order1 = tensordict[("stats", "action_error_order1")].clone()
+        self.stats["action_error_order1_mean"].add_(self.action_error_order1.mean(dim=-1).unsqueeze(-1))
+        self.stats["action_error_order1_max"].set_(torch.max(self.stats["action_error_order1_max"], self.action_error_order1.mean(dim=-1).unsqueeze(-1)))
+        self.action_error_order2 = tensordict[("stats", "action_error_order2")].clone()
+        self.stats["action_error_order2_mean"].add_(self.action_error_order2.mean(dim=-1).unsqueeze(-1))
+        self.stats["action_error_order2_max"].set_(torch.max(self.stats["action_error_order2_max"], self.action_error_order2.mean(dim=-1).unsqueeze(-1)))
+        
+
         if self.cfg.task.action_noise:
             actions *= torch.randn(actions.shape, device=self.device) * 0.1 + 1
         
@@ -327,11 +346,14 @@ class Exchange(IsaacEnv):
             obs.append(t.expand(-1, self.num_drones, self.time_encoding_dim))
         obs.append(self.drone_rpos.squeeze(2))
         
-        if self.use_last_action:
-            obs.append(self.last_actions)
+        if self.use_prev_action:
+            obs.append(self.prev_actions)
+
+        if self.use_prev_prev_action:
+            obs.append(self.prev_prev_actions)
         
-        self.stats["action_smoothness_mean"].add_(self.drone.throttle_difference.mean(dim=-1).unsqueeze(-1))
-        self.stats["action_smoothness_max"].set_(torch.max(self.drone.throttle_difference.mean(dim=-1).unsqueeze(-1), self.stats["action_smoothness_max"]))
+        self.stats["smoothness_mean"].add_(self.drone.throttle_difference.mean(dim=-1).unsqueeze(-1))
+        self.stats["smoothness_max"].set_(torch.max(self.drone.throttle_difference.mean(dim=-1).unsqueeze(-1), self.stats["smoothness_max"]))
         # linear_v, angular_v
         self.linear_v = torch.norm(self.root_state[..., 7:10], dim=-1)
         self.angular_v = torch.norm(self.root_state[..., 10:13], dim=-1)
@@ -403,7 +425,8 @@ class Exchange(IsaacEnv):
         
         reward_time = self.reward_time_scale * (-self.progress_buf / self.max_episode_length).unsqueeze(1) * (reward_pos_bonus <= 0)
         
-        reward_action_smoothness = self.reward_action_smoothness_weight * torch.exp(-self.raw_action_error)
+        reward_action_smoothness = self.reward_action_smoothness_weight * torch.exp(-self.action_error_order1)
+        reward_action_smoothness += self.reward_action_smoothness_weight * torch.exp(-self.action_error_order2)
         
         reward = (
             reward_pos
@@ -437,7 +460,10 @@ class Exchange(IsaacEnv):
         self.stats["pos_error"].div_(
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
-        self.stats['raw_action_error_mean'].div_(
+        self.stats['action_error_order1_mean'].div_(
+            torch.where(done, ep_len, torch.ones_like(ep_len))
+        )
+        self.stats['action_error_order2_mean'].div_(
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
         self.stats["linear_v_mean"].div_(
@@ -458,7 +484,7 @@ class Exchange(IsaacEnv):
         self.stats["angular_jerk_mean"].div_(
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
-        self.stats['action_smoothness_mean'].div_(
+        self.stats['smoothness_mean'].div_(
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
         
