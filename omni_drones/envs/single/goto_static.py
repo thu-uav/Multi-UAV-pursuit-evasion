@@ -80,11 +80,11 @@ class Goto_static(IsaacEnv):
         
         self.cylinder_pos = torch.zeros(self.num_envs, 2, 3, device=self.device)
         # 2 cylinders
-        self.cylinder_pos[:, 0, 0] = - 0.5 * self.cylinder_radius
-        self.cylinder_pos[:, 0, 1] = 1.5 * self.cylinder_radius
+        self.cylinder_pos[:, 0, 0] = -(0.5 * self.narrow_width - self.cylinder_radius)
+        self.cylinder_pos[:, 0, 1] = self.cylinder_y_init
         self.cylinder_pos[:, 0, 2] = 0.5 * self.cylinder_height
-        self.cylinder_pos[:, 1, 0] = 0.5 * self.cylinder_radius
-        self.cylinder_pos[:, 1, 1] = - 1.5 * self.cylinder_radius
+        self.cylinder_pos[:, 1, 0] = 0.5 * self.narrow_width - self.cylinder_radius
+        self.cylinder_pos[:, 1, 1] = - self.cylinder_y_init
         self.cylinder_pos[:, 1, 2] = 0.5 * self.cylinder_height
         # wall
         self.wall_pos = torch.zeros(self.num_envs, 1, 2, device=self.device)
@@ -95,13 +95,13 @@ class Goto_static(IsaacEnv):
         self.init_vels = torch.zeros_like(self.drone.get_velocities())
 
         self.init_drone_pos_dist = D.Uniform(
-            torch.tensor([-self.cylinder_radius, 0.8, 0.2], device=self.device),
-            torch.tensor([self.cylinder_radius, 1.2, 2.0], device=self.device)
+            torch.tensor([-(0.5 * self.narrow_width - 0.05), 1.3, 0.5], device=self.device),
+            torch.tensor([0.5 * self.narrow_width - 0.05, 2.0, 1.5], device=self.device)
         )
-        # self.init_target_pos_dist = D.Uniform(
-        #     torch.tensor([-self.cylinder_radius, - 1.2, 0.2], device=self.device),
-        #     torch.tensor([self.cylinder_radius, - 0.8, 2.0], device=self.device)
-        # )
+        self.init_target_pos_dist = D.Uniform(
+            torch.tensor([-(0.5 * self.narrow_width - 0.05), -2.0, 0.5], device=self.device),
+            torch.tensor([0.5 * self.narrow_width - 0.05, -1.3, 1.5], device=self.device)
+        )
         self.init_rpy_dist = D.Uniform(
             torch.tensor([-0.2, -0.2, 0.0], device=self.device) * torch.pi,
             torch.tensor([0.2, 0.2, 0.2], device=self.device) * torch.pi
@@ -109,13 +109,13 @@ class Goto_static(IsaacEnv):
         
         if self.use_eval:
             self.init_drone_pos_dist = D.Uniform(
-                torch.tensor([0.0, 1.0, 1.0], device=self.device),
-                torch.tensor([0.0, 1.0, 1.0], device=self.device)
+                torch.tensor([0.0, 1.5, 1.0], device=self.device),
+                torch.tensor([0.0, 1.5, 1.0], device=self.device)
             )
-            # self.init_target_pos_dist = D.Uniform(
-            #     torch.tensor([0.0, -1.0, 1.0], device=self.device),
-            #     torch.tensor([0.0, -1.0, 1.0], device=self.device)
-            # )
+            self.init_target_pos_dist = D.Uniform(
+                torch.tensor([0.0, -1.5, 1.0], device=self.device),
+                torch.tensor([0.0, -1.5, 1.0], device=self.device)
+            )
             self.init_rpy_dist = D.Uniform(
                 torch.tensor([0.0, 0.0, 0.0], device=self.device) * torch.pi,
                 torch.tensor([0.0, 0.0, 0.0], device=self.device) * torch.pi
@@ -160,33 +160,35 @@ class Goto_static(IsaacEnv):
 
         self.cylinder_height = 2.0
         self.cylinder_radius = 0.2
-        self.cylinder_y_init = 0.5
+        self.cylinder_y_init = 0.8
         self.narrow_width = 0.8
-        objects.VisualCylinder(
+        objects.DynamicCylinder(
             prim_path="/World/envs/env_0/Cylinder0",
             name="cylinder0",
-            translation= torch.tensor([-0.2, self.cylinder_y_init, self.cylinder_height / 2.0], device=self.device),
+            translation= torch.tensor([-(0.5 * self.narrow_width - self.cylinder_radius), self.cylinder_y_init, self.cylinder_height / 2.0], device=self.device),
             radius=self.cylinder_radius,
             height=self.cylinder_height,
+            mass=1000000.0
         )
-        objects.VisualCylinder(
+        objects.DynamicCylinder(
             prim_path="/World/envs/env_0/Cylinder1",
             name="cylinder1",
-            translation= torch.tensor([0.2, -self.cylinder_y_init, self.cylinder_height / 2.0], device=self.device),
+            translation= torch.tensor([0.5 * self.narrow_width - self.cylinder_radius, -self.cylinder_y_init, self.cylinder_height / 2.0], device=self.device),
             radius=self.cylinder_radius,
             height=self.cylinder_height,
+            mass=1000000.0
         )
         objects.DynamicCuboid(
             prim_path="/World/envs/env_0/wall0",
             name="wall0",
-            translation= torch.tensor([0.5 * self.narrow_width, 0.0, self.cylinder_height / 2.0], device=self.device),
+            translation= torch.tensor([0.5 * self.narrow_width + 0.01, 0.0, self.cylinder_height / 2.0], device=self.device),
             scale=[0.01, 5.0, self.cylinder_height],
             mass=1000000.0
         )
         objects.DynamicCuboid(
             prim_path="/World/envs/env_0/wall1",
             name="wall1",
-            translation= torch.tensor([-0.5 * self.narrow_width, 0.0, self.cylinder_height / 2.0], device=self.device),
+            translation= torch.tensor([-0.5 * self.narrow_width - 0.01, 0.0, self.cylinder_height / 2.0], device=self.device),
             scale=[0.01, 5.0, self.cylinder_height],
             mass=1000000.0
         )
@@ -292,8 +294,8 @@ class Goto_static(IsaacEnv):
         
         self.last_actions[env_ids] = 2.0 * torch.square(self.drone.throttle) - 1.0
 
-        # self.target_pos = self.init_target_pos_dist.sample((*env_ids.shape, 1))
-        self.target_pos = torch.tensor([0.0, -1.0, 1.0], device=self.device)
+        self.target_pos = self.init_target_pos_dist.sample((*env_ids.shape, 1))
+        # self.target_pos = torch.tensor([0.0, -1.2, 1.0], device=self.device)
         self.target_vis.set_world_poses(positions=self.target_pos + self.envs_positions[env_ids].unsqueeze(1), env_indices=env_ids)
 
         # # cylinder

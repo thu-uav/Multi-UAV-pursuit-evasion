@@ -64,6 +64,7 @@ class Exchange(IsaacEnv):
         # self.action_error_threshold = cfg.task.action_error_threshold
         self.time_encoding = cfg.task.time_encoding
         self.use_eval = cfg.task.use_eval
+        self.use_last_action = cfg.task.use_last_action
         
         self.randomization = cfg.task.get("randomization", {})
 
@@ -187,6 +188,10 @@ class Exchange(IsaacEnv):
         
         # relative pos and vel of the other drone
         observation_dim += 3
+        
+        # prev_action
+        if self.use_last_action:
+            observation_dim += 4
 
         if self.cfg.task.time_encoding:
             self.time_encoding_dim = 4
@@ -235,8 +240,6 @@ class Exchange(IsaacEnv):
             "pos_error": UnboundedContinuousTensorSpec(1),
             "raw_action_error_mean": UnboundedContinuousTensorSpec(1),
             "raw_action_error_max": UnboundedContinuousTensorSpec(1),
-            "action_error_mean": UnboundedContinuousTensorSpec(1),
-            "action_error_max": UnboundedContinuousTensorSpec(1),
             "action_smoothness_mean": UnboundedContinuousTensorSpec(1),
             "action_smoothness_max": UnboundedContinuousTensorSpec(1),
             "linear_v_max": UnboundedContinuousTensorSpec(1),
@@ -275,8 +278,6 @@ class Exchange(IsaacEnv):
         self.drone.set_velocities(self.init_vels[env_ids], env_ids)
         
         self.target_pos = torch.concat([pos1, pos0], dim=1)
-        
-        self.last_actions[env_ids] = 2.0 * torch.square(self.drone.throttle) - 1.0
 
         self.target_vis0.set_world_poses(positions=pos0 + self.envs_positions[env_ids].unsqueeze(1), env_indices=env_ids)
         self.target_vis1.set_world_poses(positions=pos1 + self.envs_positions[env_ids].unsqueeze(1), env_indices=env_ids)
@@ -294,10 +295,12 @@ class Exchange(IsaacEnv):
         cmd_init = 2.0 * (self.drone.throttle[env_ids]) ** 2 - 1.0
         max_thrust_ratio = self.drone.params['max_thrust_ratio']
         self.info['prev_action'][env_ids, :, 3] = (0.5 * (max_thrust_ratio + cmd_init)).mean(dim=-1)
+        self.last_actions[env_ids] = self.info['prev_action'][env_ids]
         
     def _pre_sim_step(self, tensordict: TensorDictBase):
         actions = tensordict[("agents", "action")]
         self.info["prev_action"] = tensordict[("info", "prev_action")]
+        self.last_actions = self.info["prev_action"].clone()
         self.raw_action_error = tensordict[("stats", "raw_action_error")].clone()
         self.stats["raw_action_error_mean"].add_(self.raw_action_error.mean(dim=-1).unsqueeze(-1))
         self.stats["raw_action_error_max"].set_(torch.max(self.stats["raw_action_error_max"], self.raw_action_error.mean(dim=-1).unsqueeze(-1)))
@@ -305,12 +308,6 @@ class Exchange(IsaacEnv):
             actions *= torch.randn(actions.shape, device=self.device) * 0.1 + 1
         
         self.effort = self.drone.apply_action(actions)
-        
-        # action difference
-        action_error = torch.norm(actions - self.last_actions, dim=-1)
-        self.stats['action_error_mean'].add_(action_error.mean(-1).unsqueeze(-1))
-        self.stats['action_error_max'].set_(torch.max(action_error.mean(-1).unsqueeze(-1), self.stats['action_error_max']))
-        self.last_actions = actions.clone()
    
     def _compute_state_and_obs(self):
         self.root_state = self.drone.get_state()
@@ -329,6 +326,9 @@ class Exchange(IsaacEnv):
             t = (self.progress_buf / self.max_episode_length).unsqueeze(-1).unsqueeze(-1)
             obs.append(t.expand(-1, self.num_drones, self.time_encoding_dim))
         obs.append(self.drone_rpos.squeeze(2))
+        
+        if self.use_last_action:
+            obs.append(self.last_actions)
         
         self.stats["action_smoothness_mean"].add_(self.drone.throttle_difference.mean(dim=-1).unsqueeze(-1))
         self.stats["action_smoothness_max"].set_(torch.max(self.drone.throttle_difference.mean(dim=-1).unsqueeze(-1), self.stats["action_smoothness_max"]))
@@ -435,9 +435,6 @@ class Exchange(IsaacEnv):
 
         ep_len = self.progress_buf.unsqueeze(-1)
         self.stats["pos_error"].div_(
-            torch.where(done, ep_len, torch.ones_like(ep_len))
-        )
-        self.stats['action_error_mean'].div_(
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
         self.stats['raw_action_error_mean'].div_(
