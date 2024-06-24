@@ -5,8 +5,8 @@ headless: true
 sim: ${task.sim}
 env: ${task.env}
 
-# model_dir: /home/jiayu/OmniDrones/scripts/outputs/goto_static_wosmooth/06-23_16-27/wandb/run-20240623_162749-lykl5nry/files/checkpoint_final.pt
-model_dir: null
+model_dir: /home/jiayu/OmniDrones/scripts/outputs/goto_static_smooth1/06-23_21-34/wandb/run-20240623_213402-6b6mhqrv/files/checkpoint_final.pt
+# model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
 max_iters: -1
@@ -25,8 +25,8 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: debug
-  run_name: goto_static_smooth1
+  run_name: goto_static_smooth1_eval
+  # run_name: goto_static_smooth1_woorder2
   job_type: train
   entity: chenjy
   project: sim2real

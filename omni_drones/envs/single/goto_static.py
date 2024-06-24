@@ -63,6 +63,7 @@ class Goto_static(IsaacEnv):
         self.reach_threshold = cfg.task.reach_threshold
         self.reward_bonus_scale = cfg.task.reward_bonus_scale
         self.use_eval = cfg.task.use_eval
+        self.use_action_error_order2 = cfg.task.use_action_error_order2
         self.num_drones = 1
         
         self.randomization = cfg.task.get("randomization", {})
@@ -434,7 +435,8 @@ class Goto_static(IsaacEnv):
         reward_up = torch.square((self.drone.up[..., 2] + 1) / 2)
 
         reward_action_smoothness = self.reward_action_smoothness_weight * torch.exp(-self.action_error_order1)
-        reward_action_smoothness += self.reward_action_smoothness_weight * torch.exp(-self.action_error_order2)
+        if self.use_action_error_order2:
+            reward_action_smoothness += self.reward_action_smoothness_weight * torch.exp(-self.action_error_order2)
 
         spin = torch.square(self.drone.vel[..., -1])
         reward_spin = 0.5 / (1.0 + torch.square(spin))

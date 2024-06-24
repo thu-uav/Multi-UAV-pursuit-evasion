@@ -66,6 +66,7 @@ class Exchange(IsaacEnv):
         self.use_eval = cfg.task.use_eval
         self.use_prev_action = cfg.task.use_prev_action
         self.use_prev_prev_action = cfg.task.use_prev_prev_action
+        self.use_action_error_order2 = cfg.task.use_action_error_order2
         
         self.randomization = cfg.task.get("randomization", {})
 
@@ -426,7 +427,8 @@ class Exchange(IsaacEnv):
         reward_time = self.reward_time_scale * (-self.progress_buf / self.max_episode_length).unsqueeze(1) * (reward_pos_bonus <= 0)
         
         reward_action_smoothness = self.reward_action_smoothness_weight * torch.exp(-self.action_error_order1)
-        reward_action_smoothness += self.reward_action_smoothness_weight * torch.exp(-self.action_error_order2)
+        if self.use_action_error_order2:
+            reward_action_smoothness += self.reward_action_smoothness_weight * torch.exp(-self.action_error_order2)
         
         reward = (
             reward_pos
