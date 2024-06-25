@@ -155,6 +155,10 @@ class Track(IsaacEnv):
                 torch.tensor([1.2, 1.2, 0.25], device=self.device),
                 torch.tensor([1.2, 1.2, 0.25], device=self.device)
             )
+            # self.traj_scale_dist = D.Uniform(
+            #     torch.tensor([0.5, 0.5, 0.25], device=self.device),
+            #     torch.tensor([0.5, 0.5, 0.25], device=self.device)
+            # )
             self.traj_c_dist = D.Uniform(
                 torch.tensor(0.0, device=self.device),
                 torch.tensor(0.0, device=self.device)
@@ -480,6 +484,18 @@ class Track(IsaacEnv):
         self.stats['reward_action_smoothness'].div_(
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
+        self.stats["linear_v_mean"].div_(
+            torch.where(done, ep_len, torch.ones_like(ep_len))
+        )
+        self.stats["angular_v_mean"].div_(
+            torch.where(done, ep_len, torch.ones_like(ep_len))
+        )
+        self.stats["linear_a_mean"].div_(
+            torch.where(done, ep_len, torch.ones_like(ep_len))
+        )
+        self.stats["angular_a_mean"].div_(
+            torch.where(done, ep_len, torch.ones_like(ep_len))
+        )
         self.stats["return"] += reward
         self.stats["episode_len"][:] = self.progress_buf.unsqueeze(1)
 
@@ -504,3 +520,4 @@ class Track(IsaacEnv):
         target_pos = vmap(torch_utils.quat_rotate)(traj_rot, target_pos) * self.traj_scale[env_ids].unsqueeze(1)
 
         return self.origin + target_pos
+

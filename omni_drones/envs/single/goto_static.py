@@ -100,10 +100,10 @@ class Goto_static(IsaacEnv):
             torch.tensor([1.3, -(0.5 * self.narrow_width - 0.05), 0.5], device=self.device),
             torch.tensor([2.0, 0.5 * self.narrow_width - 0.05, 1.5], device=self.device)
         )
-        # self.init_target_pos_dist = D.Uniform(
-        #     torch.tensor([-2.0, -(0.5 * self.narrow_width - 0.05), 0.5], device=self.device),
-        #     torch.tensor([-1.3, 0.5 * self.narrow_width - 0.05, 1.5], device=self.device)
-        # )
+        self.init_target_pos_dist = D.Uniform(
+            torch.tensor([-2.0, -(0.5 * self.narrow_width - 0.05), 0.5], device=self.device),
+            torch.tensor([-1.3, 0.5 * self.narrow_width - 0.05, 1.5], device=self.device)
+        )
         self.init_rpy_dist = D.Uniform(
             torch.tensor([-0.2, -0.2, 0.0], device=self.device) * torch.pi,
             torch.tensor([0.2, 0.2, 0.2], device=self.device) * torch.pi
@@ -360,7 +360,8 @@ class Goto_static(IsaacEnv):
         obs.append(self.rpos_cylinder.reshape(self.num_envs, -1).unsqueeze(1))
         obs.append(self.all_cylinder_height)
         obs.append(self.all_cylinder_radius)
-        self.rpos_wall = self.wall_pos - self.root_state[..., 0].unsqueeze(-1)
+        # wall pos - drone_y
+        self.rpos_wall = self.wall_pos - self.root_state[..., 1].unsqueeze(-1)
         obs.append(self.rpos_wall)
         
         if self.time_encoding:

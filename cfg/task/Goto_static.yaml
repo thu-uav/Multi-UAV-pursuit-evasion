@@ -14,7 +14,7 @@ force_sensor: false
 
 use_eval: 0
 use_action_error_order2: 0
-reward_action_smoothness_weight: 10.0
+reward_action_smoothness_weight: 0.0
 reward_distance_scale: 10.0
 reward_bonus_scale: 30.0
 reward_collision: 100.0 # 100.0
