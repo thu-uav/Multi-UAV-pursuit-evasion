@@ -22,7 +22,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 rosbags = [
-    '/home/jiayu/OmniDrones/simopt/real_data/rl_hover_1.csv'
+    # '/home/jiayu/OmniDrones/simopt/real_data/rl_hover_1.csv',
+    '/home/jiayu/OmniDrones/simopt/real_data/rl_hover_2.csv'
     # '/home/jiayu/OmniDrones/simopt/real_data/size0_8.csv',
     # '/home/jiayu/OmniDrones/simopt/real_data/size1_0.csv',
     # '/home/jiayu/OmniDrones/simopt/real_data/size1_2.csv',
@@ -35,22 +36,10 @@ def main(cfg):
         real_data: [batch_size, T, dimension]
     """
     df = pd.read_csv(rosbags[0], skip_blank_lines=True)
-    df = np.array(df)
     # preprocess, motor > 0
-    use_preprocess = True
-    if use_preprocess:
-        preprocess_df = []
-        for df_one in df:
-            if df_one[-1] > 0:
-                preprocess_df.append(df_one)
-        preprocess_df = np.array(preprocess_df)
-    else:
-        preprocess_df = df
-    # episode_len = preprocess_df.shape[0] # contains land
+    preprocess_df = np.array(df[(df[['motor.m1']].to_numpy()[:,0] > 0)])
     start_idx = 0
-    # episode_len = min(1300, preprocess_df.shape[0])
     episode_len = min(1300, preprocess_df.shape[0])
-    # episode_len = -1 # TODO, apply to all trajectories
     real_data = []
     T = 1
     skip = 1
@@ -105,9 +94,14 @@ def main(cfg):
         500.0, 500.0, 16.7, # ki
         33.3, 33.3, 166.7 # ilimit
     ]
-    # Tm = 0.349
+
+    # debug
     params[5] = 2.350347298350041e-08
-    params[9] = 0.028585119515659244
+    params[9] = 0.025
+
+    # # Tm = 0.349
+    # params[5] = 2.350347298350041e-08
+    # params[9] = 0.028585119515659244
     
     # # Tm = 0.43
     # params[5] = 2.350347298350041e-08
@@ -275,14 +269,13 @@ def main(cfg):
         m4 = real_cmd_thrust + r + p - y
         real_motor_thrust_compute = np.array([m1.numpy(), m2.numpy(), m3.numpy(), m4.numpy()]) / (2**16) * 2 - 1
         real_motor_compute.append(real_motor_thrust_compute)
-        breakpoint()
         
-        drone.apply_action(torch.from_numpy(real_motor_thrust_compute).to(sim.device))
+        # drone.apply_action(torch.from_numpy(real_motor_thrust_compute).to(sim.device))
         
-        # if use_real_action:
-        #     drone.apply_action(real_action)
-        # else:
-        #     drone.apply_action(action)
+        if use_real_action:
+            drone.apply_action(real_action)
+        else:
+            drone.apply_action(action)
         
         # _, thrust, torques = drone.apply_action_foropt(action)
         sim.step(render=True)

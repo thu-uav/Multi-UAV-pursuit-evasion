@@ -19,15 +19,16 @@ from skopt import Optimizer
 from omni_drones.utils.torch import quat_rotate, quat_rotate_inverse
 import matplotlib.pyplot as plt
 import numpy as np
+from simopt.core import RealWorldDataBuffer, DataBufferBase
 
 rosbags = [
-    # '/home/jiayu/OmniDrones/simopt/real_data/rl_hover_1.csv',
-    '/home/jiayu/OmniDrones/simopt/real_data/rl_hover_2.csv',
+    '/home/jiayu/OmniDrones/simopt/real_data/rl_hover_1.csv',
     # '/home/jiayu/OmniDrones/simopt/real_data/size0_8.csv',
     # '/home/jiayu/OmniDrones/simopt/real_data/size1_0.csv',
     # '/home/jiayu/OmniDrones/simopt/real_data/size1_2.csv',
 ]
 # shape [-1, 37]
+data_path = '/home/jiayu/OmniDrones/simopt/real_data'
 
 @hydra.main(version_base=None, config_path=".", config_name="real2sim")
 def main(cfg):
@@ -35,38 +36,15 @@ def main(cfg):
         preprocess real data
         real_data: [batch_size, T, dimension]
     """
-    real_data = []
-    for idx in range(len(rosbags)):
-        df = pd.read_csv(rosbags[idx], skip_blank_lines=True)
-        # df = np.array(df)
-        # preprocess, motor > 0
-        preprocess_df = np.array(df[(df[['motor.m1']].to_numpy()[:,0] > 0)])
-        episode_length = min(1300, preprocess_df.shape[0])
-        data_one = []
-        # real_date: [episode_length, num_trajectory, dim]
-        T = 20
-        skip = 5
-        for i in range(0, episode_length-T, skip):
-            _slice = slice(i, i+T)
-            data_one.append(preprocess_df[_slice])
-        data_one = np.array(data_one)
-        
-        # add next_pos
-        next_pos = data_one[1:, :, 1:4]
-        # add next_quat
-        next_quat = data_one[1:, :, 5:9]
-        # add next_vel
-        next_vel = data_one[1:, :, 10:13]
-        # add next_body_rate
-        next_body_rate = data_one[1:, :, 23:26]
-        data_one = np.concatenate([data_one[:-1], next_pos], axis=-1)
-        data_one = np.concatenate([data_one, next_quat], axis=-1)
-        data_one = np.concatenate([data_one, next_vel], axis=-1)
-        data_one = np.concatenate([data_one, next_body_rate], axis=-1)
-        real_data.append(data_one)
-    real_data = np.concatenate(real_data, axis=0)
 
-    num_envs = real_data.shape[0]
+    real_data = []
+
+    df = RealWorldDataBuffer(data_path)
+    
+    observations = df.observations
+    actions = df.actions
+    
+    num_envs = observations.shape[0]
 
     # start sim
     OmegaConf.resolve(cfg)
@@ -184,8 +162,9 @@ def main(cfg):
         controller = controller.to(sim.device)
         
         # shuffle index and split into batches
-        shuffled_idx = torch.randperm(real_data.shape[0])
-        shuffled_real_data = real_data[shuffled_idx]
+        shuffled_idx = torch.randperm(observations.shape[0])
+        shuffled_obs = observations[shuffled_idx]
+        shuffled_actions = actions[shuffled_idx]
         
         # update simulation parameters
         """
@@ -193,26 +172,6 @@ def main(cfg):
             2. update parameters
             3. export para to yaml 
         """
-
-        '''
-        df:
-        Index(['pos.time', 'pos.x', 'pos.y', 'pos.z', [1:4]
-            'quat.time', 'quat.w', 'quat.x','quat.y', 'quat.z', [5:9]
-            'vel.time', 'vel.x', 'vel.y', 'vel.z', [10:13]
-            'omega.time','omega.r', 'omega.p', 'omega.y', [14:17] (gyro, degree/s)
-            'command_rpy.time', 'command_rpy.cmd_r', 'command_rpy.cmd_p',
-            'command_rpy.cmd_y', 'command_rpy.cmd_thrust', [18:22]
-            'real_rate.time', 'real_rate.r', 'real_rate.p', 'real_rate.y',
-            'real_rate.thrust', [23:27] (radians, pitch = -gyro.y)
-            'target_rate.time','target_rate.r', 'target_rate.p', 'target_rate.y', 
-            'target_rate.thrust',[28:32] (degree)
-            'motor.time', 'motor.m1', 'motor.m2', 'motor.m3', 'motor.m4'],[33:37]
-            'next_pos.x', 'next_pos.y', 'next_pos.z', [37:40]
-            'next_quat.w', 'next_quat.x','next_quat.y', 'next_quat.z', [40:44]
-            'next_vel.x', 'next_vel.y', 'next_vel.z', [44:47]
-            'next_rate.r', 'next_rate.p', 'next_rate.y', [47:50]
-            dtype='object')
-        '''
         sim_pos_list = []
         real_pos_list = []
         
@@ -225,17 +184,15 @@ def main(cfg):
         sim_ang_vel_list = []
         real_ang_vel_list = []
         
-        for i in range(shuffled_real_data.shape[1]):
-            real_pos = torch.tensor(shuffled_real_data[:, i, 1:4])
-            real_quat = torch.tensor(shuffled_real_data[:, i, 5:9])
-            real_vel = torch.tensor(shuffled_real_data[:, i, 10:13])
-            real_rate = torch.tensor(shuffled_real_data[:, i, 23:26])
-            real_ang_vel = quat_rotate(real_quat, real_rate)
+        for i in range(shuffled_obs.shape[1] - 1):
+            real_pos = torch.tensor(shuffled_obs[:, i, :3])
+            real_vel = torch.tensor(shuffled_obs[:, i, 3:6])
+            real_quat = torch.tensor(shuffled_obs[:, i, 6:10])
+            real_ang_vel = torch.tensor(shuffled_obs[:, i, 10:13])
             if i == 0:
                 set_drone_state(real_pos, real_quat, real_vel, real_ang_vel)
-            real_motor_thrust = torch.tensor(real_data[:, i, 33:37])
             
-            real_action = real_motor_thrust.to(sim.device) / (2**16) * 2 - 1    
+            real_action = torch.tensor(shuffled_actions[:, i]).to(sim.device)
             drone.apply_action(real_action.unsqueeze(1))
 
             sim.step(render=True)
@@ -254,12 +211,11 @@ def main(cfg):
             next_sim_ang_vel = next_sim_state[..., 10:13]
 
             # next real states, ground truth
-            next_real_pos = torch.tensor(shuffled_real_data[:, i, 37:40])
-            next_real_quat = torch.tensor(shuffled_real_data[:, i, 40:44])
-            next_real_vel = torch.tensor(shuffled_real_data[:, i, 44:47])
-            next_real_rate = torch.tensor(shuffled_real_data[:, i, 47:50])
-            next_real_ang_vel = quat_rotate(next_real_quat, next_real_rate)
-
+            next_real_pos = torch.tensor(shuffled_obs[:, i+1, :3])
+            next_real_vel = torch.tensor(shuffled_obs[:, i+1, 3:6])
+            next_real_quat = torch.tensor(shuffled_obs[:, i+1, 6:10])
+            next_real_ang_vel = torch.tensor(shuffled_obs[:, i+1, 10:13])
+            
             sim_pos_list.append(next_sim_pos.cpu().detach().numpy())
             sim_quat_list.append(next_sim_quat.cpu().detach().numpy())
             sim_vel_list.append(next_sim_vel.cpu().detach().numpy())
@@ -280,39 +236,40 @@ def main(cfg):
         real_vel_list = np.array(real_vel_list)
         real_ang_vel_list = np.array(real_ang_vel_list)
         
-        # normalization
-        min_pos_list = np.min(np.min(sim_pos_list, axis=0), axis=0)[np.newaxis, np.newaxis, :]
-        max_pos_list = np.max(np.max(sim_pos_list, axis=0), axis=0)[np.newaxis, np.newaxis, :]
-        sim_pos_list = (sim_pos_list - min_pos_list) / (max_pos_list - min_pos_list)
-        real_pos_list = (real_pos_list - min_pos_list) / (max_pos_list - min_pos_list)
-        min_vel_list = np.min(np.min(sim_vel_list, axis=0), axis=0)[np.newaxis, np.newaxis, :]
-        max_vel_list = np.max(np.max(sim_vel_list, axis=0), axis=0)[np.newaxis, np.newaxis, :]
-        sim_vel_list = (sim_vel_list - min_vel_list) / (max_vel_list - min_vel_list)
-        real_vel_list = (real_vel_list - min_vel_list) / (max_vel_list - min_vel_list)
-        min_quat_list = np.min(np.min(sim_quat_list, axis=0), axis=0)[np.newaxis, np.newaxis, :]
-        max_quat_list = np.max(np.max(sim_quat_list, axis=0), axis=0)[np.newaxis, np.newaxis, :]
-        sim_quat_list = (sim_quat_list - min_quat_list) / (max_quat_list - min_quat_list)
-        real_quat_list = (real_quat_list - min_quat_list) / (max_quat_list - min_quat_list)
-        min_ang_vel_list = np.min(np.min(sim_ang_vel_list, axis=0), axis=0)[np.newaxis, np.newaxis, :]
-        max_ang_vel_list = np.max(np.max(sim_ang_vel_list, axis=0), axis=0)[np.newaxis, np.newaxis, :]
-        sim_ang_vel_list = (sim_ang_vel_list - min_ang_vel_list) / (max_ang_vel_list - min_ang_vel_list)
-        real_ang_vel_list = (real_ang_vel_list - min_ang_vel_list) / (max_ang_vel_list - min_ang_vel_list)
+        # # normalization
+        # min_pos_list = np.min(np.min(sim_pos_list, axis=0), axis=0)[np.newaxis, np.newaxis, :]
+        # max_pos_list = np.max(np.max(sim_pos_list, axis=0), axis=0)[np.newaxis, np.newaxis, :]
+        # sim_pos_list = (sim_pos_list - min_pos_list) / (max_pos_list - min_pos_list)
+        # real_pos_list = (real_pos_list - min_pos_list) / (max_pos_list - min_pos_list)
+        # min_vel_list = np.min(np.min(sim_vel_list, axis=0), axis=0)[np.newaxis, np.newaxis, :]
+        # max_vel_list = np.max(np.max(sim_vel_list, axis=0), axis=0)[np.newaxis, np.newaxis, :]
+        # sim_vel_list = (sim_vel_list - min_vel_list) / (max_vel_list - min_vel_list)
+        # real_vel_list = (real_vel_list - min_vel_list) / (max_vel_list - min_vel_list)
+        # min_quat_list = np.min(np.min(sim_quat_list, axis=0), axis=0)[np.newaxis, np.newaxis, :]
+        # max_quat_list = np.max(np.max(sim_quat_list, axis=0), axis=0)[np.newaxis, np.newaxis, :]
+        # sim_quat_list = (sim_quat_list - min_quat_list) / (max_quat_list - min_quat_list)
+        # real_quat_list = (real_quat_list - min_quat_list) / (max_quat_list - min_quat_list)
+        # min_ang_vel_list = np.min(np.min(sim_ang_vel_list, axis=0), axis=0)[np.newaxis, np.newaxis, :]
+        # max_ang_vel_list = np.max(np.max(sim_ang_vel_list, axis=0), axis=0)[np.newaxis, np.newaxis, :]
+        # sim_ang_vel_list = (sim_ang_vel_list - min_ang_vel_list) / (max_ang_vel_list - min_ang_vel_list)
+        # real_ang_vel_list = (real_ang_vel_list - min_ang_vel_list) / (max_ang_vel_list - min_ang_vel_list)
         
         # debug
         error_rpy = sim_quat_list - real_quat_list
         error_rpy_dot = sim_ang_vel_list - real_ang_vel_list
-        error_xyz = sim_pos_list - real_pos_list
-        error_xyz_dot = sim_vel_list - real_vel_list
+        error_xyz = (sim_pos_list - real_pos_list)
+        error_xyz_dot = (sim_vel_list - real_vel_list)
         
         error = np.concatenate([error_rpy, error_rpy_dot, error_xyz, error_xyz_dot], axis=-1)
-
+        # error = np.concatenate([error_rpy_dot], axis=-1)
+        
         L1_loss = np.linalg.norm(error, axis=-1, ord=1)
         L2_loss = np.linalg.norm(error, axis=-1, ord=2)
         L = np.mean(L1_loss + L2_loss, axis=-1)
         
         loss = torch.tensor(0.0, dtype=torch.float)
         gamma = 0.95 # discounted factor
-        for i in range(shuffled_real_data.shape[1]):
+        for i in range(shuffled_obs.shape[1] - 1):
             loss += L[i] * gamma**i
         return loss 
 

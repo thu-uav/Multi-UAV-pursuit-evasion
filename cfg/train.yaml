@@ -5,7 +5,8 @@ headless: true
 sim: ${task.sim}
 env: ${task.env}
 
-# model_dir: /home/jiayu/OmniDrones/scripts/outputs/goto_static_smooth1/06-23_21-34/wandb/run-20240623_213402-6b6mhqrv/files/checkpoint_final.pt
+# model_dir: /home/jiayu/OmniDrones/scripts/outputs/goto_static_smooth10_woorder2/06-24_13-48/wandb/run-20240624_134840-mtktp6kf/files/checkpoint_2490630144.pt
+# model_dir: /home/jiayu/OmniDrones/scripts/outputs/goto_static_smooth10_loadsmooth10_length800/06-24_18-22/wandb/run-20240624_182255-qf54mii5/files/checkpoint_2018770944.pt
 model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
@@ -17,7 +18,7 @@ seed: 0
 viewer:
   resolution: [960, 720]
   # front
-  eye: [0.005, 0., 4.]
+  eye: [0., -0.005, 6.]
   lookat: [0., 0., 1.]
   # # follow drone
   # eye: [0., 2.0, 2.5]
@@ -25,7 +26,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: Track_randomlatency2_wosmooth
+  run_name: goto_static_smooth10
   # run_name: debug
   job_type: train
   entity: chenjy
@@ -37,8 +38,8 @@ wandb:
   tags: 
 
 defaults:
-  # - task: Goto_static
-  - task: Track
+  - task: Goto_static
+  # - task: Track
   # - task: Exchange
   # - task: MultiGoto
   - algo: mappo

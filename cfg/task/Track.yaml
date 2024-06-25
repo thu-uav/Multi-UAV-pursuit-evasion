@@ -23,7 +23,7 @@ future_traj_steps: 4
 
 use_eval: 0
 use_action_error_order2: 0
-reward_action_smoothness_weight: 0.0
+reward_action_smoothness_weight: 0.5
 reward_distance_scale: 5.0
 
 action_transform: PIDrate

@@ -300,6 +300,8 @@ class Track(IsaacEnv):
         self.last_linear_jerk[env_ids] = torch.zeros_like(self.last_linear_a[env_ids])
         self.last_angular_jerk[env_ids] = torch.zeros_like(self.last_angular_a[env_ids])
 
+        self.stats[env_ids] = 0.
+
         cmd_init = 2.0 * (self.drone.throttle[env_ids]) ** 2 - 1.0
         max_thrust_ratio = self.drone.params['max_thrust_ratio']
         self.info['prev_action'][env_ids, :, 3] = (0.5 * (max_thrust_ratio + cmd_init)).mean(dim=-1)
@@ -358,6 +360,8 @@ class Track(IsaacEnv):
                 root_state = torch.stack(list(self.root_state_buffer))[random_indices, torch.arange(self.num_envs)]
             else:
                 root_state = self.root_state_buffer[0]
+        else:
+            root_state = self.root_state
 
         self.target_pos[:] = self._compute_traj(self.future_traj_steps, step_size=5)
         
@@ -500,4 +504,3 @@ class Track(IsaacEnv):
         target_pos = vmap(torch_utils.quat_rotate)(traj_rot, target_pos) * self.traj_scale[env_ids].unsqueeze(1)
 
         return self.origin + target_pos
-
