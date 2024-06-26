@@ -26,7 +26,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: goto_static_smooth0
+  run_name: Track_smooth0_simopt
   # run_name: debug
   job_type: train
   entity: chenjy
@@ -38,9 +38,9 @@ wandb:
   tags: 
 
 defaults:
-  - task: Goto_static
-  # - task: Track
-  # - task: Exchange
+  - task: Track
   # - task: MultiGoto
+  # - task: Goto_static
+  # - task: Exchange
   - algo: mappo
   - _self_
