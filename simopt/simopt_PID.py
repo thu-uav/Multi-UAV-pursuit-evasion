@@ -354,8 +354,8 @@ def main(cfg):
     # PID
     params = [
         0.0307, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
-        2.3454137942793112e-08, 2315, 7.24e-10, 0.2,
-        0.025, # Tm
+        2.2034505922031636e-08, 2315, 7.24e-10, 0.2,
+        0.018472893755721052, # Tm
         # controller
         250.0, 250.0, 120.0, # kp
         2.5, 2.5, 2.5, # kd
@@ -383,7 +383,7 @@ def main(cfg):
     params_mask = np.array([0] * len(params))
 
     # update rotor params
-    # params_mask[5] = 1
+    params_mask[5] = 1
     # params_mask[7] = 1
     params_mask[9] = 1
 
