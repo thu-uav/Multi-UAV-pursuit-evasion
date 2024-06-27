@@ -22,11 +22,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 rosbags = [
+    '/home/jiayu/OmniDrones/simopt/real_data/hover1.csv',
+    # '/home/jiayu/OmniDrones/simopt/real_data/hover2.csv',
+    # '/home/jiayu/OmniDrones/simopt/real_data/hover3.csv',
     # '/home/jiayu/OmniDrones/simopt/real_data/goto0_5.csv',
     # '/home/jiayu/OmniDrones/simopt/real_data/goto0_8.csv',
     # '/home/jiayu/OmniDrones/simopt/real_data/goto1_0.csv',
     # '/home/jiayu/OmniDrones/simopt/real_data/goto1_2.csv',
-    '/home/jiayu/OmniDrones/simopt/real_data/goto1_5.csv',
+    # '/home/jiayu/OmniDrones/simopt/real_data/goto1_5.csv',
 ]
 
 def exclude_battery_compensation(PWMs, voltages):
@@ -52,6 +55,7 @@ def main(cfg):
     df = pd.read_csv(rosbags[0], skip_blank_lines=True)
     # preprocess, motor > 0
     preprocess_df = df[(df[['motor.m1']].to_numpy()[:,0] > 0)]
+    preprocess_df = preprocess_df[300:1200]
     pos = preprocess_df[['pos.x', 'pos.y', 'pos.z']].to_numpy()
     vel = preprocess_df[['vel.x', 'vel.y', 'vel.z']].to_numpy()
     quat = preprocess_df[['quat.w', 'quat.x', 'quat.y', 'quat.z']].to_numpy()
@@ -111,15 +115,15 @@ def main(cfg):
         33.3, 33.3, 166.7 # ilimit
     ]
 
-    # # base
-    # params[0] = 0.0321
-    # params[5] = 2.350347298350041e-08
-    # params[9] = 0.025
-    
-    # simopt
+    # base
     params[0] = 0.0321
-    params[5] = 2.1965862601402255e-08
-    params[9] = 0.021811431101468833
+    params[5] = 2.350347298350041e-08
+    params[9] = 0.025
+    
+    # # simopt
+    # params[0] = 0.0321
+    # params[5] = 2.1965862601402255e-08
+    # params[9] = 0.021811431101468833
     
     tunable_parameters = {
         'mass': params[0],

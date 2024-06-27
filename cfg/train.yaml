@@ -6,7 +6,7 @@ sim: ${task.sim}
 env: ${task.env}
 
 # model_dir: /home/jiayu/OmniDrones/scripts/outputs/goto_static_smooth10_woorder2/06-24_13-48/wandb/run-20240624_134840-mtktp6kf/files/checkpoint_2490630144.pt
-# model_dir: /home/jiayu/OmniDrones/scripts/outputs/goto_static_smooth10_loadsmooth10_length800/06-24_18-22/wandb/run-20240624_182255-qf54mii5/files/checkpoint_2018770944.pt
+# model_dir: /home/jiayu/OmniDrones/scripts/outputs/Track_Tm001_smooth05.pt
 model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
@@ -26,7 +26,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: Track_smooth0_simopt
+  run_name: Track_smooth0_simopt_2stage
   # run_name: debug
   job_type: train
   entity: chenjy

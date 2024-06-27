@@ -34,7 +34,13 @@ def exclude_battery_compensation(PWMs, voltages):
     PWMs_cleaned = np.clip(thrust / 60, 0, 1) * 65535
     return PWMs_cleaned
 
+# hover1,2,3, all data. force_constant = 2.4607239122522373e-08
+# hover1,2,3, only hover. force_constant =
+
 rosbags = [
+    '/home/jiayu/OmniDrones/simopt/real_data/hover1.csv',
+    '/home/jiayu/OmniDrones/simopt/real_data/hover2.csv',
+    '/home/jiayu/OmniDrones/simopt/real_data/hover3.csv',
     '/home/jiayu/OmniDrones/simopt/real_data/goto0_5.csv',
     '/home/jiayu/OmniDrones/simopt/real_data/goto0_8.csv',
     '/home/jiayu/OmniDrones/simopt/real_data/goto1_0.csv',
@@ -55,6 +61,7 @@ def main(cfg):
     for idx in range(len(rosbags)):
         df = pd.read_csv(rosbags[idx], skip_blank_lines=True)
         preprocess_df = df[(df[['motor.m1']].to_numpy()[:,0] > 0)]
+        # preprocess_df = preprocess_df[300:1200]
         pos = preprocess_df[['pos.x', 'pos.y', 'pos.z']].to_numpy()
         vel = preprocess_df[['vel.x', 'vel.y', 'vel.z']].to_numpy()
         quat = preprocess_df[['quat.w', 'quat.x', 'quat.y', 'quat.z']].to_numpy()
@@ -258,11 +265,11 @@ def main(cfg):
         real_ang_vel_list = []
         
         for i in range(chunk_length - 1):
-            real_pos = torch.tensor(pos[:, i]).to(sim.device)
-            real_quat = torch.tensor(quat[:, i]).to(sim.device)
-            real_vel = torch.tensor(vel[:, i]).to(sim.device)
-            real_ang_vel = torch.tensor(ang_vel[:, i]).to(sim.device)
-            real_action = torch.tensor(action[:, i]).to(sim.device)
+            real_pos = torch.tensor(shuffled_pos[:, i]).to(sim.device)
+            real_quat = torch.tensor(shuffled_quat[:, i]).to(sim.device)
+            real_vel = torch.tensor(shuffled_vel[:, i]).to(sim.device)
+            real_ang_vel = torch.tensor(shuffled_ang_vel[:, i]).to(sim.device)
+            real_action = torch.tensor(shuffled_action[:, i]).to(sim.device)
             if i == 0:
                 set_drone_state(real_pos, real_quat, real_vel, real_ang_vel)    
             
@@ -284,10 +291,10 @@ def main(cfg):
             next_sim_ang_vel = next_sim_state[..., 10:13]
 
             # next real states, ground truth
-            next_real_pos = torch.tensor(pos[:, i + 1])
-            next_real_quat = torch.tensor(quat[:, i + 1])
-            next_real_vel = torch.tensor(vel[:, i + 1])
-            next_real_ang_vel = torch.tensor(ang_vel[:, i + 1])
+            next_real_pos = torch.tensor(shuffled_pos[:, i + 1])
+            next_real_quat = torch.tensor(shuffled_quat[:, i + 1])
+            next_real_vel = torch.tensor(shuffled_vel[:, i + 1])
+            next_real_ang_vel = torch.tensor(shuffled_ang_vel[:, i + 1])
 
             sim_pos_list.append(next_sim_pos.cpu().detach().numpy())
             sim_quat_list.append(next_sim_quat.cpu().detach().numpy())
@@ -309,28 +316,28 @@ def main(cfg):
         real_vel_list = np.array(real_vel_list)
         real_ang_vel_list = np.array(real_ang_vel_list)
         
-        # normalization
-        min_pos_list = np.min(np.min(sim_pos_list, axis=0), axis=0)[np.newaxis, np.newaxis, :]
-        max_pos_list = np.max(np.max(sim_pos_list, axis=0), axis=0)[np.newaxis, np.newaxis, :]
-        sim_pos_list = (sim_pos_list - min_pos_list) / (max_pos_list - min_pos_list)
-        real_pos_list = (real_pos_list - min_pos_list) / (max_pos_list - min_pos_list)
-        min_vel_list = np.min(np.min(sim_vel_list, axis=0), axis=0)[np.newaxis, np.newaxis, :]
-        max_vel_list = np.max(np.max(sim_vel_list, axis=0), axis=0)[np.newaxis, np.newaxis, :]
-        sim_vel_list = (sim_vel_list - min_vel_list) / (max_vel_list - min_vel_list)
-        real_vel_list = (real_vel_list - min_vel_list) / (max_vel_list - min_vel_list)
-        min_quat_list = np.min(np.min(sim_quat_list, axis=0), axis=0)[np.newaxis, np.newaxis, :]
-        max_quat_list = np.max(np.max(sim_quat_list, axis=0), axis=0)[np.newaxis, np.newaxis, :]
-        sim_quat_list = (sim_quat_list - min_quat_list) / (max_quat_list - min_quat_list)
-        real_quat_list = (real_quat_list - min_quat_list) / (max_quat_list - min_quat_list)
-        min_ang_vel_list = np.min(np.min(sim_ang_vel_list, axis=0), axis=0)[np.newaxis, np.newaxis, :]
-        max_ang_vel_list = np.max(np.max(sim_ang_vel_list, axis=0), axis=0)[np.newaxis, np.newaxis, :]
-        sim_ang_vel_list = (sim_ang_vel_list - min_ang_vel_list) / (max_ang_vel_list - min_ang_vel_list)
-        real_ang_vel_list = (real_ang_vel_list - min_ang_vel_list) / (max_ang_vel_list - min_ang_vel_list)
+        # # normalization
+        # min_pos_list = np.min(np.min(sim_pos_list, axis=0), axis=0)[np.newaxis, np.newaxis, :]
+        # max_pos_list = np.max(np.max(sim_pos_list, axis=0), axis=0)[np.newaxis, np.newaxis, :]
+        # sim_pos_list = (sim_pos_list - min_pos_list) / (max_pos_list - min_pos_list)
+        # real_pos_list = (real_pos_list - min_pos_list) / (max_pos_list - min_pos_list)
+        # min_vel_list = np.min(np.min(sim_vel_list, axis=0), axis=0)[np.newaxis, np.newaxis, :]
+        # max_vel_list = np.max(np.max(sim_vel_list, axis=0), axis=0)[np.newaxis, np.newaxis, :]
+        # sim_vel_list = (sim_vel_list - min_vel_list) / (max_vel_list - min_vel_list)
+        # real_vel_list = (real_vel_list - min_vel_list) / (max_vel_list - min_vel_list)
+        # min_quat_list = np.min(np.min(sim_quat_list, axis=0), axis=0)[np.newaxis, np.newaxis, :]
+        # max_quat_list = np.max(np.max(sim_quat_list, axis=0), axis=0)[np.newaxis, np.newaxis, :]
+        # sim_quat_list = (sim_quat_list - min_quat_list) / (max_quat_list - min_quat_list)
+        # real_quat_list = (real_quat_list - min_quat_list) / (max_quat_list - min_quat_list)
+        # min_ang_vel_list = np.min(np.min(sim_ang_vel_list, axis=0), axis=0)[np.newaxis, np.newaxis, :]
+        # max_ang_vel_list = np.max(np.max(sim_ang_vel_list, axis=0), axis=0)[np.newaxis, np.newaxis, :]
+        # sim_ang_vel_list = (sim_ang_vel_list - min_ang_vel_list) / (max_ang_vel_list - min_ang_vel_list)
+        # real_ang_vel_list = (real_ang_vel_list - min_ang_vel_list) / (max_ang_vel_list - min_ang_vel_list)
         
         error_rpy = sim_quat_list - real_quat_list
         error_rpy_dot = sim_ang_vel_list - real_ang_vel_list
-        error_xyz = sim_pos_list - real_pos_list
-        error_xyz_dot = sim_vel_list - real_vel_list
+        error_xyz = 100 * (sim_pos_list - real_pos_list)
+        error_xyz_dot = 10 * (sim_vel_list - real_vel_list)
         
         error = np.concatenate([error_rpy, error_rpy_dot, error_xyz, error_xyz_dot], axis=-1)
 
@@ -346,8 +353,8 @@ def main(cfg):
 
     # PID
     params = [
-        0.0321, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
-        2.350347298350041e-08, 2315, 7.24e-10, 0.2,
+        0.0307, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
+        2.3454137942793112e-08, 2315, 7.24e-10, 0.2,
         0.025, # Tm
         # controller
         250.0, 250.0, 120.0, # kp
@@ -376,7 +383,7 @@ def main(cfg):
     params_mask = np.array([0] * len(params))
 
     # update rotor params
-    params_mask[5] = 1
+    # params_mask[5] = 1
     # params_mask[7] = 1
     params_mask[9] = 1
 

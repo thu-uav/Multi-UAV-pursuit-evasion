@@ -15,7 +15,7 @@ inertia:
   yy: 1.4e-5
   yz: 0.0
   zz: 2.17e-5
-mass: 0.0321 # cf13: 0.0321, cf11:0.0308, cf12: 0.0313
+mass: 0.0307 # cf13: 0.0321, cf11:0.0308, cf12: 0.0307
 l: 0.096
 drag_coef: 0.2
 rotor_configuration:
@@ -33,14 +33,18 @@ rotor_configuration:
   # 1/4mg = (mean_hover_pwm / 2**16) * omega_max^2 * force_constants
   # force_constants = 1/4mg * kf / omega_max^2
   # kf = force_constants * omega_max^2 / 1/4mg
-  # - 2.350347298350041e-08 # kf = 2**16 / mean_hover_pwm = 1.6
+  # - 2.350347298350041e-08 # kf = 2**16 / mean_hover_pwm = 1.6, 悬浮推力算出来
   # - 2.350347298350041e-08
   # - 2.350347298350041e-08
   # - 2.350347298350041e-08
-  - 2.6441407106437967e-08 # simopt
-  - 2.6441407106437967e-08
-  - 2.6441407106437967e-08
-  - 2.6441407106437967e-08
+  - 2.3454137942793112e-08 # simopt, 先kf，后Tm
+  - 2.3454137942793112e-08
+  - 2.3454137942793112e-08
+  - 2.3454137942793112e-08
+  # - 2.2034505922031636e-08 # kf = 1.5
+  # - 2.2034505922031636e-08
+  # - 2.2034505922031636e-08
+  # - 2.2034505922031636e-08
   max_rotation_velocities:     
   - 2315      # 16mm dc motor -- 14000 rpm/v 3.7V --> 863 rps
   - 2315
@@ -57,9 +61,8 @@ rotor_configuration:
   - 2.35619449
   - 3.92699082
   - 5.49778714
-  # time_constant: 0.023255813953488372 # 0.43, tau = dt / time_constant
-  # time_constant: 0.025 # 0.4, DATT
-  time_constant: 0.02736377359664069
+  # time_constant: 0.025 # 0.4, DATT, tau = dt / time_constant
+  time_constant: 0.022206083355528664 # simopt, 先kf，后Tm
 controller_configuration: # invalid
   gain:
   - 0.0052
