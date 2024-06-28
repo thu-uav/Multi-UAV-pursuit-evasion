@@ -25,11 +25,11 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: Track_smooth05_randommass
+  run_name: Track_smooth0_newopt
   # run_name: debug
   job_type: train
   entity: chenjy
-  project: sim2real
+  project: simpleflight
   # mode: disabled
   mode: online # set to 'disabled' when debugging locally, online
   run_id: 

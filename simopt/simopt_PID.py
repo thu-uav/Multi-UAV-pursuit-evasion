@@ -35,18 +35,18 @@ def exclude_battery_compensation(PWMs, voltages):
     return PWMs_cleaned
 
 rosbags = [
-    '/home/jiayu/OmniDrones/simopt/real_data/data/cf0_size05.csv',
-    '/home/jiayu/OmniDrones/simopt/real_data/data/cf0_size08.csv',
-    '/home/jiayu/OmniDrones/simopt/real_data/data/cf0_size10.csv',
-    '/home/jiayu/OmniDrones/simopt/real_data/data/cf0_size12.csv',
-    # '/home/jiayu/OmniDrones/simopt/real_data/data/cf12_size05.csv',
-    # '/home/jiayu/OmniDrones/simopt/real_data/data/cf12_size08.csv',
-    # '/home/jiayu/OmniDrones/simopt/real_data/data/cf12_size10.csv',
-    # '/home/jiayu/OmniDrones/simopt/real_data/data/cf12_size12.csv',
-    # '/home/jiayu/OmniDrones/simopt/real_data/data/cf15_size05.csv',
-    # '/home/jiayu/OmniDrones/simopt/real_data/data/cf15_size08.csv',
-    # '/home/jiayu/OmniDrones/simopt/real_data/data/cf15_size10.csv',
-    # '/home/jiayu/OmniDrones/simopt/real_data/data/cf15_size12.csv',
+    '/home/chenjy/OmniDrones/simopt/real_data/data/cf0_size05.csv',
+    '/home/chenjy/OmniDrones/simopt/real_data/data/cf0_size08.csv',
+    '/home/chenjy/OmniDrones/simopt/real_data/data/cf0_size10.csv',
+    '/home/chenjy/OmniDrones/simopt/real_data/data/cf0_size12.csv',
+    '/home/chenjy/OmniDrones/simopt/real_data/data/cf12_size05.csv',
+    '/home/chenjy/OmniDrones/simopt/real_data/data/cf12_size08.csv',
+    '/home/chenjy/OmniDrones/simopt/real_data/data/cf12_size10.csv',
+    '/home/chenjy/OmniDrones/simopt/real_data/data/cf12_size12.csv',
+    '/home/chenjy/OmniDrones/simopt/real_data/data/cf15_size05.csv',
+    '/home/chenjy/OmniDrones/simopt/real_data/data/cf15_size08.csv',
+    '/home/chenjy/OmniDrones/simopt/real_data/data/cf15_size10.csv',
+    '/home/chenjy/OmniDrones/simopt/real_data/data/cf15_size12.csv',
 ]
 @hydra.main(version_base=None, config_path=".", config_name="real2sim")
 def main(cfg):
@@ -62,7 +62,7 @@ def main(cfg):
     for idx in range(len(rosbags)):
         df = pd.read_csv(rosbags[idx], skip_blank_lines=True)
         preprocess_df = df[(df[['motor.m1']].to_numpy()[:,0] > 0)]
-        preprocess_df = preprocess_df[200:1600] # only figure 8
+        # preprocess_df = preprocess_df[200:1600] # only figure 8
         pos = preprocess_df[['pos.x', 'pos.y', 'pos.z']].to_numpy()
         vel = preprocess_df[['vel.x', 'vel.y', 'vel.z']].to_numpy()
         quat = preprocess_df[['quat.w', 'quat.x', 'quat.y', 'quat.z']].to_numpy()
@@ -81,7 +81,7 @@ def main(cfg):
         ang_vel_one = []
         action_one = []
         T = 20
-        skip = 1
+        skip = 10
         for i in range(0, episode_length-T, skip):
             _slice = slice(i, i+T)
             pos_one.append(pos[_slice])
@@ -354,7 +354,7 @@ def main(cfg):
     # PID
     params = [
         0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
-        2.2034505922031636e-08, 2315, 7.24e-10, 0.2,
+        2.375058893776619e-08, 2315, 7.24e-10, 0.2,
         0.018472893755721052, # Tm
         # controller
         250.0, 250.0, 120.0, # kp
@@ -383,7 +383,7 @@ def main(cfg):
     params_mask = np.array([0] * len(params))
 
     # update rotor params
-    params_mask[5] = 1
+    # params_mask[5] = 1
     # params_mask[7] = 1
     params_mask[9] = 1
 
@@ -391,8 +391,8 @@ def main(cfg):
     count = 0
     for param, mask in zip(params, params_mask):
         if mask == 1:
-            if count == 5: # force_constant -> kf:[1.5, 1.8]
-                params_range.append((2.2034505922031636e-08, 2.6441407106437967e-08))
+            if count == 5: # force_constant -> kf:[1.7, 2.1]
+                params_range.append((2.3338729013989898e-08, 2.8830194664340464e-08))
             elif count == 9: # Tm: [0.01, 0.05], v(t+\delta_t) = v(t) * (1 - \delta_t / Tm) + throttle_des * (\delta_t / Tm)
                 params_range.append((0.01, 0.03))
         count += 1

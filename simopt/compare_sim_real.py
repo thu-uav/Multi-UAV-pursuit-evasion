@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 rosbags = [
-    '/home/jiayu/OmniDrones/simopt/real_data/data/cf0_size05.csv',
+    '/home/chenjy/OmniDrones/simopt/real_data/old/hover1.csv',
     # '/home/jiayu/OmniDrones/simopt/real_data/data/cf0_size12.csv',
 ]
 
