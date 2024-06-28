@@ -14,7 +14,7 @@ force_sensor: false
 time_encoding: true
 intrinsics: false
 wind: false
-latency: true
+latency: false
 latency_step: 2
 random_latency: true
 
@@ -31,5 +31,5 @@ action_transform: PIDrate
 # randomization:
 #   drone:
 #     train:
-#       mass_scale: [1., 1.3]
+#       mass_scale: [0.9, 1.1]
 #       inertia_scale: [0.7, 1.3]

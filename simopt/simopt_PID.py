@@ -34,18 +34,19 @@ def exclude_battery_compensation(PWMs, voltages):
     PWMs_cleaned = np.clip(thrust / 60, 0, 1) * 65535
     return PWMs_cleaned
 
-# hover1,2,3, all data. force_constant = 2.4607239122522373e-08
-# hover1,2,3, only hover. force_constant =
-
 rosbags = [
-    '/home/jiayu/OmniDrones/simopt/real_data/hover1.csv',
-    '/home/jiayu/OmniDrones/simopt/real_data/hover2.csv',
-    '/home/jiayu/OmniDrones/simopt/real_data/hover3.csv',
-    '/home/jiayu/OmniDrones/simopt/real_data/goto0_5.csv',
-    '/home/jiayu/OmniDrones/simopt/real_data/goto0_8.csv',
-    '/home/jiayu/OmniDrones/simopt/real_data/goto1_0.csv',
-    '/home/jiayu/OmniDrones/simopt/real_data/goto1_2.csv',
-    '/home/jiayu/OmniDrones/simopt/real_data/goto1_5.csv',
+    '/home/jiayu/OmniDrones/simopt/real_data/data/cf0_size05.csv',
+    '/home/jiayu/OmniDrones/simopt/real_data/data/cf0_size08.csv',
+    '/home/jiayu/OmniDrones/simopt/real_data/data/cf0_size10.csv',
+    '/home/jiayu/OmniDrones/simopt/real_data/data/cf0_size12.csv',
+    # '/home/jiayu/OmniDrones/simopt/real_data/data/cf12_size05.csv',
+    # '/home/jiayu/OmniDrones/simopt/real_data/data/cf12_size08.csv',
+    # '/home/jiayu/OmniDrones/simopt/real_data/data/cf12_size10.csv',
+    # '/home/jiayu/OmniDrones/simopt/real_data/data/cf12_size12.csv',
+    # '/home/jiayu/OmniDrones/simopt/real_data/data/cf15_size05.csv',
+    # '/home/jiayu/OmniDrones/simopt/real_data/data/cf15_size08.csv',
+    # '/home/jiayu/OmniDrones/simopt/real_data/data/cf15_size10.csv',
+    # '/home/jiayu/OmniDrones/simopt/real_data/data/cf15_size12.csv',
 ]
 @hydra.main(version_base=None, config_path=".", config_name="real2sim")
 def main(cfg):
@@ -61,17 +62,16 @@ def main(cfg):
     for idx in range(len(rosbags)):
         df = pd.read_csv(rosbags[idx], skip_blank_lines=True)
         preprocess_df = df[(df[['motor.m1']].to_numpy()[:,0] > 0)]
-        # preprocess_df = preprocess_df[300:1200]
+        preprocess_df = preprocess_df[200:1600] # only figure 8
         pos = preprocess_df[['pos.x', 'pos.y', 'pos.z']].to_numpy()
         vel = preprocess_df[['vel.x', 'vel.y', 'vel.z']].to_numpy()
         quat = preprocess_df[['quat.w', 'quat.x', 'quat.y', 'quat.z']].to_numpy()
         ang_vel = preprocess_df[['omega.r', 'omega.p', 'omega.y']].to_numpy() / 180.0 * torch.pi
         PWMs = preprocess_df[['motor.m1', 'motor.m2', 'motor.m3', 'motor.m4']].to_numpy()
         voltages = preprocess_df[['bat']].to_numpy()
-        exclude_battery_compensation_flag = False
+        exclude_battery_compensation_flag = True
         if exclude_battery_compensation_flag:
             PWMs = exclude_battery_compensation(PWMs, voltages)
-        # TODO
         action = PWMs / (2**16) * 2 - 1
         
         episode_length = preprocess_df.shape[0]
@@ -353,7 +353,7 @@ def main(cfg):
 
     # PID
     params = [
-        0.0307, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
+        0.03, 1.4e-5, 1.4e-5, 2.17e-5, 0.043,
         2.2034505922031636e-08, 2315, 7.24e-10, 0.2,
         0.018472893755721052, # Tm
         # controller

@@ -5,6 +5,7 @@ headless: true
 sim: ${task.sim}
 env: ${task.env}
 
+# model_dir: /home/jiayu/OmniDrones/scripts/outputs/Track_simopt_smooth01_latnecy1.pt
 model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
@@ -24,7 +25,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: Track_smooth0_simopt_latency1
+  run_name: Track_smooth05_randommass
   # run_name: debug
   job_type: train
   entity: chenjy

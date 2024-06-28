@@ -22,14 +22,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 rosbags = [
-    '/home/jiayu/OmniDrones/simopt/real_data/hover1.csv',
-    # '/home/jiayu/OmniDrones/simopt/real_data/hover2.csv',
-    # '/home/jiayu/OmniDrones/simopt/real_data/hover3.csv',
-    # '/home/jiayu/OmniDrones/simopt/real_data/goto0_5.csv',
-    # '/home/jiayu/OmniDrones/simopt/real_data/goto0_8.csv',
-    # '/home/jiayu/OmniDrones/simopt/real_data/goto1_0.csv',
-    # '/home/jiayu/OmniDrones/simopt/real_data/goto1_2.csv',
-    # '/home/jiayu/OmniDrones/simopt/real_data/goto1_5.csv',
+    '/home/jiayu/OmniDrones/simopt/real_data/data/cf0_size05.csv',
+    # '/home/jiayu/OmniDrones/simopt/real_data/data/cf0_size12.csv',
 ]
 
 def exclude_battery_compensation(PWMs, voltages):
@@ -55,7 +49,7 @@ def main(cfg):
     df = pd.read_csv(rosbags[0], skip_blank_lines=True)
     # preprocess, motor > 0
     preprocess_df = df[(df[['motor.m1']].to_numpy()[:,0] > 0)]
-    preprocess_df = preprocess_df[300:1200]
+    preprocess_df = preprocess_df[200:1600]
     pos = preprocess_df[['pos.x', 'pos.y', 'pos.z']].to_numpy()
     vel = preprocess_df[['vel.x', 'vel.y', 'vel.z']].to_numpy()
     quat = preprocess_df[['quat.w', 'quat.x', 'quat.y', 'quat.z']].to_numpy()
