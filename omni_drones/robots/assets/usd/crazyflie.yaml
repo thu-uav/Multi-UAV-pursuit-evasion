@@ -41,10 +41,10 @@ rotor_configuration:
   - 2.2034505922031636e-08
   - 2.2034505922031636e-08
   - 2.2034505922031636e-08
-  # - 2.2034505922031636e-08 # kf = 1.5
-  # - 2.2034505922031636e-08
-  # - 2.2034505922031636e-08
-  # - 2.2034505922031636e-08
+  # - 1.826369950879092e-08 # kf = 1.5
+  # - 1.826369950879092e-08
+  # - 1.826369950879092e-08
+  # - 1.826369950879092e-08
   max_rotation_velocities:     
   - 2315      # 16mm dc motor -- 14000 rpm/v 3.7V --> 863 rps
   - 2315
@@ -63,6 +63,7 @@ rotor_configuration:
   - 5.49778714
   # time_constant: 0.025 # 0.4, DATT, tau = dt / time_constant
   time_constant: 0.018472893755721052 # simopt
+  # time_constant: 0.01 # simopt
 controller_configuration: # invalid
   gain:
   - 0.0052
