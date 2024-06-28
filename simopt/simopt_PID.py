@@ -69,7 +69,7 @@ def main(cfg):
         ang_vel = preprocess_df[['omega.r', 'omega.p', 'omega.y']].to_numpy() / 180.0 * torch.pi
         PWMs = preprocess_df[['motor.m1', 'motor.m2', 'motor.m3', 'motor.m4']].to_numpy()
         voltages = preprocess_df[['bat']].to_numpy()
-        exclude_battery_compensation_flag = True
+        exclude_battery_compensation_flag = False # True: maybe nan
         if exclude_battery_compensation_flag:
             PWMs = exclude_battery_compensation(PWMs, voltages)
         action = PWMs / (2**16) * 2 - 1
