@@ -507,6 +507,7 @@ class PIDRateController(nn.Module):
         self.integ[reset_pid] = torch.zeros(size=(*batch_shape, 3)).to(device).reshape(-1, 3).to(device)[reset_pid]
 
         pos, rot, linvel, angvel = root_state.split([3, 4, 3, 3], dim=1)
+        # convert angular velocity from world frame to body frame
         body_rate = quat_rotate_inverse(rot, angvel) * 180.0 / torch.pi
 
         rate_error = target_rate - body_rate
