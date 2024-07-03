@@ -33,14 +33,10 @@ rotor_configuration:
   # 1/4mg = (mean_hover_pwm / 2**16) * omega_max^2 * force_constants
   # force_constants = 1/4mg * kf / omega_max^2
   # kf = force_constants * omega_max^2 / 1/4mg
-  - 2.2861220810385573e-8 # simopt1
-  - 2.2861220810385573e-8
-  - 2.2861220810385573e-8
-  - 2.2861220810385573e-8
-  # - 2.296355623749042e-08 # simopt2
-  # - 2.296355623749042e-08
-  # - 2.296355623749042e-08
-  # - 2.296355623749042e-08
+  - 2.296355623749042e-08 # simopt2
+  - 2.296355623749042e-08
+  - 2.296355623749042e-08
+  - 2.296355623749042e-08
   max_rotation_velocities:     
   - 2315      # 16mm dc motor -- 14000 rpm/v 3.7V --> 863 rps
   - 2315
@@ -58,8 +54,8 @@ rotor_configuration:
   - 3.92699082
   - 5.49778714
   # time_constant: 0.025 # 0.4, DATT, tau = dt / time_constant
-  time_constant: 0.03763820988559519 # simopt1
   # time_constant: 0.0303294880836865 # simopt2
+  time_constant: 0.02
 controller_configuration: # invalid
   gain:
   - 0.0052
