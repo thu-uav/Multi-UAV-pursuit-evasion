@@ -506,8 +506,7 @@ class MultirotorBase(RobotBase):
         self.throttle_difference[:] = torch.norm(self.throttle - last_throttle, dim=-1)
         return self.throttle.sum(-1)
 
-    # add only for simopt
-    def apply_action_foropt(self, actions: torch.Tensor) -> torch.Tensor:
+    def apply_action_output(self, actions: torch.Tensor) -> torch.Tensor:
         rotor_cmds = actions.expand(*self.shape, self.num_rotors)
         last_throttle = self.throttle.clone()
         thrusts, moments = vmap(vmap(self.rotors, randomness="different"), randomness="same")(
@@ -535,7 +534,6 @@ class MultirotorBase(RobotBase):
                 quat_rotate(self.rot, self.thrusts.sum(-2)),
                 kz=0.3
             ).sum(-2)
-            
         self.forces[:] += (self.drag_coef * self.masses) * self.vel[..., :3]
 
         self.rotors_view.apply_forces_and_torques_at_pos(
@@ -549,7 +547,53 @@ class MultirotorBase(RobotBase):
             is_global=True
         )
         self.throttle_difference[:] = torch.norm(self.throttle - last_throttle, dim=-1)
-        return self.throttle.sum(-1), thrusts, moments
+        return self.throttle.sum(-1)
+
+    def apply_action_residual(self, actions: torch.Tensor, residual: torch.Tensor) -> torch.Tensor:
+        rotor_cmds = actions.expand(*self.shape, self.num_rotors)
+        last_throttle = self.throttle.clone()
+        thrusts, moments = vmap(vmap(self.rotors, randomness="different"), randomness="same")(
+            rotor_cmds, self.rotor_params
+        )
+        # add res
+        thrusts = thrusts + residual[..., :4]
+        moments = moments + residual[..., 4:]
+
+        rotor_pos, rotor_rot = self.rotors_view.get_world_poses()
+        torque_axis = quat_axis(rotor_rot.flatten(end_dim=-2), axis=2).unflatten(0, (*self.shape, self.num_rotors))
+
+        self.thrusts[..., 2] = thrusts
+        self.torques[:] = (moments.unsqueeze(-1) * torque_axis).sum(-2)
+        # TODO@btx0424: general rotating rotor
+        if self.is_articulation and self.rotor_joint_indices is not None:
+            rot_vel = (self.throttle * self.directions * self.MAX_ROT_VEL)
+            self._view.set_joint_velocities(
+                rot_vel.reshape(-1, self.num_rotors),
+                joint_indices=self.rotor_joint_indices
+            )
+        self.forces.zero_()
+        # TODO: global downwash
+        if self.n > 1:
+            self.forces[:] += vmap(self.downwash)(
+                self.pos,
+                self.pos,
+                quat_rotate(self.rot, self.thrusts.sum(-2)),
+                kz=0.3
+            ).sum(-2)
+        self.forces[:] += (self.drag_coef * self.masses) * self.vel[..., :3]
+
+        self.rotors_view.apply_forces_and_torques_at_pos(
+            self.thrusts.reshape(-1, 3), 
+            positions=self.rotor_pos_offset,
+            is_global=False
+        )
+        self.base_link.apply_forces_and_torques_at_pos(
+            self.forces.reshape(-1, 3), 
+            self.torques.reshape(-1, 3), 
+            is_global=True
+        )
+        self.throttle_difference[:] = torch.norm(self.throttle - last_throttle, dim=-1)
+        return self.throttle.sum(-1)
 
     def get_state(self, check_nan: bool=False):
         self.pos[:], self.rot[:] = self.get_world_poses(True)

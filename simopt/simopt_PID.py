@@ -16,7 +16,7 @@ import pdb
 import numpy as np
 import yaml
 from skopt import Optimizer
-from omni_drones.utils.torch import quat_rotate, quat_rotate_inverse
+from omni_drones.utils.torch import quat_rotate, quat_rotate_inverse, euler_to_quaternion, quaternion_to_euler
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -35,18 +35,14 @@ def exclude_battery_compensation(PWMs, voltages):
     return PWMs_cleaned
 
 rosbags = [
-    # '/home/jiayu/OmniDrones/simopt/real_data/data/cf0_size05.csv',
-    # '/home/jiayu/OmniDrones/simopt/real_data/data/cf0_size08.csv',
-    # '/home/jiayu/OmniDrones/simopt/real_data/data/cf0_size10.csv',
-    # '/home/jiayu/OmniDrones/simopt/real_data/data/cf0_size12.csv',
-    # '/home/jiayu/OmniDrones/simopt/real_data/data/cf12_size05.csv',
-    # '/home/jiayu/OmniDrones/simopt/real_data/data/cf12_size08.csv',
-    # '/home/jiayu/OmniDrones/simopt/real_data/data/cf12_size10.csv',
-    '/home/jiayu/OmniDrones/simopt/real_data/data/cf15_size08.csv',
-    '/home/jiayu/OmniDrones/simopt/real_data/data/cf15_size10.csv',
-    '/home/jiayu/OmniDrones/simopt/real_data/data/cf15_size12.csv',
+    '/home/jiayu/OmniDrones/simopt/real_data/dataset/data/cf15_large_data1.csv',
+    '/home/jiayu/OmniDrones/simopt/real_data/dataset/data/cf15_large_data3.csv',
+    '/home/jiayu/OmniDrones/simopt/real_data/dataset/data/cf15_large_data5.csv',
+    '/home/jiayu/OmniDrones/simopt/real_data/dataset/data/cf15_small_data1.csv',
+    '/home/jiayu/OmniDrones/simopt/real_data/dataset/data/cf15_small_data2.csv',
+    '/home/jiayu/OmniDrones/simopt/real_data/dataset/data/cf15_small_data4.csv',
 ]
-T = 50
+T = 35
 prep_step = 5
 skip = 1
 
@@ -68,14 +64,16 @@ def main(cfg):
         preprocess_df = preprocess_df[:1600] # only figure 8
         pos = preprocess_df[['pos.x', 'pos.y', 'pos.z']].to_numpy()
         vel = preprocess_df[['vel.x', 'vel.y', 'vel.z']].to_numpy()
-        quat = preprocess_df[['quat.w', 'quat.x', 'quat.y', 'quat.z']].to_numpy()
-        rate_rpy = preprocess_df[['omega.r', 'omega.p', 'omega.y']].to_numpy() / 180.0 * torch.pi
-        rate_rpy[:, 1] = - rate_rpy[:, 1]
+        rpy = preprocess_df[['rpy.r', 'rpy.p', 'rpy.y']].to_numpy() / 180.0 * torch.pi
+        rpy[..., 1] = - rpy[..., 1] # crazyflie
+        quat = euler_to_quaternion(torch.from_numpy(rpy)).numpy()
+        rate_rpy = preprocess_df[['rate_rpy.r', 'rate_rpy.p', 'rate_rpy.y']].to_numpy() / 1000.0
+        rate_rpy[..., 1] = - rate_rpy[..., 1] # crazyflie
         PWMs = preprocess_df[['motor.m1', 'motor.m2', 'motor.m3', 'motor.m4']].to_numpy()
-        voltages = preprocess_df[['bat']].to_numpy()
-        exclude_battery_compensation_flag = False # True: maybe nan
-        if exclude_battery_compensation_flag:
-            PWMs = exclude_battery_compensation(PWMs, voltages)
+        # voltages = preprocess_df[['bat']].to_numpy()
+        # exclude_battery_compensation_flag = False # True: maybe nan
+        # if exclude_battery_compensation_flag:
+        #     PWMs = exclude_battery_compensation(PWMs, voltages)
         action = PWMs / (2**16) * 2 - 1.0
         
         episode_length = preprocess_df.shape[0]
@@ -129,7 +127,6 @@ def main(cfg):
     from omni.isaac.core.simulation_context import SimulationContext
     from omni_drones.controllers import RateController, PIDRateController
     from omni_drones.robots.drone import MultirotorBase
-    from omni_drones.utils.torch import euler_to_quaternion, quaternion_to_euler
     from omni_drones.sensors.camera import Camera, PinholeCameraCfg
     from omni.isaac.cloner import GridCloner
     from omni.isaac.core.utils import prims as prim_utils, stage as stage_utils
@@ -362,13 +359,13 @@ def main(cfg):
         # sim_ang_vel_list = (sim_ang_vel_list - min_ang_vel_list) / (max_ang_vel_list - min_ang_vel_list)
         # real_ang_vel_list = (real_ang_vel_list - min_ang_vel_list) / (max_ang_vel_list - min_ang_vel_list)
         
-        error_rpy = sim_quat_list - real_quat_list
-        error_rpy_dot = sim_ang_vel_list - real_ang_vel_list
+        error_rpy = (sim_quat_list - real_quat_list)[..., :2]
+        error_rpy_dot = (sim_ang_vel_list - real_ang_vel_list)[..., :2]
         error_xyz = 100 * (sim_pos_list - real_pos_list)
         error_xyz_dot = 50 * (sim_vel_list - real_vel_list)
         
         error = np.concatenate([error_rpy, error_rpy_dot, error_xyz, error_xyz_dot], axis=-1)
-        # error = np.concatenate([error_rpy_dot], axis=-1)
+        # error = np.concatenate([error_xyz_dot], axis=-1)
 
         L1_loss = np.linalg.norm(error, axis=-1, ord=1)
         L2_loss = np.linalg.norm(error, axis=-1, ord=2)
@@ -376,7 +373,7 @@ def main(cfg):
         
         loss = torch.tensor(0.0, dtype=torch.float)
         # gamma = 0.95 # discounted factor
-        gamma = 1.0
+        gamma = 1.0 # accumulative error, estimate the real throttle
         # opt trajectory = sim_length
         for i in range(chunk_length - 1):
             loss += L[i] * gamma**i
@@ -418,6 +415,7 @@ def main(cfg):
     # update rotor params
     params_mask[5] = 1
     # params_mask[7] = 1
+    params_mask[8] = 1
     params_mask[9] = 1
 
     params_range = []
@@ -426,6 +424,10 @@ def main(cfg):
         if mask == 1:
             if count == 5:
                 params_range.append((2.1965862601402255e-08, 2.8830194664340464e-08)) # force_constant -> kf:[1.6, 2.1]
+            elif count == 7:
+                params_range.append((6.0e-10, 8.0e-10)) # moment_constants
+            elif count == 8:
+                params_range.append((0.0, 0.4)) # moment_constants
             elif count == 9: # Tm: [0.01, 0.5], v(t+\delta_t) = v(t) * (1 - \delta_t / Tm) + throttle_des * (\delta_t / Tm)
                 params_range.append((0.01, 0.5))
         count += 1

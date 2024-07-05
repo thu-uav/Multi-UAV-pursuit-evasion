@@ -1,38 +1,64 @@
+import os
+
+from typing import Dict, Optional
+import torch
+from functorch import vmap
+import torch.optim as optim
+from scipy import optimize
+import time
+
+import hydra
+from omegaconf import OmegaConf
+from omni_drones import init_simulation_app
+from tensordict import TensorDict
 import pandas as pd
+import pdb
+import numpy as np
+import yaml
+from skopt import Optimizer
+from omni_drones.utils.torch import quat_rotate, quat_rotate_inverse
 import matplotlib.pyplot as plt
 import numpy as np
+
+def sanity_check_of_data(df: pd.DataFrame):
+    r"""Check if CSV values are in the right column.
+
+    Errors could happen if some values are not communicated from drone to
+    host PC.
+    """
+    LOG_FREQ = 100  # data logging frequency on CrazyFlie
+
+    # take every 1/LOG_FREQ value from time such that we get:
+    # [1-1, 2-2, 3-3, ..] as time entries from data frame
+    # ts = df['time'].values[::LOG_FREQ]
+    ts = df['pos.time'].values[::1]
+
+    ts_diff = (ts[1:] - ts[:-1] - 1) / 1e9
+    if np.all(np.abs(ts_diff) < 0.005):
+        print('Time data within tolerance < 5 ms')
+
+    elif np.all(np.abs(ts_diff) < 0.050):
+        print(f'Time data within tolerance < 50 ms. '
+                        f'Max={np.max(np.abs(ts_diff))*1000:0.0f}ms')
+    else:
+        print(f'Time data within tolerance > 50 ms. '
+                        f'Max={np.max(np.abs(ts_diff))* 1000:0.0f}ms')
+        raise ValueError
+
 rosbags = [
-    '/home/jiayu/OmniDrones/simopt/real_data/goto0_5.csv',
-    '/home/jiayu/OmniDrones/simopt/real_data/goto0_8.csv',
-    '/home/jiayu/OmniDrones/simopt/real_data/goto1_0.csv',
-    '/home/jiayu/OmniDrones/simopt/real_data/goto1_2.csv',
-    '/home/jiayu/OmniDrones/simopt/real_data/goto1_5.csv',
+    '/home/jiayu/OmniDrones/simopt/real_data/dataset/data/cf15_large_data1.csv',
+    # '/home/jiayu/OmniDrones/simopt/real_data/dataset/data/cf15_large_data2.csv',
+    '/home/jiayu/OmniDrones/simopt/real_data/dataset/data/cf15_large_data3.csv',
+    # '/home/jiayu/OmniDrones/simopt/real_data/dataset/data/cf15_large_data4.csv',
+    '/home/jiayu/OmniDrones/simopt/real_data/dataset/data/cf15_large_data5.csv',
+    '/home/jiayu/OmniDrones/simopt/real_data/dataset/data/cf15_small_data1.csv',
+    '/home/jiayu/OmniDrones/simopt/real_data/dataset/data/cf15_small_data2.csv',
+    # '/home/jiayu/OmniDrones/simopt/real_data/dataset/data/cf15_small_data3.csv',
+    '/home/jiayu/OmniDrones/simopt/real_data/dataset/data/cf15_small_data4.csv',
+    # '/home/jiayu/OmniDrones/simopt/real_data/dataset/data/cf15_small_data5.csv',
 ]
-gt_time = 0.01 # 100Hz
-threshold = 0.005
+
 for idx in range(len(rosbags)):
     df = pd.read_csv(rosbags[idx], skip_blank_lines=True)
-    pos_time = df['pos.time']
-    vel_time = df['vel.time']
-    quat_time = df['quat.time']
-    omega_time = df['omega.time']
-    action_time = df['motor.time']
-    bat_time = df['bat.time']
-    pos_time = (pos_time - pos_time[0]).to_numpy() / 1e9
-    vel_time = (vel_time - vel_time[0]).to_numpy() / 1e9
-    quat_time = (quat_time - quat_time[0]).to_numpy() / 1e9
-    omega_time = (omega_time - omega_time[0]).to_numpy() / 1e9
-    action_time = (action_time - action_time[0]).to_numpy() / 1e9
-    bat_time = (bat_time - bat_time[0]).to_numpy() / 1e9
-    diff_pos_time = np.abs(np.diff(pos_time) - gt_time)
-    diff_vel_time = np.abs(np.diff(vel_time) - gt_time)
-    diff_quat_time = np.abs(np.diff(quat_time) - gt_time)
-    diff_omega_time = np.abs(np.diff(omega_time) - gt_time)
-    diff_action_time = np.abs(np.diff(action_time) - gt_time)
-    diff_bat_time = np.abs(np.diff(bat_time) - gt_time)
-    print('Traj_{}_illegal_pos'.format(idx), np.sum(diff_pos_time > threshold))
-    print('Traj_{}_illegal_vel'.format(idx), np.sum(diff_vel_time > threshold))
-    print('Traj_{}_illegal_quat'.format(idx), np.sum(diff_quat_time > threshold))
-    print('Traj_{}_illegal_omega'.format(idx), np.sum(diff_omega_time > threshold))
-    print('Traj_{}_illegal_action'.format(idx), np.sum(diff_action_time > threshold))
-    print('Traj_{}_illegal_bat'.format(idx), np.sum(diff_bat_time > threshold))
+    print('current idx', idx)
+    sanity_check_of_data(df)

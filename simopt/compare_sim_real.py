@@ -17,21 +17,12 @@ import quaternion
 import numpy as np
 import yaml
 from skopt import Optimizer
-from omni_drones.utils.torch import quat_rotate, quat_rotate_inverse, quaternion_to_euler
+from omni_drones.utils.torch import quat_rotate, quat_rotate_inverse, quaternion_to_euler, euler_to_quaternion
 import matplotlib.pyplot as plt
 import numpy as np
 
 rosbags = [
-    # '/home/jiayu/OmniDrones/simopt/real_data/data/cf0_size05.csv',
-    # '/home/jiayu/OmniDrones/simopt/real_data/data/cf0_size08.csv',
-    # '/home/jiayu/OmniDrones/simopt/real_data/data/cf0_size10.csv',
-    '/home/jiayu/OmniDrones/simopt/real_data/data/cf0_size12.csv',
-    # '/home/jiayu/OmniDrones/simopt/real_data/data/cf12_size05.csv',
-    # '/home/jiayu/OmniDrones/simopt/real_data/data/cf12_size08.csv',
-    # '/home/jiayu/OmniDrones/simopt/real_data/data/cf12_size10.csv',
-    # '/home/jiayu/OmniDrones/simopt/real_data/data/cf15_size08.csv',
-    # '/home/jiayu/OmniDrones/simopt/real_data/data/cf15_size10.csv',
-    # '/home/jiayu/OmniDrones/simopt/real_data/data/cf15_size12.csv',
+    '/home/jiayu/OmniDrones/simopt/real_data/dataset/data/cf15_large_data1.csv',
 ]
 
 def exclude_battery_compensation(PWMs, voltages):
@@ -60,14 +51,17 @@ def main(cfg):
     preprocess_df = preprocess_df[:1600]
     pos = preprocess_df[['pos.x', 'pos.y', 'pos.z']].to_numpy()
     vel = preprocess_df[['vel.x', 'vel.y', 'vel.z']].to_numpy()
-    quat = preprocess_df[['quat.w', 'quat.x', 'quat.y', 'quat.z']].to_numpy()
-    rate_rpy = preprocess_df[['omega.r', 'omega.p', 'omega.y']].to_numpy() / 180.0 * torch.pi
-    rate_rpy[:, 1] = - rate_rpy[:, 1]
+    # quat = preprocess_df[['quat.w', 'quat.x', 'quat.y', 'quat.z']].to_numpy()
+    rpy = preprocess_df[['rpy.r', 'rpy.p', 'rpy.y']].to_numpy() / 180.0 * torch.pi
+    rpy[..., 1] = - rpy[..., 1] # crazyflie
+    quat = euler_to_quaternion(torch.from_numpy(rpy)).numpy()
+    rate_rpy = preprocess_df[['rate_rpy.r', 'rate_rpy.p', 'rate_rpy.y']].to_numpy() / 1000.0
+    rate_rpy[..., 1] = - rate_rpy[..., 1] # crazyflie
     PWMs = preprocess_df[['motor.m1', 'motor.m2', 'motor.m3', 'motor.m4']].to_numpy()
-    voltages = preprocess_df[['bat']].to_numpy()
-    exclude_battery_compensation_flag = False
-    if exclude_battery_compensation_flag:
-        PWMs = exclude_battery_compensation(PWMs, voltages)
+    # voltages = preprocess_df[['bat']].to_numpy()
+    # exclude_battery_compensation_flag = False
+    # if exclude_battery_compensation_flag:
+    #     PWMs = exclude_battery_compensation(PWMs, voltages)
     action = PWMs / (2**16) * 2 - 1.0
     
     # start sim
@@ -165,16 +159,13 @@ def main(cfg):
         500.0, 500.0, 16.7, # ki
         33.3, 33.3, 166.7 # ilimit
     ]
-
-    # base
-    params[0] = 0.03
-    params[5] = 2.2861220810385573e-8
-    params[9] = 0.03763820988559519
     
-    # # simopt
-    # params[0] = 0.0321
-    # params[5] = 2.1965862601402255e-08
-    # params[9] = 0.021811431101468833
+    # simopt
+    params[0] = 0.03
+    params[5] = 2.1965862601402255e-08
+    params[8] = 0.08765309988122862
+    params[9] = 0.028945283545750024
+
     
     tunable_parameters = {
         'mass': params[0],
@@ -363,7 +354,7 @@ def main(cfg):
     max_quat_list = np.max(np.max(sim_quat_list, axis=0), axis=0)
     sim_quat_list = (sim_quat_list - min_quat_list) / (max_quat_list - min_quat_list)
     real_quat_list = (real_quat_list - min_quat_list) / (max_quat_list - min_quat_list)
-    quat_error = sim_quat_list[:,0] - real_quat_list
+    quat_error = (sim_quat_list[:,0] - real_quat_list)[..., :2]
     quat_error1 = np.linalg.norm(quat_error, axis=-1, ord=1)
     quat_error2 = np.linalg.norm(quat_error, axis=-1, ord=2)
     print('sim_real/Quat_error', np.mean(quat_error1 + quat_error2))
@@ -425,7 +416,7 @@ def main(cfg):
     max_angvel_list = np.max(np.max(sim_angvel_list, axis=0), axis=0)
     sim_angvel_list = (sim_angvel_list - min_angvel_list) / (max_angvel_list - min_angvel_list)
     real_angvel_list = (real_angvel_list - min_angvel_list) / (max_angvel_list - min_angvel_list)
-    angvel_error = sim_angvel_list[:,0] - real_angvel_list
+    angvel_error = (sim_angvel_list[:,0] - real_angvel_list)[..., :2]
     angvel_error1 = np.linalg.norm(angvel_error, axis=-1, ord=1)
     angvel_error2 = np.linalg.norm(angvel_error, axis=-1, ord=2)
     print('sim_real/Angvel_error', np.mean(angvel_error1 + angvel_error2))
