@@ -1,0 +1,43 @@
+name: HideAndSeek_square
+
+defaults:
+  # see https://hydra.cc/docs/advanced/overriding_packages/
+  - /base/env_base@_here_
+  - /base/sim_base@_here_
+
+env:
+  num_envs: 100
+  max_episode_length: 800
+
+drone_model: Crazyflie
+force_sensor: false
+time_encoding: true
+
+# action_transform: multidiscrete:4
+action_transform: rate
+
+# use rejection sampling validation
+use_validation: 1
+
+# evalution scenario
+evaluation_flag: null # '3_cylineder_line', '5_cylineder_line', '8_cylineder_ring', '7_cylineder_ring'
+
+# exp
+num_agents: 4
+
+arena_size: 3.0
+v_drone: 1.0
+v_prey: 1.3
+
+collision_coef: 20.0
+catch_radius: 0.2
+drone_detect_radius: 0.3
+target_detect_radius: 0.5
+collision_radius: 0.05
+
+cylinder:
+  size: 0.1
+  num: 2
+  # max_active: 3
+  # min_active: 0
+  # random_active: False # if False, only train max_active

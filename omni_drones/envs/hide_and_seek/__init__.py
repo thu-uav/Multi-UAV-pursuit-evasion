@@ -10,3 +10,4 @@ from .hideandseek_circle_static_ued_cl_v2 import HideAndSeek_circle_static_UED_c
 from .hideandseek_circle_eval import HideAndSeek_circle_eval
 from .hideandseek_circle_eval_large import HideAndSeek_circle_eval_large
 from .hideandseek_multiprey import HideAndSeek_multiprey
+from .hideandseek_square import HideAndSeek_square

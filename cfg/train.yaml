@@ -1,9 +1,3 @@
-# model_dir: /home/chenjy/OmniDrones/scripts/outputs/random0to3_final/v2_0_catch0_2_height0_6_size0_9.pt
-# model_dir: /home/chenjy/OmniDrones/scripts/outputs/final_results/DR_wovalidation/seed0/v1_6_catch0_2_height1_2_size0_9.pt
-# model_dir: null
-model_dir: /home/jiayu/OmniDrones/scripts/outputs/cl_v2_4_catch0_13.pt
-# model_dir: /home/jiayu/OmniDrones/scripts/outputs/cl_wodistance_collisionradius0_05_insidepenalty_v2_4_catch0_25/04-18_17-10/wandb/run-20240418_171039-d2uv9yuf/files/checkpoint_471990272.pt
-
 # hydra.job.chdir: false
 
 headless: true
@@ -11,37 +5,37 @@ headless: true
 sim: ${task.sim}
 env: ${task.env}
 
-total_frames: 100_000_000_000
+# model_dir: /home/jiayu/OmniDrones/scripts/outputs/Track_smooth02_simopt1/07-03_21-33/wandb/run-20240703_213310-51gcndtt/files/checkpoint_final.pt
+model_dir: null
+
+total_frames: 3000_000_000 #1000_000_000
 max_iters: -1
-eval_interval: 200
-save_interval: 200
+eval_interval: -1
+save_interval: 100
 seed: 0
 
 viewer:
   resolution: [960, 720]
-  # up
-  eye: [0.0, 0.0, 6.]
-  lookat: [0.01, 0., 2.]
-  # # front
-  # eye: [2.5, 2.5, 4.0]
-  # lookat: [0., 0., 0.7]
+  # front
+  eye: [0., -0.005, 4.]
+  lookat: [0., 0., 1.]
+  # # follow drone
+  # eye: [0., 2.0, 2.5]
+  # lookat: [0., 0., 1.0]
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: cl_wodistance_v2_4_catch0_12_thresholdmax100
-  run_name: 1_central
-  # run_name: debug
+  run_name: debug
   job_type: train
   entity: chenjy
-  project: PredatorPrey
-  mode: online
-  # mode: disabled # set to 'disabled' when debugging locally
+  project: pursuit-evasion
+  mode: disabled
+  # mode: online # set to 'disabled' when debugging locally, online
   run_id: 
   monitor_gym: True
   tags: 
 
 defaults:
-  # - task: HideAndSeek_circle_static_UED_large_cylinder_cl_v2
-  - task: HideAndSeek_circle_eval_large
+  - task: HideAndSeek_square
   - algo: mappo
   - _self_
