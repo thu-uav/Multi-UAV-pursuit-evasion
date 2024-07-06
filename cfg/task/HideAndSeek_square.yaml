@@ -6,7 +6,7 @@ defaults:
   - /base/sim_base@_here_
 
 env:
-  num_envs: 100
+  num_envs: 10
   max_episode_length: 800
 
 drone_model: Crazyflie
@@ -30,7 +30,7 @@ v_drone: 1.0
 v_prey: 1.3
 
 collision_coef: 20.0
-catch_radius: 0.2
+catch_radius: 0.3
 drone_detect_radius: 0.3
 target_detect_radius: 0.5
 collision_radius: 0.05

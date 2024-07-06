@@ -397,7 +397,7 @@ class HideAndSeek_square(IsaacEnv):
         forces_target = self._get_dummy_policy_prey()
         
         # fixed velocity
-        target_vel[:,:3] = self.v_prey * forces_target / (torch.norm(forces_target, dim=1).unsqueeze(1) + 1e-5)
+        target_vel[...,:3] = self.v_prey * forces_target / (torch.norm(forces_target, dim=1).unsqueeze(1) + 1e-5)
         
         self.target.set_velocities(target_vel.type(torch.float32), self.env_ids)
 
@@ -485,31 +485,22 @@ class HideAndSeek_square(IsaacEnv):
         )
 
     def _compute_reward_and_done(self):
-        pass
-        # # TODO: check step by step
-        # drone_pos, _ = self.drone.get_world_poses()
-        # target_pos, _ = self.target.get_world_poses()
-        # target_pos = target_pos.unsqueeze(1)
+        # TODO: check step by step
+        drone_pos, _ = self.drone.get_world_poses()
+        target_pos, _ = self.target.get_world_poses()
+        target_pos = target_pos.unsqueeze(1)
 
-        # target_dist = torch.norm(target_pos - drone_pos, dim=-1)
+        target_dist = torch.norm(target_pos - drone_pos, dim=-1)
 
-        # capture_flag = (target_dist < self.drone_detect_radius)
+        capture_flag = (target_dist < self.drone_detect_radius)
         # self.stats['capture_episode'].add_(torch.sum(capture_flag, dim=1).unsqueeze(-1))
         # self.stats['capture'].set_(torch.from_numpy(self.stats['capture_episode'].to('cpu').numpy() > 0.0).type(torch.float32).to(self.device))
         
-        # self.stats['capture_0'].set_(torch.ones_like(self.stats['capture'], device=self.device) * self.stats['capture'][(self.cylinders_mask.sum(-1) == 0)].mean())
-        # for idx in range(self.max_active_cylinders):
-        #     self.stats['capture_{}'.format(idx + 1)].set_(torch.ones_like(self.stats['capture'], device=self.device) * self.stats['capture'][(self.cylinders_mask.sum(-1) == idx + 1)].mean())
-        # if not self.set_train:
-        #     self.info['capture_0'].set_(torch.ones_like(self.stats['capture'], device=self.device) * self.stats['capture'][(self.cylinders_mask.sum(-1) == 0)].mean())
-        #     for idx in range(self.max_active_cylinders):
-        #         self.info['capture_{}'.format(idx + 1)].set_(torch.ones_like(self.stats['capture'], device=self.device) * self.stats['capture'][(self.cylinders_mask.sum(-1) == idx + 1)].mean())
-        
         # self.stats['capture_per_step'].set_(self.stats['capture_episode'] / self.step_spec)
-        # # catch_reward = 10 * capture_flag.type(torch.float32) # selfish
-        # catch_reward = 10 * torch.any(capture_flag, dim=-1).unsqueeze(-1).expand_as(capture_flag) # cooperative
-        # catch_flag = torch.any(catch_reward, dim=1).unsqueeze(-1)
-        # self.stats['first_capture_step'][catch_flag * (self.stats['first_capture_step'] >= self.step_spec)] = self.step_spec
+        # catch_reward = 10 * capture_flag.type(torch.float32) # selfish
+        catch_reward = 10 * torch.any(capture_flag, dim=-1).unsqueeze(-1).expand_as(capture_flag) # cooperative
+        catch_flag = torch.any(catch_reward, dim=1).unsqueeze(-1)
+        self.stats['first_capture_step'][catch_flag * (self.stats['first_capture_step'] >= self.step_spec)] = self.step_spec
 
         # # speed penalty
         drone_vel = self.drone.get_velocities()
@@ -668,7 +659,8 @@ class HideAndSeek_square(IsaacEnv):
         
         force_c = torch.zeros_like(force)
         dist_target_cylinder = torch.norm(nearest_cylinder_to_target[..., :2], dim=-1)
-        force_c[..., :2] = nearest_cylinder_to_target.squeeze(2) / (dist_target_cylinder**2 + 1e-5)
+        detect_cylinder = (dist_target_cylinder < self.target_detect_radius)
+        force_c[..., :2] = detect_cylinder * nearest_cylinder_to_target[..., :2].squeeze(2) / (dist_target_cylinder**2 + 1e-5)
         force += force_c
 
         return force.type(torch.float32)

@@ -17,7 +17,7 @@ seed: 0
 viewer:
   resolution: [960, 720]
   # front
-  eye: [0., -0.005, 4.]
+  eye: [0., -0.005, 8.]
   lookat: [0., 0., 1.]
   # # follow drone
   # eye: [0., 2.0, 2.5]
@@ -29,8 +29,8 @@ wandb:
   job_type: train
   entity: chenjy
   project: pursuit-evasion
-  mode: disabled
-  # mode: online # set to 'disabled' when debugging locally, online
+  # mode: disabled
+  mode: online # set to 'disabled' when debugging locally, online
   run_id: 
   monitor_gym: True
   tags: 
