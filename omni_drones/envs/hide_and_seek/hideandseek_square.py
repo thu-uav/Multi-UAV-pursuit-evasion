@@ -153,7 +153,7 @@ class HideAndSeek_square(IsaacEnv):
         self.detect_reward_coef = self.cfg.task.detect_reward_coef
         self.collision_coef = self.cfg.task.collision_coef
         self.speed_coef = self.cfg.task.speed_coef
-        self.use_eval = self.cfg.use_eval
+        self.use_eval = self.cfg.task.use_eval
         
         self.central_env_pos = Float3(
             *self.envs_positions[self.central_env_idx].tolist()
@@ -174,6 +174,9 @@ class HideAndSeek_square(IsaacEnv):
 
         self.mask_value = -5.0
         self.draw = _debug_draw.acquire_debug_draw_interface()
+
+        # for deployment
+        self.prev_actions = torch.zeros(self.num_envs, self.num_agents, 4, device=self.device)
 
     def _set_specs(self):        
         drone_state_dim = self.drone.state_spec.shape.numel()
@@ -226,9 +229,12 @@ class HideAndSeek_square(IsaacEnv):
             "first_capture_step": UnboundedContinuousTensorSpec(1),
             "sum_detect_step": UnboundedContinuousTensorSpec(1),
             "return": UnboundedContinuousTensorSpec(1),
+            "action_error_order1_mean": UnboundedContinuousTensorSpec(1),
+            "action_error_order1_max": UnboundedContinuousTensorSpec(1),
         }).expand(self.num_envs).to(self.device)
         info_spec = CompositeSpec({
-            "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13)),
+            "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13), device=self.device),
+            "prev_action": torch.stack([self.drone.action_spec] * self.drone.n, 0).to(self.device),
         }).expand(self.num_envs).to(self.device)
         self.observation_spec["stats"] = stats_spec
         self.observation_spec["info"] = info_spec
@@ -361,12 +367,24 @@ class HideAndSeek_square(IsaacEnv):
         self.stats[env_ids] = 0.
         self.stats['first_capture_step'].set_(torch.ones_like(self.stats['first_capture_step']) * self.max_episode_length)
 
+        cmd_init = 2.0 * (self.drone.throttle[env_ids]) ** 2 - 1.0
+        max_thrust_ratio = self.drone.params['max_thrust_ratio']
+        self.info['prev_action'][env_ids, :, 3] = (0.5 * (max_thrust_ratio + cmd_init)).mean(dim=-1)
+        self.prev_actions[env_ids] = self.info['prev_action'][env_ids]
+
         # for substep in range(1):
         #     self.sim.step(self._should_render(substep))
 
     def _pre_sim_step(self, tensordict: TensorDictBase):   
         actions = tensordict[("agents", "action")]
         
+        # for deployment
+        self.info["prev_action"] = tensordict[("info", "prev_action")]
+        self.prev_actions = self.info["prev_action"].clone()
+        self.action_error_order1 = tensordict[("stats", "action_error_order1")].clone()
+        self.stats["action_error_order1_mean"].add_(self.action_error_order1.mean(dim=-1).unsqueeze(-1))
+        self.stats["action_error_order1_max"].set_(torch.max(self.stats["action_error_order1_max"], self.action_error_order1.mean(dim=-1).unsqueeze(-1)))
+
         self.effort = self.drone.apply_action(actions)
         
         target_vel = self.target.get_velocities()
@@ -376,7 +394,7 @@ class HideAndSeek_square(IsaacEnv):
         target_vel[...,:3] = self.v_prey * forces_target / (torch.norm(forces_target, dim=1).unsqueeze(1) + 1e-5)
         
         self.target.set_velocities(target_vel.type(torch.float32), self.env_ids)
-
+     
     def _compute_state_and_obs(self):
         self.drone_states = self.drone.get_state()
         self.info["drone_state"][:] = self.drone_states[..., :13]

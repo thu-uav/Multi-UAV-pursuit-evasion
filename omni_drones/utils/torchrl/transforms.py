@@ -445,7 +445,6 @@ class PIDRateController(Transform):
         # raw action error
         ctbr_action = torch.concat([target_rate, target_thrust], dim=-1)
         prev_ctbr_action = tensordict[("info", "prev_action")]
-        prev_prev_ctbr_action = tensordict[("info", "prev_prev_action")]
 
         # action smoothness
         if not(self.epsilon is None) and self.use_action_smooth:
@@ -454,12 +453,8 @@ class PIDRateController(Transform):
 
         action_error = torch.norm(ctbr_action - prev_ctbr_action, dim = -1)
         tensordict.set(("stats", "action_error_order1"), action_error)
-        action_error_2 = torch.norm(prev_prev_ctbr_action + ctbr_action - 2 * prev_ctbr_action, dim = -1)
-        tensordict.set(("stats", "action_error_order2"), action_error_2)
         # update prev_action = current ctbr_action
         tensordict.set(("info", "prev_action"), ctbr_action)
-        # update prev_prev_action =  prev_ctbr_action
-        tensordict.set(("info", "prev_prev_action"), prev_ctbr_action)
         
         # scale
         target_rate = target_rate * 180.0 * self.target_clip
