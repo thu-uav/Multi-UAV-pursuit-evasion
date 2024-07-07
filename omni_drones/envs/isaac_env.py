@@ -218,12 +218,11 @@ class IsaacEnv(EnvBase):
         # self.sim.step(render=False)
         self.sim._physics_sim_view.flush()
         self.progress_buf[env_ids] = 0.
-        self._tensordict["return"][env_ids] = 0.
-        # tensordict = TensorDict({}, self.batch_size, device=self.device)
-        self._tensordict.update(self._compute_state_and_obs())
-        self._tensordict['stats'] = last_stats
-        self._tensordict.set("truncated", (self.progress_buf > self.max_episode_length).unsqueeze(1))
-        return self._tensordict
+        tensordict = TensorDict({}, self.batch_size, device=self.device)
+        tensordict.update(self._compute_state_and_obs())
+        tensordict['stats'] = last_stats
+        tensordict.set("truncated", (self.progress_buf > self.max_episode_length).unsqueeze(1))
+        return tensordict
 
     @abc.abstractmethod
     def _reset_idx(self, env_ids: torch.Tensor):

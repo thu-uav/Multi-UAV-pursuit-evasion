@@ -1,5 +1,13 @@
+# origin
+update_sim: True
 name: crazyflie
 target_clip: 1.0
+max_thrust_ratio: 0.9
+fixed_yaw: 0
+use_cbf: 0
+use_action_smooth: 0
+epsilon: 0.01 # action smooth
+# epsilon: null
 inertia:
   xx: 1.4e-5
   xy: 0.0
@@ -7,7 +15,7 @@ inertia:
   yy: 1.4e-5
   yz: 0.0
   zz: 2.17e-5
-mass: 0.028
+mass: 0.03 # cf13: 0.0321, cf11:0.0308, cf12: 0.0307
 l: 0.096
 drag_coef: 0.2
 rotor_configuration:
@@ -22,17 +30,20 @@ rotor_configuration:
   - -1.0
   - 1.0
   force_constants:
-  - 2.88e-8 # kf
-  - 2.88e-8
-  - 2.88e-8
-  - 2.88e-8
+  # 1/4mg = (mean_hover_pwm / 2**16) * omega_max^2 * force_constants
+  # force_constants = 1/4mg * kf / omega_max^2
+  # kf = force_constants * omega_max^2 / 1/4mg
+  - 2.2148508468341153e-08 # simopt1
+  - 2.2148508468341153e-08
+  - 2.2148508468341153e-08
+  - 2.2148508468341153e-08
   max_rotation_velocities:     
   - 2315      # 16mm dc motor -- 14000 rpm/v 3.7V --> 863 rps
   - 2315
   - 2315
   - 2315
   moment_constants:
-  - 7.24e-10
+  - 7.24e-10 # origin
   - 7.24e-10
   - 7.24e-10
   - 7.24e-10
@@ -42,3 +53,10 @@ rotor_configuration:
   - 2.35619449
   - 3.92699082
   - 5.49778714
+  # time_constant: 0.025 # 0.4, DATT, tau = dt / time_constant
+  time_constant: 0.02618507955424977 # simopt1
+controller_configuration: # invalid
+  gain:
+  - 0.0052
+  - 0.0052
+  - 0.00025

@@ -73,8 +73,11 @@ def create_obstacle(
     UsdPhysics.RigidBodyAPI.Apply(prim)
     UsdPhysics.CollisionAPI.Apply(prim)
     prim.GetAttribute("physics:kinematicEnabled").Set(True)
-    kit_utils.set_collision_properties(
-        prim_path, contact_offset=0.02, rest_offset=0
+    # kit_utils.set_collision_properties(
+    #     prim_path, contact_offset=0.02, rest_offset=0
+    # )
+    kit_utils.set_rigid_body_properties(
+        prim_path, rigid_body_enabled=True
     )
     kit_utils.set_rigid_body_properties(
         prim_path, rigid_body_enabled=True
@@ -177,8 +180,143 @@ def lemniscate(t, c):
     x = torch.stack([
         cos_t, sin_t * cos_t, c * sin_t
     ], dim=-1) / sin2p1.unsqueeze(-1)
+    
+    v_x = - sin_t * (3 - torch.square(sin_t)) / (torch.square(sin_t) + 1)**2
+    v_y = (cos_t**2 - sin_t**2 - sin_t**4 - sin_t**2 * cos_t**2) / (torch.square(sin_t) + 1)**2
+    v_z = cos_t * (1 - torch.square(sin_t)) / (torch.square(sin_t) + 1)**2
+    v = torch.stack([
+        v_x, v_y, v_z
+    ], dim=-1)
+    
+    return x, v
 
-    return x
+def line_acc(t, a, threshold, alpha):
+    # Convert angle c from degrees to radians
+    c = torch.deg2rad(alpha)
+    
+    # Calculate the components of acceleration
+    a_x = a * torch.cos(c)
+    a_y = a * torch.sin(c)
+    
+    # Calculate maximum velocities in x and y directions
+    v_max_x = a_x * threshold
+    v_max_y = a_y * threshold
+    
+    # Calculate position components for x and y directions
+    x = torch.where(t <= threshold, 0.5 * a_x * t**2, 
+                    0.5 * a_x * threshold**2 + v_max_x * (t - threshold) - 0.5 * a_x * (t - threshold)**2)
+    y = torch.where(t <= threshold, 0.5 * a_y * t**2, 
+                    0.5 * a_y * threshold**2 + v_max_y * (t - threshold) - 0.5 * a_y * (t - threshold)**2)
+    
+    # z remains zero since no movement along z-axis
+    z = torch.zeros_like(t)
+
+    return torch.stack([x, y, z], dim=-1)
+
+def line_segments(t, v, threshold, c):
+    # v = torch.tensor(v)
+    # threshold = torch.tensor(threshold)
+    # c = torch.tensor(c)
+    x = torch.where(t <= threshold, v * t, v * threshold + v * (t - threshold) * torch.cos(c))
+    y = torch.where(t <= threshold, torch.zeros_like(t), v * (t - threshold) * torch.sin(c))
+    z = torch.zeros_like(t)
+
+    return torch.stack([x, y, z], dim=-1)
+
+def line_segments_acc(t, a, unif_start, unif_end, c):
+    v_turn = a * unif_start
+    
+    # 1th phase
+    x1 = 0.5 * a * t**2
+    y1 = torch.zeros_like(t)
+    
+    # 2th phase
+    x2 = 0.5 * a * unif_start**2 + v_turn * (t - unif_start) * torch.cos(c)
+    y2 = v_turn * (t - unif_start) * torch.sin(c)
+    
+    # 3th phase
+    x3 = 0.5 * a * unif_start**2 + v_turn * (unif_end - unif_start) * torch.cos(c) + \
+          (v_turn * (t - unif_end) - 0.5 * a * (t - unif_end)**2) * torch.cos(c)
+    y3 = v_turn * (unif_end - unif_start) * torch.sin(c) + \
+          (v_turn * (t - unif_end) - 0.5 * a * (t - unif_end)**2) * torch.sin(c)
+    
+    x = torch.where(t <= unif_start, x1, torch.where(t <= unif_end, x2, x3))
+    y = torch.where(t <= unif_start, y1, torch.where(t <= unif_end, y2, y3))
+    z = torch.zeros_like(t)
+    
+    return torch.stack([x, y, z], dim=-1)
+
+def pentagram(t):
+    a = 1.0
+    b = 0.5
+    x = -a * torch.sin(2 * t) - b * torch.sin(3 * t)
+    y = a * torch.cos(2 * t) - b * torch.cos(3 * t)
+    z = torch.zeros_like(t)
+
+    return torch.stack([x, y, z], dim=-1)
+
+def infeasible_pentagram(t, max_time):    
+    v = 1.0
+    T = 0.2 * max_time
+    max_cycle_number = 5
+    cycle_number = torch.clip(torch.floor(t / T).long(), 0, max_cycle_number - 1)
+    time_in_cycle = t % T
+    
+    # init
+    x = torch.zeros_like(t)
+    y = torch.zeros_like(t)
+    
+    # get all corners
+    x0 = torch.tensor(0.0).to(t.device)
+    y0 = torch.tensor(0.0).to(t.device)
+    angle = torch.tensor(0.0).to(t.device)
+    pos_init = [torch.stack([x0, y0], dim=-1).clone()]
+    angle_list = [angle.clone()]
+    for _ in range(max_cycle_number - 1):
+        x0 += v * T * torch.cos(angle)
+        y0 += v * T * torch.sin(angle)
+        angle -= torch.tensor(144.0) * (torch.pi / 180.0)
+        pos_init.append(torch.stack([x0, y0], dim=-1).clone())
+        angle_list.append(angle.clone())
+    pos_init = torch.stack(pos_init)
+    angle_list = torch.stack(angle_list)
+
+    x = v * time_in_cycle * torch.cos(angle_list[cycle_number]) + pos_init[cycle_number][:, 0]
+    y = v * time_in_cycle * torch.sin(angle_list[cycle_number]) + pos_init[cycle_number][:, 1]
+    
+    z = torch.zeros_like(x)
+
+    return torch.stack([x, y, z], dim=-1)
+
+def zigzag(t, target_times, target_points):
+    # target_times: [batch, num_points]
+    # target_points: [batch, num_points, 2]
+    
+    target_times = torch.concat([torch.zeros(1, device=target_times.device), torch.cumsum(target_times, dim=0)])
+    num_points = target_times.shape[0]
+    
+    times_expanded = target_times.unsqueeze(0).expand(t.shape[-1], -1)
+    t_expanded = t.unsqueeze(-1)
+    prev_idx = num_points - (times_expanded > t_expanded).sum(dim=-1) - 1
+    next_idx = num_points - (times_expanded > t_expanded).sum(dim=-1)
+    # clip
+    prev_idx = torch.clamp(prev_idx, max=num_points - 2) # [batch, future_step]
+    next_idx = torch.clamp(next_idx, max=num_points - 1) # [batch, future_step]
+
+    prev_x = torch.gather(target_points[:,0], 0, prev_idx) # [batch, future_step]
+    next_x = torch.gather(target_points[:,0], 0, next_idx)
+    prev_y = torch.gather(target_points[:,1], 0, prev_idx)
+    next_y = torch.gather(target_points[:,1], 0, next_idx)
+    prev_times = torch.gather(target_times, 0, prev_idx)
+    next_times = torch.gather(target_times, 0, next_idx)
+    k_x = (next_x - prev_x) / (next_times - prev_times)
+    k_y = (next_y - prev_y) / (next_times - prev_times)
+    x = prev_x + k_x * (t - prev_times) # [batch, future_step]
+    y = prev_y + k_y * (t - prev_times)
+    z = torch.zeros_like(x)
+    k_z = torch.zeros_like(k_x)
+    
+    return torch.stack([x, y, z], dim=-1), torch.stack([k_x, k_y, k_z], dim=-1)
 
 def scale_time(t, a: float=1.0):
     return t / (1 + 1/(a*torch.abs(t)))

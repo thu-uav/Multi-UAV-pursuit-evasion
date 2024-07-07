@@ -6,21 +6,30 @@ defaults:
   - /base/sim_base@_here_
 
 env:
-  num_envs: 500
-  max_episode_length: 600
+  num_envs: 100
+  max_episode_length: 1000
 
-drone_model: Hummingbird
+drone_model: Crazyflie
 force_sensor: false
 time_encoding: true
 intrinsics: false
 wind: false
+latency: false
+latency_step: 2
+random_latency: true
 
-reset_thres: 0.5
+reset_thres: 1.
 future_traj_steps: 4
 
-reward_effort_weight: 0.1
-reward_action_smoothness_weight: 0.
-reward_motion_smoothness_weight: 0.
-reward_distance_scale: 1.6
+use_eval: 1
+use_action_error_order2: 0
+reward_action_smoothness_weight: 0.2
+reward_distance_scale: 5.0
 
-action_transform: null
+action_transform: PIDrate
+# history: true
+# randomization:
+#   drone:
+#     train:
+#       mass_scale: [0.9, 1.1]
+#       inertia_scale: [0.7, 1.3]

@@ -46,7 +46,7 @@ from torchrl.data import (
 )
 from .env import AgentSpec
 from dataclasses import replace
-
+from torch.distributions.transforms import TanhTransform
 
 def _transform_agent_spec(self: Transform, agent_spec: AgentSpec) -> AgentSpec:
     return agent_spec
@@ -65,6 +65,33 @@ def _agent_spec(self: TransformedEnv) -> AgentSpec:
     return {name: replace(spec, _env=self) for name, spec in agent_spec.items()}
 TransformedEnv.agent_spec = property(_agent_spec)
 
+# # cbf
+# def solve_qp_batch(actions, prev_actions, delta):
+#     tmp_batch, num_agents, action_size = actions.shape
+#     batch_size = tmp_batch * num_agents
+    
+#     actions = actions.reshape(-1, action_size)
+#     prev_actions = prev_actions.reshape(-1, action_size)
+
+#     # define variable
+#     a = cp.Variable((batch_size, action_size))
+
+#     # define the objective
+#     objective = cp.Minimize(cp.sum_squares(a - actions))
+
+#     # define constraints
+#     constraints = [cp.norm(a - prev_actions, 2, axis=1) <= delta]
+
+#     # problem
+#     prob = cp.Problem(objective, constraints)
+
+#     # solve
+#     prob.solve()
+
+#     # get corrected_actions
+#     corrected_actions = a.value
+
+#     return corrected_actions.reshape(-1, num_agents, action_size)
 
 class LogOnEpisode(Transform):
     def __init__(
@@ -332,7 +359,6 @@ class VelController(Transform):
         tensordict.set(self.action_key, cmds)
         return tensordict
 
-
 class RateController(Transform):
     def __init__(
         self,
@@ -344,6 +370,9 @@ class RateController(Transform):
         self.action_key = action_key
         self.max_thrust = self.controller.max_thrusts.sum(-1)
         self.target_clip = self.controller.target_clip
+        self.max_thrust_ratio = self.controller.max_thrust_ratio
+        self.fixed_yaw = self.controller.fixed_yaw
+        # self.tanh = TanhTransform()
     
     def transform_input_spec(self, input_spec: TensorSpec) -> TensorSpec:
         action_spec = input_spec[("_action_spec", *self.action_key)]
@@ -354,17 +383,99 @@ class RateController(Transform):
     def _inv_call(self, tensordict: TensorDictBase) -> TensorDictBase:
         drone_state = tensordict[("info", "drone_state")][..., :13]
         action = tensordict[self.action_key]
+        action = torch.tanh(action)
         target_rate, target_thrust = action.split([3, 1], -1)
-        target_thrust = ((target_thrust + 1) / 2).clip(0.) * self.max_thrust
+        if self.fixed_yaw:
+            target_rate[..., 2] = 0.0
+        target_thrust = torch.clamp((target_thrust + 1) / 2, min = 0.0, max = self.max_thrust_ratio) * self.max_thrust
+        # target_thrust = ((target_thrust + 1) / 2).clip(0.) * self.max_thrust
         cmds = self.controller(
             drone_state, 
-            target_rate=target_rate * torch.pi * self.target_clip, 
+            # target_rate=target_rate * torch.pi,
+            target_rate=target_rate * torch.pi * self.target_clip, # rate is between [-30, 30] degree/s
+            # target_rate=target_rate * torch.pi / 3,
+            # target_rate=target_rate * torch.pi / 2,
             target_thrust=target_thrust
         )
         torch.nan_to_num_(cmds, 0.)
         tensordict.set(self.action_key, cmds)
         return tensordict
 
+class PIDRateController(Transform):
+    def __init__(
+        self,
+        controller,
+        action_key: str = ("agents", "action"),
+    ):
+        super().__init__([], in_keys_inv=[("info", "drone_state")])
+        self.controller = controller
+        self.action_key = action_key
+        self.max_thrust = self.controller.max_thrusts.sum(-1)
+        self.target_clip = self.controller.target_clip
+        self.max_thrust_ratio = self.controller.max_thrust_ratio
+        self.fixed_yaw = self.controller.fixed_yaw
+        # for action smooth
+        self.use_action_smooth = self.controller.use_action_smooth
+        self.use_cbf = self.controller.use_cbf
+        self.epsilon = self.controller.epsilon
+        # self.tanh = TanhTransform()
+    
+    def transform_input_spec(self, input_spec: TensorSpec) -> TensorSpec:
+        action_spec = input_spec[("_action_spec", *self.action_key)]
+        spec = UnboundedContinuousTensorSpec(action_spec.shape[:-1]+(4,), device=action_spec.device)
+        input_spec[("_action_spec", *self.action_key)] = spec
+        return input_spec
+    
+    def _inv_call(self, tensordict: TensorDictBase) -> TensorDictBase:
+        drone_state = tensordict[("info", "drone_state")][..., :13]
+        action = tensordict[self.action_key]
+        device = drone_state.device
+        
+        # if not(self.epsilon is None) and self.use_cbf:
+        #     action = solve_qp_batch(action.to('cpu').numpy(), prev_action.to('cpu').numpy(), self.epsilon)
+        #     action = torch.from_numpy(action).to(device).float()
+
+        action = torch.tanh(action)
+        target_rate, target_thrust = action.split([3, 1], -1)
+        # target_rate: [-1, 1], target_thrust: [0, max_thrust_ratio]
+        target_thrust = torch.clamp((target_thrust + 1) / 2, min = 0.0, max = self.max_thrust_ratio)
+        if self.fixed_yaw:
+            target_rate[..., 2] = 0.0
+
+        # raw action error
+        ctbr_action = torch.concat([target_rate, target_thrust], dim=-1)
+        prev_ctbr_action = tensordict[("info", "prev_action")]
+        prev_prev_ctbr_action = tensordict[("info", "prev_prev_action")]
+
+        # action smoothness
+        if not(self.epsilon is None) and self.use_action_smooth:
+            ctbr_action = prev_ctbr_action + torch.clamp(ctbr_action - prev_ctbr_action, min = - self.epsilon, max = + self.epsilon)        
+            target_rate, target_thrust = ctbr_action.split([3, 1], -1)
+
+        action_error = torch.norm(ctbr_action - prev_ctbr_action, dim = -1)
+        tensordict.set(("stats", "action_error_order1"), action_error)
+        action_error_2 = torch.norm(prev_prev_ctbr_action + ctbr_action - 2 * prev_ctbr_action, dim = -1)
+        tensordict.set(("stats", "action_error_order2"), action_error_2)
+        # update prev_action = current ctbr_action
+        tensordict.set(("info", "prev_action"), ctbr_action)
+        # update prev_prev_action =  prev_ctbr_action
+        tensordict.set(("info", "prev_prev_action"), prev_ctbr_action)
+        
+        # scale
+        target_rate = target_rate * 180.0 * self.target_clip
+        target_thrust = target_thrust * 2**16
+
+        cmds, ctbr = self.controller(
+            drone_state, 
+            target_rate=target_rate,
+            target_thrust=target_thrust,
+            reset_pid=tensordict['done'].expand(-1, drone_state.shape[1]) # num_drones: drone_state.shape[1]
+        )
+        torch.nan_to_num_(cmds, 0.)
+        tensordict.set(self.action_key, cmds)
+        tensordict.set('ctbr', ctbr)
+        tensordict.set('target_rate', target_rate)
+        return tensordict
 
 class AttitudeController(Transform):
     def __init__(
@@ -397,7 +508,6 @@ class AttitudeController(Transform):
         torch.nan_to_num_(cmds, 0.)
         tensordict.set(self.action_key, cmds)
         return tensordict
-
 
 class History(Transform):
     def __init__(

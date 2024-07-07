@@ -247,10 +247,10 @@ class TanhIndependentNormalModule(nn.Module):
     def forward(self, tensor: torch.Tensor) -> Tuple[torch.Tensor]:
         if self.state_dependent_std:
             loc, scale = self.operator(tensor).chunk(2, -1)
-            scale = self.scale_mapping(scale).clamp_min(self.scale_lb)
+            scale = self.scale_mapping(scale) # .clamp_min(self.scale_lb)
         else:
             loc = self.operator(tensor)
-            scale = self.scale_mapping(self.log_std).clamp_min(self.scale_lb)
+            scale = self.scale_mapping(self.log_std)# .clamp_min(self.scale_lb)
         return self.dist_cls(loc, scale)
 
 

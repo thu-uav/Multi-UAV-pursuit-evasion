@@ -1,39 +1,19 @@
-# MIT License
-# 
-# Copyright (c) 2023 Botian Xu, Tsinghua University
-# 
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-# 
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-# 
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
-
-
 import functorch
 import torch
 import torch.distributions as D
 
 import omni.isaac.core.utils.prims as prim_utils
+import omni.isaac.core.objects as objects
+import numpy as np
 
 from omni_drones.envs.isaac_env import AgentSpec, IsaacEnv
 from omni_drones.robots.drone import MultirotorBase
 from omni_drones.views import ArticulationView, RigidPrimView
-from omni_drones.utils.torch import euler_to_quaternion, quat_axis
+from omni_drones.utils.torch import euler_to_quaternion, quat_axis, quat_rotate_inverse
 
 from tensordict.tensordict import TensorDict, TensorDictBase
 from torchrl.data import UnboundedContinuousTensorSpec, CompositeSpec
+import collections
 
 def attach_payload(parent_path):
     from omni.isaac.core import objects
@@ -60,61 +40,54 @@ def attach_payload(parent_path):
 class Hover(IsaacEnv):
     r"""
     A basic control task. The goal for the agent is to maintain a stable
-    position and heading in mid-air without drifting. This task is designed
-    to serve as a sanity check.
+    position and heading in mid-air without drifting. 
 
-    ## Observation
+    Observation
+    -----------
     The observation space consists of the following part:
 
     - `rpos` (3): The position relative to the target hovering position.
-    - `root_state` (16 + `num_rotors`): The basic information of the drone (except its position), 
+    - `root_state` (16 + num_rotors): The basic information of the drone (except its position), 
       containing its rotation (in quaternion), velocities (linear and angular), 
       heading and up vectors, and the current throttle.
     - `rheading` (3): The difference between the reference heading and the current heading.
-    - `time_encoding` (optional): The time encoding, which is a 4-dimensional vector encoding the current
-      progress of the episode.
+    - *time_encoding*:
 
-    ## Reward
-    - `pos`: Reward computed from the position error to the target position.
-    - `heading_alignment`: Reward computed from the alignment of the heading to the target heading.
-    - `up`: Reward computed from the uprightness of the drone to discourage large tilting.
-    - `spin`: Reward computed from the spin of the drone to discourage spinning.
-    - `effort`: Reward computed from the effort of the drone to optimize the
-      energy consumption.
-    - `action_smoothness`: Reward that encourages smoother drone actions, computed based on the throttle difference of the drone.
+    Reward 
+    ------
+    - pos: 
+    - heading_alignment:
+    - up:
+    - spin:
 
-    The total reward is computed as follows:
+    The total reward is 
 
-    ```{math}
-        r = r_\text{pos} + r_\text{pos} * (r_\text{up} + r_\text{spin}) + r_\text{effort} + r_\text{action_smoothness}
-    ```
-        
-    ## Episode End
-    The episode ends when the drone mishebaves, i.e., it crashes into the ground or flies too far away:
-
-    ```{math}
-        d_\text{pos} > 4 \text{ or } x^w_z < 0.2
-    ```
+    .. math:: 
     
-    or when the episode reaches the maximum length.
+        r = r_\text{pos} + r_\text{pos} * (r_\text{up} + r_\text{heading})
 
+    Episode End
+    -----------
+    - Termination: 
 
-    ## Config
-
-    | Parameter               | Type  | Default   | Description |
-    |-------------------------|-------|-----------|-------------|
-    | `drone_model`           | str   | "firefly" | Specifies the model of the drone being used in the environment. |
-    | `reward_distance_scale` | float | 1.2       | Scales the reward based on the distance between the drone and its target. |
-    | `time_encoding`         | bool  | True      | Indicates whether to include time encoding in the observation space. If set to True, a 4-dimensional vector encoding the current progress of the episode is included in the observation. If set to False, this feature is not included. |
-    | `has_payload`           | bool  | False     | Indicates whether the drone has a payload attached. If set to True, it means that a payload is attached; otherwise, if set to False, no payload is attached. |
+    Config
+    ------
 
 
     """
     def __init__(self, cfg, headless):
-        self.reward_effort_weight = cfg.task.reward_effort_weight
+        # self.reward_effort_weight = cfg.task.reward_effort_weight
         self.reward_action_smoothness_weight = cfg.task.reward_action_smoothness_weight
         self.reward_distance_scale = cfg.task.reward_distance_scale
+        self.reward_v_scale = cfg.task.reward_v_scale
+        self.reward_acc_scale = cfg.task.reward_acc_scale
+        self.reward_jerk_scale = cfg.task.reward_jerk_scale
+        self.linear_vel_max = cfg.task.linear_vel_max
+        self.linear_acc_max = cfg.task.linear_acc_max
         self.time_encoding = cfg.task.time_encoding
+        self.use_acc = cfg.task.use_acc
+        self.use_jerk = cfg.task.use_jerk
+        
         self.randomization = cfg.task.get("randomization", {})
         self.has_payload = "payload" in self.randomization.keys()
 
@@ -148,22 +121,38 @@ class Hover(IsaacEnv):
         self.init_poses = self.drone.get_world_poses(clone=True)
         self.init_vels = torch.zeros_like(self.drone.get_velocities())
 
+        # # eval
+        # self.init_pos_dist = D.Uniform(
+        #     torch.tensor([0.0, 0.0, 0.05], device=self.device),
+        #     torch.tensor([0.0, 0.0, 0.05], device=self.device)
+        # )
         self.init_pos_dist = D.Uniform(
-            torch.tensor([-2.5, -2.5, 1.], device=self.device),
-            torch.tensor([2.5, 2.5, 2.5], device=self.device)
+            torch.tensor([-1., -1., 0.05], device=self.device),
+            torch.tensor([1., 1., 2.0], device=self.device)
         )
+        # self.init_rpy_dist = D.Uniform(
+        #     torch.tensor([0.0, 0.0, 0.0], device=self.device) * torch.pi,
+        #     torch.tensor([0.0, 0.0, 0.0], device=self.device) * torch.pi
+        # )
         self.init_rpy_dist = D.Uniform(
-            torch.tensor([-.2, -.2, 0.], device=self.device) * torch.pi,
-            torch.tensor([0.2, 0.2, 2.], device=self.device) * torch.pi
+            torch.tensor([-0.2, -0.2, 0.0], device=self.device) * torch.pi,
+            torch.tensor([0.2, 0.2, 0.5], device=self.device) * torch.pi
         )
         self.target_rpy_dist = D.Uniform(
             torch.tensor([0., 0., 0.], device=self.device) * torch.pi,
-            torch.tensor([0., 0., 2.], device=self.device) * torch.pi
+            torch.tensor([0., 0., 0.], device=self.device) * torch.pi
         )
 
-        self.target_pos = torch.tensor([[0.0, 0.0, 2.]], device=self.device)
+        self.target_pos = torch.tensor([[0.0, 0.0, 1.]], device=self.device)
         self.target_heading = torch.zeros(self.num_envs, 1, 3, device=self.device)
         self.alpha = 0.8
+
+        self.last_linear_v = torch.zeros(self.num_envs, 1, device=self.device)
+        self.last_angular_v = torch.zeros(self.num_envs, 1, device=self.device)
+        self.last_linear_a = torch.zeros(self.num_envs, 1, device=self.device)
+        self.last_angular_a = torch.zeros(self.num_envs, 1, device=self.device)
+        self.last_linear_jerk = torch.zeros(self.num_envs, 1, device=self.device)
+        self.last_angular_jerk = torch.zeros(self.num_envs, 1, device=self.device)
 
     def _design_scene(self):
         import omni_drones.utils.kit as kit_utils
@@ -172,11 +161,14 @@ class Hover(IsaacEnv):
         drone_model = MultirotorBase.REGISTRY[self.cfg.task.drone_model]
         cfg = drone_model.cfg_cls(force_sensor=self.cfg.task.force_sensor)
         self.drone: MultirotorBase = drone_model(cfg=cfg)
+        drone_prim = self.drone.spawn(translations=[(0.0, 0.0, 0.05)])[0]
+        if self.has_payload:
+            attach_payload(drone_prim.GetPath().pathString)
 
         target_vis_prim = prim_utils.create_prim(
             prim_path="/World/envs/env_0/target",
             usd_path=self.drone.usd_path,
-            translation=(0.0, 0.0, 2.),
+            translation=(0.0, 0.0, 1.),
         )
 
         kit_utils.set_nested_collision_properties(
@@ -194,21 +186,34 @@ class Hover(IsaacEnv):
             dynamic_friction=1.0,
             restitution=0.0,
         )
-        drone_prim = self.drone.spawn(translations=[(0.0, 0.0, 2.)])[0]
-        if self.has_payload:
-            attach_payload(drone_prim.GetPath().pathString)
+
         return ["/World/defaultGroundPlane"]
 
     def _set_specs(self):
-        drone_state_dim = self.drone.state_spec.shape[-1]
-        observation_dim = drone_state_dim + 3
+        # drone_state_dim = self.drone.state_spec.shape[-1]
+        observation_dim = 3 + 3 + 4 + 3 + 3 # position, velocity, quaternion, heading, up
+
+        if self.use_acc:
+            observation_dim += 2
+        if self.use_jerk:
+            observation_dim += 2
+
+        if self.cfg.task.omega:
+            observation_dim += 3
+
+        if self.cfg.task.motor:
+            observation_dim += self.drone.num_rotors
 
         if self.cfg.task.time_encoding:
             self.time_encoding_dim = 4
             observation_dim += self.time_encoding_dim
 
+        self.latency = 2 if self.cfg.task.latency else 0
+        self.obs_buffer = collections.deque(maxlen=self.latency)
+
         self.observation_spec = CompositeSpec({
             "agents": CompositeSpec({
+                #"observation": UnboundedContinuousTensorSpec((1, observation_dim-6), device=self.device),   remove throttle
                 "observation": UnboundedContinuousTensorSpec((1, observation_dim), device=self.device),
                 "intrinsics": self.drone.intrinsics_spec.unsqueeze(0).to(self.device)
             })
@@ -233,11 +238,44 @@ class Hover(IsaacEnv):
 
         stats_spec = CompositeSpec({
             "return": UnboundedContinuousTensorSpec(1),
+            "pos_bonus": UnboundedContinuousTensorSpec(1),
+            "head_bonus": UnboundedContinuousTensorSpec(1),
+            "reward_pos": UnboundedContinuousTensorSpec(1),
+            "reward_up": UnboundedContinuousTensorSpec(1),
+            "reward_vel": UnboundedContinuousTensorSpec(1),
+            "reward_acc": UnboundedContinuousTensorSpec(1),
+            "reward_jerk": UnboundedContinuousTensorSpec(1),
             "episode_len": UnboundedContinuousTensorSpec(1),
             "pos_error": UnboundedContinuousTensorSpec(1),
             "heading_alignment": UnboundedContinuousTensorSpec(1),
             "uprightness": UnboundedContinuousTensorSpec(1),
             "action_smoothness": UnboundedContinuousTensorSpec(1),
+            "linear_v_max": UnboundedContinuousTensorSpec(1),
+            "angular_v_max": UnboundedContinuousTensorSpec(1),
+            "linear_a_max": UnboundedContinuousTensorSpec(1),
+            "angular_a_max": UnboundedContinuousTensorSpec(1),
+            "linear_jerk_max": UnboundedContinuousTensorSpec(1),
+            "angular_jerk_max": UnboundedContinuousTensorSpec(1),
+            "linear_v_mean": UnboundedContinuousTensorSpec(1),
+            "angular_v_mean": UnboundedContinuousTensorSpec(1),
+            "linear_a_mean": UnboundedContinuousTensorSpec(1),
+            "angular_a_mean": UnboundedContinuousTensorSpec(1),
+            "linear_jerk_mean": UnboundedContinuousTensorSpec(1),
+            "angular_jerk_mean": UnboundedContinuousTensorSpec(1),
+            "motor1": UnboundedContinuousTensorSpec(1),
+            "motor2": UnboundedContinuousTensorSpec(1),
+            "motor3": UnboundedContinuousTensorSpec(1),
+            "motor4": UnboundedContinuousTensorSpec(1),
+            "cmd_r": UnboundedContinuousTensorSpec(1),
+            "cmd_p": UnboundedContinuousTensorSpec(1),
+            "cmd_y": UnboundedContinuousTensorSpec(1),
+            "cmd_thrust": UnboundedContinuousTensorSpec(1),
+            "target_r_rate": UnboundedContinuousTensorSpec(1),
+            "target_p_rate": UnboundedContinuousTensorSpec(1),
+            "target_y_rate": UnboundedContinuousTensorSpec(1),
+            "real_r_rate": UnboundedContinuousTensorSpec(1),
+            "real_p_rate": UnboundedContinuousTensorSpec(1),
+            "real_y_rate": UnboundedContinuousTensorSpec(1),
         }).expand(self.num_envs).to(self.device)
         info_spec = CompositeSpec({
             "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13), device=self.device),
@@ -247,7 +285,6 @@ class Hover(IsaacEnv):
         self.observation_spec["info"] = info_spec
         self.stats = stats_spec.zero()
         self.info = info_spec.zero()
-
 
     def _reset_idx(self, env_ids: torch.Tensor):
         self.drone._reset_idx(env_ids, self.training)
@@ -280,25 +317,115 @@ class Hover(IsaacEnv):
         self.target_heading[env_ids] = quat_axis(target_rot.squeeze(1), 0).unsqueeze(1)
         self.target_vis.set_world_poses(orientations=target_rot, env_indices=env_ids)
 
+        # set last values
+        self.last_linear_v[env_ids] = torch.norm(self.init_vels[env_ids][..., :3], dim=-1)
+        self.last_angular_v[env_ids] = torch.norm(self.init_vels[env_ids][..., 3:], dim=-1)
+        self.last_linear_a[env_ids] = torch.zeros_like(self.last_linear_v[env_ids])
+        self.last_angular_a[env_ids] = torch.zeros_like(self.last_angular_v[env_ids])
+        self.last_linear_jerk[env_ids] = torch.zeros_like(self.last_linear_a[env_ids])
+        self.last_angular_jerk[env_ids] = torch.zeros_like(self.last_angular_a[env_ids])
+
         self.stats[env_ids] = 0.
+        
+        self.linear_v_episode = torch.zeros_like(self.stats["linear_v_mean"])
+        self.angular_v_episode = torch.zeros_like(self.stats["angular_v_mean"])
+        self.linear_a_episode = torch.zeros_like(self.stats["linear_a_mean"])
+        self.angular_a_episode = torch.zeros_like(self.stats["angular_a_mean"])
+        self.linear_jerk_episode = torch.zeros_like(self.stats["linear_jerk_mean"])
+        self.angular_jerk_episode = torch.zeros_like(self.stats["angular_jerk_mean"])
 
     def _pre_sim_step(self, tensordict: TensorDictBase):
         actions = tensordict[("agents", "action")]
+        if self.cfg.task.action_noise:
+            actions *= torch.randn(actions.shape, device=self.device) * 0.1 + 1
+        self.stats['motor1'].set_(actions[..., 0])
+        self.stats['motor2'].set_(actions[..., 1])
+        self.stats['motor3'].set_(actions[..., 2])
+        self.stats['motor4'].set_(actions[..., 3])
+        
         self.effort = self.drone.apply_action(actions)
+        
+        # log ctbr
+        ctbr = tensordict['ctbr']
+        self.stats['cmd_r'].set_(ctbr[..., 0])
+        self.stats['cmd_p'].set_(ctbr[..., 1])
+        self.stats['cmd_y'].set_(ctbr[..., 2])
+        self.stats['cmd_thrust'].set_(ctbr[..., 3])
+        
+        # log target
+        target_rate = tensordict['target_rate']
+        self.stats['target_r_rate'].set_(target_rate[..., 0])
+        self.stats['target_p_rate'].set_(target_rate[..., 1])
+        self.stats['target_y_rate'].set_(target_rate[..., 2])
 
     def _compute_state_and_obs(self):
         self.root_state = self.drone.get_state()
         self.info["drone_state"][:] = self.root_state[..., :13]
 
+        _, log_rot, _, log_angvel = self.root_state[..., :13].reshape(-1, 13).split([3, 4, 3, 3], dim=1)
+        body_rate = quat_rotate_inverse(log_rot, log_angvel).unsqueeze(1) * 180.0 / torch.pi
+        self.stats['real_r_rate'].set_(body_rate[..., 0])
+        self.stats['real_p_rate'].set_(body_rate[..., 1])
+        self.stats['real_y_rate'].set_(body_rate[..., 2])
+
         # relative position and heading
         self.rpos = self.target_pos - self.root_state[..., :3]
         self.rheading = self.target_heading - self.root_state[..., 13:16]
         
-        obs = [self.rpos, self.root_state[..., 3:], self.rheading,]
+        obs = [self.rpos, self.root_state[..., 3:10], self.root_state[..., 13:19],]  # (relative) position, velocity, quaternion, heading, up
+        if self.cfg.task.omega:
+            obs.append(self.root_state[..., 10:13])
+        if self.cfg.task.motor:
+            obs.append(self.root_state[..., 19:])
         if self.time_encoding:
             t = (self.progress_buf / self.max_episode_length).unsqueeze(-1)
+            # t = torch.zeros_like(self.progress_buf).unsqueeze(-1)
             obs.append(t.expand(-1, self.time_encoding_dim).unsqueeze(1))
+        
+        # linear_v, angular_v
+        self.linear_v = torch.norm(self.root_state[..., 7:10], dim=-1)
+        self.angular_v = torch.norm(self.root_state[..., 10:13], dim=-1)
+        self.stats["linear_v_max"].set_(torch.max(self.stats["linear_v_max"], torch.abs(self.linear_v)))
+        self.linear_v_episode.add_(torch.abs(self.linear_v))
+        self.stats["linear_v_mean"].set_(self.linear_v_episode / (self.progress_buf + 1.0).unsqueeze(1))
+        self.stats["angular_v_max"].set_(torch.max(self.stats["angular_v_max"], torch.abs(self.angular_v)))
+        self.angular_v_episode.add_(torch.abs(self.angular_v))
+        self.stats["angular_v_mean"].set_(self.angular_v_episode / (self.progress_buf + 1.0).unsqueeze(1))
+        # linear_a, angular_a
+        self.linear_a = torch.abs(self.linear_v - self.last_linear_v) / self.dt
+        self.angular_a = torch.abs(self.angular_v - self.last_angular_v) / self.dt
+        self.stats["linear_a_max"].set_(torch.max(self.stats["linear_a_max"], torch.abs(self.linear_a)))
+        self.linear_a_episode.add_(torch.abs(self.linear_a))
+        self.stats["linear_a_mean"].set_(self.linear_a_episode / (self.progress_buf + 1.0).unsqueeze(1))
+        self.stats["angular_a_max"].set_(torch.max(self.stats["angular_a_max"], torch.abs(self.angular_a)))
+        self.angular_a_episode.add_(torch.abs(self.angular_a))
+        self.stats["angular_a_mean"].set_(self.angular_a_episode / (self.progress_buf + 1.0).unsqueeze(1))
+        # linear_jerk, angular_jerk
+        self.linear_jerk = torch.abs(self.linear_a - self.last_linear_a) / self.dt
+        self.angular_jerk = torch.abs(self.angular_a - self.last_angular_a) / self.dt
+        self.stats["linear_jerk_max"].set_(torch.max(self.stats["linear_jerk_max"], torch.abs(self.linear_jerk)))
+        self.linear_jerk_episode.add_(torch.abs(self.linear_jerk))
+        self.stats["linear_jerk_mean"].set_(self.linear_jerk_episode / (self.progress_buf + 1.0).unsqueeze(1))
+        self.stats["angular_jerk_max"].set_(torch.max(self.stats["angular_jerk_max"], torch.abs(self.angular_jerk)))
+        self.angular_jerk_episode.add_(torch.abs(self.angular_jerk))
+        self.stats["angular_jerk_mean"].set_(self.angular_jerk_episode / (self.progress_buf + 1.0).unsqueeze(1))
+        
+        # set last
+        self.last_linear_v = self.linear_v.clone()
+        self.last_angular_v = self.angular_v.clone()
+        self.last_linear_a = self.linear_a.clone()
+        self.last_angular_a = self.angular_a.clone()
+        self.last_linear_jerk = self.linear_jerk.clone()
+        self.last_angular_jerk = self.angular_jerk.clone()
+        
         obs = torch.cat(obs, dim=-1)
+
+        if self.cfg.task.add_noise:
+            obs *= torch.randn(obs.shape, device=self.device) * 0.1 + 1 # add a gaussian noise of mean 0 and variance 0.01
+        
+        if self.latency:
+            self.obs_buffer.append(obs)
+            obs = self.obs_buffer[0]
 
         return TensorDict({
             "agents": {
@@ -312,36 +439,62 @@ class Hover(IsaacEnv):
     def _compute_reward_and_done(self):
         # pose reward
         pos_error = torch.norm(self.rpos, dim=-1)
+        head_error = torch.norm(self.rheading, dim=-1)
+        
         heading_alignment = torch.sum(self.drone.heading * self.target_heading, dim=-1)
         
-        distance = torch.norm(torch.cat([self.rpos, self.rheading], dim=-1), dim=-1)
+        # check done
+        distance = torch.norm(torch.cat([self.rpos], dim=-1), dim=-1)
 
-        reward_pose = 1.0 / (1.0 + torch.square(self.reward_distance_scale * distance))
-        # pose_reward = torch.exp(-distance * self.reward_distance_scale)
-        # uprightness
-        reward_up = torch.square((self.drone.up[..., 2] + 1) / 2)
-
-        # spin reward
-        spinnage = torch.square(self.drone.vel[..., -1])
-        reward_spin = 1.0 / (1.0 + torch.square(spinnage))
-
-        # effort
-        reward_effort = self.reward_effort_weight * torch.exp(-self.effort)
-        reward_action_smoothness = self.reward_action_smoothness_weight * torch.exp(-self.drone.throttle_difference)
-
-        assert reward_pose.shape == reward_up.shape == reward_spin.shape
-        reward = (
-            reward_pose 
-            + reward_pose * (reward_up + reward_spin) 
-            + reward_effort 
-            + reward_action_smoothness
-        )
+        reward_pos = - pos_error * self.reward_distance_scale
+        reward_pos_bonus = ((pos_error <= 0.02) * 10).float()
         
-        done_misbehave = (self.drone.pos[..., 2] < 0.2) | (distance > 4)
+        reward_head = - head_error * (reward_pos_bonus > 0)
+        reward_head_bonus = ((head_error <= 0.02) * 10 * (reward_pos_bonus > 0)).float()
+
+        # # uprightness
+        reward_up = torch.square((self.drone.up[..., 2] + 1) / 2)
+        
+        # v, acc, jerk
+        reward_v = self.reward_v_scale * (reward_pos_bonus > 0) * (self.linear_v < self.linear_vel_max)
+        reward_acc = self.reward_acc_scale * (reward_pos_bonus > 0) * (self.linear_a < self.linear_acc_max)
+        reward_jerk = self.reward_jerk_scale * (reward_pos_bonus > 0) * (- self.linear_jerk)
+
+        reward = (
+            reward_pos
+            + reward_pos_bonus
+            + reward_head 
+            + reward_head_bonus
+            + reward_up
+            + reward_v
+            + reward_acc
+            + reward_jerk
+        )
+
+        # reward_pose = 1.0 / (1.0 + torch.square(self.reward_distance_scale * distance))
+        # pose_reward = torch.exp(-distance * self.reward_distance_scale)
+
+        # # spin reward
+        # spinnage = torch.square(self.drone.vel[..., -1])
+        # reward_spin = 1.0 / (1.0 + torch.square(spinnage))
+
+        # # effort
+        # reward_effort = self.reward_effort_weight * torch.exp(-self.effort)
+        # reward_action_smoothness = self.reward_action_smoothness_weight * torch.exp(-self.drone.throttle_difference)
+
+        # # assert reward_pose.shape == reward_up.shape == reward_spin.shape
+        # reward = (
+        #     reward_pose 
+        #     # + reward_pose * (reward_up) 
+        #     + reward_effort 
+        #     + reward_action_smoothness
+        # )
+        
+        # done_misbehave = (distance > 0.5)
 
         done = (
             (self.progress_buf >= self.max_episode_length).unsqueeze(-1)
-            | done_misbehave
+            # | done_misbehave
         )
 
         self.stats["pos_error"].lerp_(pos_error, (1-self.alpha))
@@ -349,6 +502,14 @@ class Hover(IsaacEnv):
         self.stats["uprightness"].lerp_(self.root_state[..., 18], (1-self.alpha))
         self.stats["action_smoothness"].lerp_(-self.drone.throttle_difference, (1-self.alpha))
         self.stats["return"] += reward
+        # bonus
+        self.stats["reward_pos"] = reward_pos
+        self.stats["pos_bonus"] = reward_pos_bonus
+        self.stats["head_bonus"] = reward_head_bonus
+        # self.stats["reward_up"] = reward_up
+        self.stats["reward_vel"] = reward_v
+        self.stats["reward_acc"] = reward_acc
+        self.stats["reward_jerk"] = reward_jerk
         self.stats["episode_len"][:] = self.progress_buf.unsqueeze(1)
 
         return TensorDict(

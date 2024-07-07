@@ -5,7 +5,7 @@ train_every: 64
 num_minibatches: 16
 ppo_epochs: 4
 clip_param: 0.1
-entropy_coef: 0.001
+entropy_coef: 0
 gae_lambda: 0.95
 gamma: 0.995
 max_grad_norm: 10.0
@@ -21,7 +21,7 @@ actor:
   lr_scheduler_kwargs: 
   
   # mlp
-  hidden_units: [256, 128, 128]
+  hidden_units: [256, 256, 256]
   layer_norm: true
 
   weight_decay: 0.0
@@ -51,7 +51,7 @@ critic:
   lr_scheduler_kwargs: 
 
   # mlp
-  hidden_units: [256, 128, 128]
+  hidden_units: [256, 256, 256]
   layer_norm: true
 
   weight_decay: 0.0

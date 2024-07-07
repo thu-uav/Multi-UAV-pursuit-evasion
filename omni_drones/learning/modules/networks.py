@@ -286,29 +286,16 @@ class PartialAttentionEncoder(nn.Module):
             x: (batch, N, dim)
             padding_mask: (batch, N)
         """
-        # breakpoint()
-        # get_mask = lambda key: torch.isnan(x[key]).any(-1) # (num_batch, num_drone, num_entity)
-        # mask = torch.cat(
-        #     [get_mask(key) for key in self.split_embed.input_spec.keys()], dim=-1
-        # )
-
-        x = self.split_embed(x) # (num_batch, num_drone, num_entity, embed_dim)
+        x = self.split_embed(x)
         original_shape = x.shape[:-2]
-        x = x.reshape(-1, x.shape[-2], x.shape[-1]) # (num_batch * num_drone, num_entity, embed_dim)
-        # mask = mask.reshape(-1, mask.shape[-1]) # (num_batch * num_drone, num_entity)
-        # if key_padding_mask is None:
-        #     key_padding_mask = mask
-            # key_padding_mask = torch.isnan(x).any(-1) # (num_batch * num_drone, num_entity)
-            # x = torch.nan_to_num(x, nan=0.0)
-        
+        x = x.reshape(-1, x.shape[-2], x.shape[-1])
         if self.norm_first:
             x = x[:, self.query_index] + self._pa_block(self.norm1(x), key_padding_mask)
             x = x + self._ff_block(self.norm2(x))
         else:
             x = self.norm1(x[:, self.query_index] + self._pa_block(x, key_padding_mask))
             x = self.norm2(x + self._ff_block(x))
-        # x: (num_batch * num_drone, 1, embed_dim)
-        return x.reshape(*original_shape, -1) # (num_batch, num_drone, embed_dim)
+        return x.mean(-2).reshape(*original_shape, -1)
 
     def _pa_block(self, x: Tensor, key_padding_mask: Optional[Tensor] = None):
         # breakpoint()
