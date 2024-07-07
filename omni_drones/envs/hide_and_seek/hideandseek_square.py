@@ -43,33 +43,29 @@ from .draw_circle import Float3, _COLOR_ACCENT, _carb_float3_add
 # only cubes are available as walls
 
 # TODO: whether the target in the shadow of cylinders
-# 1. compute_reward: for catch reward
+# 1. compute_reward: for catch reward, not blocked
 # 2. compute_obs: for drones' state, mask the target state in the shadow
-# 3. dummy_prey_policy: if in the shadow, the target do not get force from the drone
-# target_rpos: drone - target
-# cylinder_rpos: drone - cylinder
-def check_shadow(target_rpos, cylinder_rpos, cylinder_size):
-    # output: [detect_target, in_shadow]
-    # in_shadow: drones and the target can not detect each other
-    # target_rpos: [num_envs, num_drones, 1, 3]
-    # cylinder_rpos: [num_envs, num_drones, 1, 3], nearest cylinder
-    drone2target_dist = torch.norm(target_rpos, dim=-1)
-    drone2cylinder_dist = torch.norm(cylinder_rpos[..., :2], dim=-1)  # x-y plane
-    alpha_threshold = torch.asin(cylinder_size / (drone2cylinder_dist + 1e-5))
-    cos_drone2cylinder_drone2target = torch.matmul(target_rpos[..., :2], cylinder_rpos[..., :2].transpose(-1, -2)).squeeze(-1) / (drone2target_dist * drone2cylinder_dist)
-    alpha_drone2cylinder_drone2target = torch.acos(cos_drone2cylinder_drone2target)
-    in_shadow = alpha_drone2cylinder_drone2target <= alpha_threshold
-    return in_shadow
+# 3. dummy_prey_policy: if not blocked, the target gets force from the drone
+def is_line_blocked_by_cylinder(drone_pos, target_pos, cylinder_pos, cylinder_size):
+    # drone_pos: [num_envs, num_agents, 3]
+    # target_pos: [num_envs, 1, 3]
+    # cylinder_pos: [num_envs, num_cylinders, 3]
+    # consider the x-y plane, the distance of c to the line ab
+    # d = abs((x2 - x1)(y3 - y1) - (y2 - y1)(x3 - x1)) / sqrt((x2 - x1)**2 + (y2 - y1)**2)
+    
+    diff = drone_pos - target_pos
+    diff2 = cylinder_pos - target_pos
+    # numerator: [num_envs, num_agents, num_cylinders]
+    numerator = torch.abs(torch.matmul(diff[..., 0].unsqueeze(-1), diff2[..., 1].unsqueeze(1)) - torch.matmul(diff[..., 1].unsqueeze(-1), diff2[..., 0].unsqueeze(1)))
+    # denominator: [num_envs, num_agents, 1]
+    denominator = torch.sqrt(diff[..., 0].unsqueeze(-1) ** 2 + diff[..., 1].unsqueeze(-1) ** 2)
+    dist_to_line = numerator / (denominator + 1e-5)
 
-def detect_target(target_rpos, cylinder_rpos, cylinder_size, drone_detect_radius):
-    # output: [detect_target, in_shadow]
-    # in_shadow: drones and the target can not detect each other
-    # target_rpos: [num_envs, num_drones, 1, 3]
-    # cylinder_rpos: [num_envs, num_drones, 1, 3], nearest cylinder
-    drone2target_dist = torch.norm(target_rpos, dim=-1)
-    in_detect_range = drone2target_dist < drone_detect_radius
-    in_shadow = check_shadow(target_rpos, cylinder_rpos, cylinder_size)
-    return in_detect_range * (~in_shadow)
+    # which cylinder blocks the line between the ith drone and the target
+    # blocked: [num_envs, num_agents, num_cylinders]
+    blocked = dist_to_line <= cylinder_size
+
+    return blocked.any(dim=(-1))
 
 class HideAndSeek_square(IsaacEnv): 
     """
@@ -152,6 +148,9 @@ class HideAndSeek_square(IsaacEnv):
         self.collision_radius = self.cfg.task.collision_radius
         self.init_poses = self.drone.get_world_poses(clone=True)
         self.v_prey = self.cfg.task.v_drone * self.cfg.task.v_prey
+        self.catch_reward_coef = self.cfg.task.catch_reward_coef
+        self.detect_reward_coef = self.cfg.task.detect_reward_coef
+        self.collision_coef = self.cfg.task.collision_coef
         
         self.central_env_pos = Float3(
             *self.envs_positions[self.central_env_idx].tolist()
@@ -259,6 +258,7 @@ class HideAndSeek_square(IsaacEnv):
         self.num_cylinders = self.cfg.task.cylinder.num
         self.drone_detect_radius = self.cfg.task.drone_detect_radius
         self.target_detect_radius = self.cfg.task.target_detect_radius
+        self.catch_radius = self.cfg.task.catch_radius
         self.arena_size = self.cfg.task.arena_size
         self.max_height = self.cfg.task.arena_size
         self.cylinder_size = self.cfg.task.cylinder.size
@@ -375,8 +375,6 @@ class HideAndSeek_square(IsaacEnv):
         self.target_pos = self.init_target_pos_dist.sample((*env_ids.shape, 1))
         self.target.set_world_poses(positions=self.target_pos + self.envs_positions[env_ids].unsqueeze(1), env_indices=env_ids)
 
-        self.step_spec = 0
-
         # reset stats
         self.stats[env_ids] = 0.
         self.stats['first_capture_step'].set_(torch.ones_like(self.stats['first_capture_step']) * self.max_episode_length)
@@ -388,7 +386,6 @@ class HideAndSeek_square(IsaacEnv):
         #     self.sim.step(self._should_render(substep))
 
     def _pre_sim_step(self, tensordict: TensorDictBase):   
-        self.step_spec += 1
         actions = tensordict[("agents", "action")]
         
         self.effort = self.drone.apply_action(actions)
@@ -435,10 +432,12 @@ class HideAndSeek_square(IsaacEnv):
         # state_self
         target_pos, _ = self.get_env_poses(self.target.get_world_poses())
         target_rpos = vmap(cpos)(drone_pos, target_pos) # [num_envs, num_agents, 1, 3]
-        # the first time to calculate the shadow
-        detect = detect_target(target_rpos, obs["cylinders"][..., :3], self.cylinder_size, self.drone_detect_radius)
-        # detect: [num_envs, num_agents, 1], in which drones' detect range
-        # TODO: maybe do not share detect info to all drones
+        # self.blocked use in the _compute_reward_and_done
+        # _get_dummy_policy_prey: recompute
+        self.blocked = is_line_blocked_by_cylinder(drone_pos, target_pos, cylinders_pos, self.cylinder_size)
+        in_detection_range = (torch.norm(target_rpos, dim=-1) < self.drone_detect_radius)
+        # detect: [num_envs, num_agents, 1]
+        detect = in_detection_range * (~ self.blocked.unsqueeze(-1))
         # broadcast the detect info to all drones
         broadcast_detect = torch.any(detect, dim=1).unsqueeze(1).expand(-1, self.num_agents, -1)
         target_mask = (~ broadcast_detect).unsqueeze(-1).expand_as(target_rpos) # [num_envs, num_agents, 1, 3]
@@ -488,19 +487,19 @@ class HideAndSeek_square(IsaacEnv):
         # TODO: check step by step
         drone_pos, _ = self.drone.get_world_poses()
         target_pos, _ = self.target.get_world_poses()
-        target_pos = target_pos.unsqueeze(1)
-
+        
         target_dist = torch.norm(target_pos - drone_pos, dim=-1)
 
-        capture_flag = (target_dist < self.drone_detect_radius)
-        # self.stats['capture_episode'].add_(torch.sum(capture_flag, dim=1).unsqueeze(-1))
-        # self.stats['capture'].set_(torch.from_numpy(self.stats['capture_episode'].to('cpu').numpy() > 0.0).type(torch.float32).to(self.device))
+        # detect
         
-        # self.stats['capture_per_step'].set_(self.stats['capture_episode'] / self.step_spec)
-        # catch_reward = 10 * capture_flag.type(torch.float32) # selfish
-        catch_reward = 10 * torch.any(capture_flag, dim=-1).unsqueeze(-1).expand_as(capture_flag) # cooperative
-        catch_flag = torch.any(catch_reward, dim=1).unsqueeze(-1)
-        self.stats['first_capture_step'][catch_flag * (self.stats['first_capture_step'] >= self.step_spec)] = self.step_spec
+
+        capture = (target_dist < self.catch_radius)
+        masked_capture = capture * (~ self.blocked).float()
+        broadcast_capture = torch.any(masked_capture, dim=-1).unsqueeze(-1).expand_as(masked_capture) # cooperative reward
+        catch_reward = self.catch_reward_coef * broadcast_capture
+        breakpoint()
+        if torch.any(catch_reward, dim = 1):
+            self.stats['first_capture_step'] = torch.min(self.stats['first_capture_step'], self.progress_buf)
 
         # # speed penalty
         drone_vel = self.drone.get_velocities()
@@ -610,23 +609,12 @@ class HideAndSeek_square(IsaacEnv):
 
         # pursuers
         dist_pos = torch.norm(target_rpos, dim=-1).squeeze(1).unsqueeze(-1)
-        # get the nearest cylinder to each drone
-        cylinders_mdist_z = torch.abs(drone_cylinders_rpos[..., 2]) - 0.5 * self.cylinder_height
-        cylinders_mdist_xy = torch.norm(drone_cylinders_rpos[..., :2], dim=-1) - self.cylinder_size
-        cylinders_mdist = torch.stack([torch.max(cylinders_mdist_xy, torch.zeros_like(cylinders_mdist_xy)), 
-                                       torch.max(cylinders_mdist_z, torch.zeros_like(cylinders_mdist_z))
-                                       ], dim=-1)
-        # only use the nearest cylinder
-        min_distance_idx = torch.argmin(torch.norm(cylinders_mdist, dim=-1), dim=-1)
-        min_distance_idx_expanded = min_distance_idx.unsqueeze(-1).unsqueeze(-1).expand(-1, -1, 1, drone_cylinders_rpos.shape[-1])
-        # nearest_cylinder: the nearest cylinder to each drone
-        nearest_cylinder_to_drone = drone_cylinders_rpos.gather(2, min_distance_idx_expanded)
-        in_shadow = check_shadow(target_rpos, nearest_cylinder_to_drone, self.cylinder_size)
+        blocked = is_line_blocked_by_cylinder(drone_pos, target_pos, cylinders_pos, self.cylinder_size)
         detect_drone = (dist_pos < self.target_detect_radius).squeeze(-1)
 
-        # active_drone:if drone is out of detect range, do not get force from it
-        active_drone = (detect_drone * (~in_shadow)).unsqueeze(-1) # [num_envs, num_agents, 1, 1]      
-        force_p = -target_rpos.squeeze(1) * (1 / (dist_pos**2 + 1e-5)) * active_drone
+        # active_drone: if drone is in th detect range, get force from it
+        active_drone = detect_drone * (~blocked).unsqueeze(-1) # [num_envs, num_agents, 1]      
+        force_p = -target_rpos.squeeze(1) * (1 / (dist_pos**2 + 1e-5)) * active_drone.unsqueeze(-1)
         force += torch.sum(force_p, dim=1)
 
         # arena
