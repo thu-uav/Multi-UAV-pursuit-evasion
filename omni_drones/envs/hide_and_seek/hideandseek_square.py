@@ -37,6 +37,7 @@ from omni.isaac.debug_draw import _debug_draw
 from .placement import rejection_sampling_with_validation_large_cylinder_cl, generate_outside_cylinders_x_y
 from .draw import draw_traj, draw_detection, draw_court
 from .draw_circle import Float3, _COLOR_ACCENT, _carb_float3_add
+import time
 
 
 # drones on land by default
@@ -183,11 +184,17 @@ class HideAndSeek_square(IsaacEnv):
         if self.cfg.task.time_encoding:
             self.time_encoding_dim = 4       
 
-        observation_spec = CompositeSpec({
-            "state_self": UnboundedContinuousTensorSpec((1, 3 + self.time_encoding_dim + 13)),
-            "state_others": UnboundedContinuousTensorSpec((self.drone.n-1, 3)), # pos
-            "cylinders": UnboundedContinuousTensorSpec((1, 5)), # pos + radius + height
-        }).to(self.device)
+        if self.drone.n > 1:
+            observation_spec = CompositeSpec({
+                "state_self": UnboundedContinuousTensorSpec((1, 3 + self.time_encoding_dim + 13)),
+                "state_others": UnboundedContinuousTensorSpec((self.drone.n-1, 3)), # pos
+                "cylinders": UnboundedContinuousTensorSpec((1, 5)), # pos + radius + height
+            }).to(self.device)
+        else:
+            observation_spec = CompositeSpec({
+                "state_self": UnboundedContinuousTensorSpec((1, 3 + self.time_encoding_dim + 13)),
+                "cylinders": UnboundedContinuousTensorSpec((1, 5)), # pos + radius + height
+            }).to(self.device)
         state_spec = CompositeSpec({
             "state_drones": UnboundedContinuousTensorSpec((self.drone.n, 3 + drone_state_dim)),
             "cylinders": UnboundedContinuousTensorSpec((1, 5)), # pos + radius + height
@@ -262,7 +269,7 @@ class HideAndSeek_square(IsaacEnv):
                             [-0.4, -0.4, 0.5],
                             [-0.7, -0.4, 0.5],
                             [-0.4, -0.7, 0.5],
-                        ], device=self.device)
+                        ], device=self.device)[:self.num_agents]
         self.drone.spawn(drone_pos)
         
         # init prey
@@ -280,7 +287,7 @@ class HideAndSeek_square(IsaacEnv):
         cylinders_pos = torch.tensor([
                             [0.0, self.cylinder_size, 0.5 * self.cylinder_height],
                             [0.0, - self.cylinder_size, 0.5 * self.cylinder_height],
-                        ], device=self.device)
+                        ], device=self.device)[:self.num_cylinders]
         for idx in range(self.num_cylinders):
             # orientation = None
             self.cylinders_size.append(self.cylinder_size)
@@ -452,7 +459,8 @@ class HideAndSeek_square(IsaacEnv):
         ).unsqueeze(2)
                          
         # state_others
-        obs["state_others"] = self.drone_rpos
+        if self.drone.n > 1:
+            obs["state_others"] = self.drone_rpos
         
         state = TensorDict({}, [self.num_envs])
         state["state_drones"] = torch.cat(
@@ -481,7 +489,6 @@ class HideAndSeek_square(IsaacEnv):
         )
 
     def _compute_reward_and_done(self):
-        # TODO: check step by step
         drone_pos, _ = self.get_env_poses(self.drone.get_world_poses())
         target_pos, _ = self.get_env_poses(self.target.get_world_poses())
         

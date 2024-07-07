@@ -25,17 +25,18 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: debug
+  run_name: drone3_hns_003
   job_type: train
   entity: chenjy
   project: pursuit-evasion
-  mode: disabled
-  # mode: online # set to 'disabled' when debugging locally, online
+  # mode: disabled
+  mode: online # set to 'disabled' when debugging locally, online
   run_id: 
   monitor_gym: True
   tags: 
 
 defaults:
   - task: HideAndSeek_square
+  # - task: Track
   - algo: mappo
   - _self_
