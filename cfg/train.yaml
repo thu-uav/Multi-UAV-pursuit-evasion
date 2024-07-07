@@ -5,7 +5,7 @@ headless: true
 sim: ${task.sim}
 env: ${task.env}
 
-# model_dir: /home/jiayu/OmniDrones/scripts/outputs/Track_smooth02_simopt1/07-03_21-33/wandb/run-20240703_213310-51gcndtt/files/checkpoint_final.pt
+# model_dir: /home/jiayu/OmniDrones/scripts/outputs/drone3_arena2/07-07_18-06/wandb/run-20240707_180621-e6bnfxns/files/checkpoint_603193344.pt
 model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
@@ -17,7 +17,7 @@ seed: 0
 viewer:
   resolution: [960, 720]
   # front
-  eye: [0., -0.005, 6.]
+  eye: [0., -0.005, 4.]
   lookat: [0., 0., 1.]
   # # follow drone
   # eye: [0., 2.0, 2.5]
@@ -25,7 +25,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: drone3_hns_003
+  run_name: fixedtarget_arena2
   job_type: train
   entity: chenjy
   project: pursuit-evasion
