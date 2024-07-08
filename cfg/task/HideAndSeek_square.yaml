@@ -28,14 +28,14 @@ arena_size: 2.0
 v_drone: 1.0
 v_prey: 0.0
 
-dist_reward_coef: 10.0
-catch_reward_coef: 20.0
-detect_reward_coef: 10.0
+dist_reward_coef: 5.0
+catch_reward_coef: 5.0
+detect_reward_coef: 5.0
 collision_coef: 100.0
 speed_coef: 100.0
-catch_radius: 1.0
-drone_detect_radius: 3.0
-target_detect_radius: 3.0
+catch_radius: 0.5
+drone_detect_radius: 0.5
+target_detect_radius: 0.5
 collision_radius: 0.1
 
 cylinder:
