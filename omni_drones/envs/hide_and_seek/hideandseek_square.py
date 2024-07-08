@@ -35,7 +35,7 @@ from omni_drones.utils.torch import euler_to_quaternion
 from omni.isaac.debug_draw import _debug_draw
 
 from .placement import rejection_sampling_with_validation_large_cylinder_cl, generate_outside_cylinders_x_y
-from .draw import draw_traj, draw_detection, draw_court
+from .draw import draw_traj, draw_detection, draw_catch, draw_court
 from .draw_circle import Float3, _COLOR_ACCENT, _carb_float3_add
 import time
 
@@ -154,7 +154,9 @@ class HideAndSeek_square(IsaacEnv):
         self.detect_reward_coef = self.cfg.task.detect_reward_coef
         self.collision_coef = self.cfg.task.collision_coef
         self.speed_coef = self.cfg.task.speed_coef
+        self.dist_reward_coef = self.cfg.task.dist_reward_coef
         self.use_eval = self.cfg.task.use_eval
+        self.use_wall_blocked = self.cfg.task.use_wall_blocked
         
         self.central_env_pos = Float3(
             *self.envs_positions[self.central_env_idx].tolist()
@@ -437,8 +439,11 @@ class HideAndSeek_square(IsaacEnv):
         target_pos, _ = self.get_env_poses(self.target.get_world_poses())
         target_rpos = vmap(cpos)(drone_pos, target_pos) # [num_envs, num_agents, 1, 3]
         # self.blocked use in the _compute_reward_and_done
-        # _get_dummy_policy_prey: recompute
-        self.blocked = is_line_blocked_by_cylinder(drone_pos, target_pos, cylinders_pos, self.cylinder_size)
+        # _get_dummy_policy_prey: recompute the blocked
+        if self.use_wall_blocked:
+            self.blocked = is_line_blocked_by_cylinder(drone_pos, target_pos, cylinders_pos, self.cylinder_size)
+        else:
+            self.blocked = torch.zeros(self.num_envs, self.num_agents, device = self.device).type(torch.bool)
         in_detection_range = (torch.norm(target_rpos, dim=-1) < self.drone_detect_radius)
         # detect: [num_envs, num_agents, 1]
         detect = in_detection_range * (~ self.blocked.unsqueeze(-1))
@@ -472,7 +477,7 @@ class HideAndSeek_square(IsaacEnv):
 
         # draw drone trajectory and detection range
         if self._should_render(0) and self.use_eval:
-            self._draw_traj()
+            # self._draw_traj()
             if self.drone_detect_radius > 0.0:
                 self._draw_detection()   
 
@@ -499,7 +504,7 @@ class HideAndSeek_square(IsaacEnv):
         min_dist = torch.min(target_dist, dim=-1).values.unsqueeze(-1).expand_as(target_dist)
         active_distance_reward = (min_dist > self.catch_radius).float()
         # share distance reward
-        distance_reward = 1.0 / torch.exp(min_dist * active_distance_reward)
+        distance_reward = - self.dist_reward_coef * min_dist * active_distance_reward
         self.stats['distance_reward'].add_(distance_reward.mean(-1).unsqueeze(-1))
         
         # detect
@@ -548,7 +553,7 @@ class HideAndSeek_square(IsaacEnv):
         collision_reward += - self.collision_coef * (torch.abs(self.arena_size - drone_pos[..., 2]) < self.collision_radius).type(torch.float32)
         collision_reward += - self.collision_coef * (torch.abs(0.0 - drone_pos[..., 2]) < self.collision_radius).type(torch.float32)
 
-        self.stats['collision_reward'].add_(torch.abs(collision_reward).mean(-1).unsqueeze(-1))
+        self.stats['collision_reward'].add_(collision_reward.mean(-1).unsqueeze(-1))
         
         reward = (
             distance_reward
@@ -600,7 +605,10 @@ class HideAndSeek_square(IsaacEnv):
 
         # pursuers
         dist_pos = torch.norm(target_rpos, dim=-1).squeeze(1).unsqueeze(-1)
-        blocked = is_line_blocked_by_cylinder(drone_pos, target_pos, cylinders_pos, self.cylinder_size)
+        if self.use_wall_blocked:
+            blocked = is_line_blocked_by_cylinder(drone_pos, target_pos, cylinders_pos, self.cylinder_size)
+        else:
+            blocked = torch.zeros(self.num_envs, self.num_agents, device = self.device).type(torch.bool)
         detect_drone = (dist_pos < self.target_detect_radius).squeeze(-1)
 
         # active_drone: if drone is in th detect range, get force from it
@@ -644,42 +652,6 @@ class HideAndSeek_square(IsaacEnv):
 
         return force.type(torch.float32)
 
-    # def obs_repel(self, pos):
-    #     # drone or prey
-    #     shape_pos = pos.shape
-    #     # cylinders
-    #     # cylinder_mask = self.cylinders_mask.reshape(self.num_envs, 1, -1, 1)
-    #     # TODO: get prey cylinder_mask
-    #     cylinder_mask = torch.zeros()
-    #     force = torch.zeros_like(pos)
-    #     cylinders_pos, _ = self.get_env_poses(self.cylinders.get_world_poses())
-    #     # cylinders_pos, cylinders_height = refresh_cylinder_pos_height(max_cylinder_height=self.cylinder_height,
-    #     #                                                                   origin_cylinder_pos=cylinders_pos,
-    #     #                                                                   device=self.device)
-    #     xy_dist = (torch.norm(vmap(cpos)(pos[..., :2], cylinders_pos[..., :2]), dim=-1) - self.cylinder_size).unsqueeze(-1)
-    #     z_dist = vmap(cpos)(pos[..., 2].unsqueeze(-1), self.cylinders_height.unsqueeze(-1))
-    #     xy_mask = (xy_dist > 0) * (z_dist < 0) * 1.0
-    #     z_mask = (xy_dist < 0) * (z_dist > 0) * 1.0
-    #     # xy
-    #     drone_to_cy = vmap(cpos)(pos[..., :2], cylinders_pos[..., :2])
-    #     dist_drone_cy = torch.norm(drone_to_cy, dim=-1, keepdim=True)
-    #     p_drone_cy = drone_to_cy / (dist_drone_cy + 1e-9)
-    #     force[..., :2] = torch.sum(p_drone_cy / (torch.relu(dist_drone_cy - self.cylinder_size - 0.05) + 1e-9) * xy_mask * cylinder_mask, dim=-2) # 0.05 also for ball
-    #     force[..., 2] = torch.sum(1 / (torch.relu(z_dist - 0.05) + 1e-9) * z_mask * cylinder_mask, dim=-2).squeeze(-1)
-        
-    #     # if xy_dist>0 and z_dist>0
-    #     p_circle = torch.zeros(self.num_envs, shape_pos[1], self.num_cylinders, 3, device=self.device)
-    #     p_circle[..., :2] = p_drone_cy * xy_dist
-    #     p_circle[..., 2] = z_dist[..., 0]
-    #     p_force = torch.sum(self._norm(p_circle, p=1) * (xy_dist > 0) * (z_dist > 0) * cylinder_mask, dim=-2)
-    #     force += p_force
-
-    #     return force
-
-    def _norm(self, x, p=0):
-        y = x / ((torch.norm(x, dim=-1, keepdim=True)).expand_as(x) + 1e-9)**(p+1)
-        return y
-
     # visualize functions
     def _draw_court(self, size, height):
         self.draw.clear_lines()
@@ -717,6 +689,8 @@ class HideAndSeek_square(IsaacEnv):
         drone_xaxis = quat_axis(drone_ori, 0)
         drone_yaxis = quat_axis(drone_ori, 1)
         drone_zaxis = quat_axis(drone_ori, 2)
+        
+        # detection
         point_list, colors, sizes = draw_detection(
             pos=drone_pos[self.central_env_idx, :],
             xaxis=drone_xaxis[self.central_env_idx, 0, :],
@@ -728,4 +702,17 @@ class HideAndSeek_square(IsaacEnv):
             _carb_float3_add(p, self.central_env_pos) for p in point_list
         ]
         self.draw.draw_points(point_list, colors, sizes)
+        
+        # # catch
+        # point_list, colors, sizes = draw_catch(
+        #     pos=drone_pos[self.central_env_idx, :],
+        #     xaxis=drone_xaxis[self.central_env_idx, 0, :],
+        #     yaxis=drone_yaxis[self.central_env_idx, 0, :],
+        #     zaxis=drone_zaxis[self.central_env_idx, 0, :],
+        #     drange=self.drone_detect_radius,
+        # )
+        # point_list = [
+        #     _carb_float3_add(p, self.central_env_pos) for p in point_list
+        # ]
+        # self.draw.draw_points(point_list, colors, sizes)
     
