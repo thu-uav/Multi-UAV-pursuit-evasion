@@ -546,12 +546,12 @@ class HideAndSeek_square(IsaacEnv):
         drone_pos_dist = torch.norm(self.drone_rpos, dim=-1)
         collision_reward += - self.collision_coef * (drone_pos_dist < 2.0 * self.collision_radius).float().sum(-1)
         # for wall
-        collision_reward += - self.collision_coef * (torch.abs(0.5 * self.arena_size - drone_pos[..., 0]) < self.collision_radius).type(torch.float32)
-        collision_reward += - self.collision_coef * (torch.abs(-0.5 * self.arena_size - drone_pos[..., 0]) < self.collision_radius).type(torch.float32)
-        collision_reward += - self.collision_coef * (torch.abs(0.5 * self.arena_size - drone_pos[..., 1]) < self.collision_radius).type(torch.float32)
-        collision_reward += - self.collision_coef * (torch.abs(-0.5 * self.arena_size - drone_pos[..., 1]) < self.collision_radius).type(torch.float32)
-        collision_reward += - self.collision_coef * (torch.abs(self.arena_size - drone_pos[..., 2]) < self.collision_radius).type(torch.float32)
-        collision_reward += - self.collision_coef * (torch.abs(0.0 - drone_pos[..., 2]) < self.collision_radius).type(torch.float32)
+        collision_reward += - self.collision_coef * (drone_pos[..., 0] > 0.5 * self.arena_size - self.collision_radius).type(torch.float32)
+        collision_reward += - self.collision_coef * (drone_pos[..., 0] < - (0.5 * self.arena_size - self.collision_radius)).type(torch.float32)
+        collision_reward += - self.collision_coef * (drone_pos[..., 1] > 0.5 * self.arena_size - self.collision_radius).type(torch.float32)
+        collision_reward += - self.collision_coef * (drone_pos[..., 1] < - (0.5 * self.arena_size - self.collision_radius)).type(torch.float32)
+        collision_reward += - self.collision_coef * (drone_pos[..., 2] < - (0.0 - self.collision_radius)).type(torch.float32)
+        collision_reward += - self.collision_coef * (drone_pos[..., 2] > self.arena_size - self.collision_radius).type(torch.float32)
 
         self.stats['collision_reward'].add_(collision_reward.mean(-1).unsqueeze(-1))
         
