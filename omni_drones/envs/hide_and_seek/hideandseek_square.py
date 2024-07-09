@@ -163,12 +163,12 @@ class HideAndSeek_square(IsaacEnv):
         )
 
         self.init_drone_pos_dist = D.Uniform(
-            torch.tensor([-1.0, -1.0, 0.05], device=self.device),
-            torch.tensor([-0.3, -0.3, self.max_height], device=self.device)
+            torch.tensor([-(0.5 * self.arena_size - 0.1), -(0.5 * self.arena_size - 0.1), 0.5], device=self.device),
+            torch.tensor([0.5 * self.arena_size - 0.1, 0.5 * self.arena_size - 0.1, self.max_height - 0.5], device=self.device)
         )
         self.init_target_pos_dist = D.Uniform(
-            torch.tensor([0.3, 0.3, 0.05], device=self.device),
-            torch.tensor([1.0, 1.0, self.max_height], device=self.device)
+            torch.tensor([-(0.5 * self.arena_size - 0.1), -(0.5 * self.arena_size - 0.1), 0.5], device=self.device),
+            torch.tensor([0.5 * self.arena_size - 0.1, 0.5 * self.arena_size - 0.1, self.max_height - 0.5], device=self.device)
         )
         self.init_rpy_dist = D.Uniform(
             torch.tensor([0.0, 0.0, 0.0], device=self.device) * torch.pi,

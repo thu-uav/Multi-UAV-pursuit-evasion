@@ -5,7 +5,7 @@ headless: true
 sim: ${task.sim}
 env: ${task.env}
 
-# model_dir: /home/chenjy/OmniDrones/scripts/outputs/fixedtarget_woblocked_catch05_detect05/07-08_21-03/wandb/run-20240708_210400-inhjaq3j/files/checkpoint_final.pt
+# model_dir: /home/chenjy/OmniDrones/scripts/outputs/fixedtarget_woblocked/07-09_14-03/wandb/run-20240709_140343-h83pxsfs/files/checkpoint_262406144.pt
 model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
@@ -24,7 +24,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: fixedtarget_woblocked
+  run_name: fixedtarget_woblocked_random
   job_type: train
   entity: chenjy
   project: pursuit-evasion
