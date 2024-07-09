@@ -383,8 +383,9 @@ class MAPPOPolicy(object):
                 tensordict,
                 int(self.cfg.num_minibatches),
                 self.minibatch_seq_len if hasattr(self, "minibatch_seq_len") else 1,
-            )
+            )            
             for minibatch in dataset:
+                breakpoint()
                 train_info.append(
                     TensorDict(
                         {
@@ -394,6 +395,8 @@ class MAPPOPolicy(object):
                         batch_size=[],
                     )
                 )
+
+            # TODO: update TP network
 
         train_info = {k: v.mean().item() for k, v in torch.stack(train_info).items()}
         train_info["advantages_mean"] = advantages_mean.item()

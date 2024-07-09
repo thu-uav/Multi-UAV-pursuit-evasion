@@ -157,6 +157,9 @@ class HideAndSeek_square(IsaacEnv):
         self.dist_reward_coef = self.cfg.task.dist_reward_coef
         self.use_eval = self.cfg.task.use_eval
         self.use_wall_blocked = self.cfg.task.use_wall_blocked
+        # TP network
+        self.future_predcition_step = self.cfg.task.future_predcition_step
+        self.history_step = self.cfg.task.history_step
         
         self.central_env_pos = Float3(
             *self.envs_positions[self.central_env_idx].tolist()
@@ -201,11 +204,17 @@ class HideAndSeek_square(IsaacEnv):
             "state_drones": UnboundedContinuousTensorSpec((self.drone.n, 3 + drone_state_dim)),
             "cylinders": UnboundedContinuousTensorSpec((1, 5)), # pos + radius + height
         }).to(self.device)
+        # collect data for TP network
+        TP_spec = CompositeSpec({
+            "TP_output": UnboundedContinuousTensorSpec((1, 3 * self.future_predcition_step)),
+            "TP_groundtruth": UnboundedContinuousTensorSpec((1, 3 * self.future_predcition_step)),
+        }).to(self.device)
         
         self.observation_spec = CompositeSpec({
             "agents": CompositeSpec({
                 "observation": observation_spec.expand(self.drone.n),
                 "state": state_spec,
+                "TP": TP_spec
             })
         }).expand(self.num_envs).to(self.device)
         self.action_spec = CompositeSpec({
@@ -224,7 +233,7 @@ class HideAndSeek_square(IsaacEnv):
             observation_key=("agents", "observation"),
             action_key=("agents", "action"),
             reward_key=("agents", "reward"),
-            state_key=("agents", "state")
+            state_key=("agents", "state"),
         )
 
         # stats and infos
@@ -455,6 +464,10 @@ class HideAndSeek_square(IsaacEnv):
 
         t = (self.progress_buf / self.max_episode_length).unsqueeze(-1).unsqueeze(-1)
 
+        # TODO: use the predicted target to compute target_rpos
+        # use the history data to predict the current target pos
+        # use the real target pos to supervise the TP network
+
         obs["state_self"] = torch.cat(
             [target_rpos_masked.reshape(self.num_envs, self.num_agents, -1),
              self.drone_states[..., 3:10],
@@ -486,6 +499,7 @@ class HideAndSeek_square(IsaacEnv):
                 "agents": {
                     "observation": obs,
                     "state": state,
+                    "TP_input": state,
                 },
                 "stats": self.stats,
                 "info": self.info,

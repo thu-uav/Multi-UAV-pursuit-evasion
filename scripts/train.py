@@ -282,6 +282,7 @@ def main(cfg):
             }
             info.update(stats)
         
+        breakpoint()
         info.update(policy.train_op(data.to_tensordict()))
 
         if eval_interval > 0 and i % eval_interval == 0:

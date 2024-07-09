@@ -6,7 +6,7 @@ defaults:
   - /base/sim_base@_here_
 
 env:
-  num_envs: 4096
+  num_envs: 10
   max_episode_length: 800
 
 drone_model: Crazyflie
@@ -23,6 +23,8 @@ use_eval: 0
 # exp
 num_agents: 3
 use_wall_blocked: 0
+history_step: 5
+future_predcition_step: 1
 
 arena_size: 2.0
 v_drone: 1.0
