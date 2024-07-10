@@ -21,7 +21,7 @@
 # SOFTWARE.
 
 
-from .mappo import MAPPOPolicy
+from .mappo import MAPPOPolicy, TP_net
 from .ppo import *
 # from .test_single import Policy
 # from .mappo_formation import PPOFormation as Policy

@@ -385,7 +385,6 @@ class MAPPOPolicy(object):
                 self.minibatch_seq_len if hasattr(self, "minibatch_seq_len") else 1,
             )            
             for minibatch in dataset:
-                breakpoint()
                 train_info.append(
                     TensorDict(
                         {
@@ -484,7 +483,6 @@ def make_ppo_actor(cfg, observation_spec: TensorSpec, action_spec: TensorSpec):
 
     return Actor(encoder, act_dist, rnn)
 
-
 def make_critic(cfg, state_spec: TensorSpec, reward_spec: TensorSpec, centralized=False):
     assert isinstance(reward_spec, (UnboundedTensorSpec, BoundedTensorSpec))
     encoder = make_encoder(cfg, state_spec)
@@ -504,6 +502,20 @@ def make_critic(cfg, state_spec: TensorSpec, reward_spec: TensorSpec, centralize
         nn.init.orthogonal_(v_out.weight, cfg.gain)
         return Critic(encoder, rnn, v_out, reward_spec.shape[-1:])
 
+class TP_net(nn.Module):
+    def __init__(self, input_dim, output_dim, num_layers=1):
+        super(TP_net, self).__init__()
+        self.hidden_dim = 64
+        self.lstm = nn.LSTM(input_dim, self.hidden_dim, num_layers, batch_first=True)
+        self.fc = nn.Linear(self.hidden_dim, output_dim)
+
+    def forward(self, x):
+        h_0 = torch.zeros(2, x.size(0), self.hidden_dim).to(x.device)
+        c_0 = torch.zeros(2, x.size(0), self.hidden_dim).to(x.device)
+
+        out, _ = self.lstm(x, (h_0, c_0))
+        out = self.fc(out[:, -1, :])  # get the output of the last layer
+        return out
 
 class Actor(nn.Module):
     def __init__(
@@ -543,7 +555,6 @@ class Actor(nn.Module):
             action = action_dist.mode if deterministic else action_dist.sample()
             action_log_probs = action_dist.log_prob(action).unsqueeze(-1)
             return action, action_log_probs, None, rnn_state
-
 
 class Critic(nn.Module):
     def __init__(

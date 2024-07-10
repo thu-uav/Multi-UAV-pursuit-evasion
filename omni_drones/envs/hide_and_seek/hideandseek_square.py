@@ -38,7 +38,8 @@ from .placement import rejection_sampling_with_validation_large_cylinder_cl, gen
 from .draw import draw_traj, draw_detection, draw_catch, draw_court
 from .draw_circle import Float3, _COLOR_ACCENT, _carb_float3_add
 import time
-
+from omni_drones.learning import TP_net
+import collections
 
 # drones on land by default
 # only cubes are available as walls
@@ -183,6 +184,9 @@ class HideAndSeek_square(IsaacEnv):
 
         # for deployment
         self.prev_actions = torch.zeros(self.num_envs, self.num_agents, 4, device=self.device)
+
+        # TP net
+        self.history = collections.deque(maxlen=5)
 
     def _set_specs(self):        
         drone_state_dim = self.drone.state_spec.shape.numel()
@@ -464,9 +468,12 @@ class HideAndSeek_square(IsaacEnv):
 
         t = (self.progress_buf / self.max_episode_length).unsqueeze(-1).unsqueeze(-1)
 
-        # TODO: use the predicted target to compute target_rpos
+        # TODO: use the predicted target_rpos to replace target_rpos_masked
         # use the history data to predict the current target pos
         # use the real target pos to supervise the TP network
+        TP = TensorDict({}, [self.num_envs])
+        TP["TP_output"] = None
+        TP["TP_groundtruth"]
 
         obs["state_self"] = torch.cat(
             [target_rpos_masked.reshape(self.num_envs, self.num_agents, -1),
@@ -499,7 +506,7 @@ class HideAndSeek_square(IsaacEnv):
                 "agents": {
                     "observation": obs,
                     "state": state,
-                    "TP_input": state,
+                    "TP": TP,
                 },
                 "stats": self.stats,
                 "info": self.info,
