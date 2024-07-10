@@ -181,7 +181,8 @@ def main(cfg):
     env.set_seed(cfg.seed)
 
     agent_spec: AgentSpec = env.agent_spec["drone"]
-    policy = algos[cfg.algo.name.lower()](cfg.algo, agent_spec=agent_spec, device="cuda")
+    # add base_env.TP to MAPPOPolicy
+    policy = algos[cfg.algo.name.lower()](cfg.algo, base_env.TP, agent_spec=agent_spec, device="cuda")
 
     frames_per_batch = env.num_envs * int(cfg.algo.train_every)
     total_frames = cfg.get("total_frames", -1) // frames_per_batch * frames_per_batch
@@ -282,7 +283,6 @@ def main(cfg):
             }
             info.update(stats)
         
-        breakpoint()
         info.update(policy.train_op(data.to_tensordict()))
 
         if eval_interval > 0 and i % eval_interval == 0:

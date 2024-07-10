@@ -53,7 +53,7 @@ from torchrl.modules import TanhNormal, IndependentNormal
 
 class MAPPOPolicy(object):
     def __init__(
-        self, cfg, agent_spec: AgentSpec, device="cuda"
+        self, cfg, TP_net, agent_spec: AgentSpec, device="cuda"
     ) -> None:
         super().__init__()
 
@@ -66,6 +66,7 @@ class MAPPOPolicy(object):
 
         self.clip_param = cfg.clip_param
         self.ppo_epoch = int(cfg.ppo_epochs)
+        self.TP_epoch = int(cfg.TP_epochs)
         self.num_minibatches = int(cfg.num_minibatches)
         self.normalize_advantages = cfg.normalize_advantages
 
@@ -88,6 +89,8 @@ class MAPPOPolicy(object):
 
         self.make_actor()
         self.make_critic()
+        self.TP_optimizer = torch.optim.Adam(TP_net.parameters(), lr=0.0001)
+        self.TP_criterion = nn.MSELoss()
 
         self.train_in_keys = list(
             set(
@@ -244,6 +247,20 @@ class MAPPOPolicy(object):
         tensordict.update(self.value_op(tensordict))
         return tensordict
 
+    def update_TP(self, batch: TensorDict) -> Dict[str, Any]:
+        breakpoint()
+        TP_groundtruth = batch['next']['agents']['TP']['TP_groundtruth']
+        TP_output = batch['next']['agents']['TP']['TP_output']
+        loss = self.TP_criterion(TP_output, TP_groundtruth)
+        
+        self.TP_optimizer.zero_grad()
+        loss.backward()
+        self.TP_optimizer.step()
+        
+        return {
+            "TP_loss": loss.item()
+        }
+
     def update_actor(self, batch: TensorDict) -> Dict[str, Any]:
         advantages = batch["advantages"]
         actor_input = batch.select(*self.actor_in_keys)
@@ -378,6 +395,25 @@ class MAPPOPolicy(object):
             )
 
         train_info = []
+        
+        # TODO: update TP network
+        for _ in range(self.TP_epoch):
+            dataset = make_dataset_naive(
+                tensordict,
+                int(self.cfg.num_minibatches),
+                self.minibatch_seq_len if hasattr(self, "minibatch_seq_len") else 1,
+            )   
+            for minibatch in dataset:
+                train_info.append(
+                    TensorDict(
+                        {
+                            **self.update_TP(minibatch),
+                        },
+                        batch_size=[],
+                    )
+                ) 
+        
+        # RL_update
         for ppo_epoch in range(self.ppo_epoch):
             dataset = make_dataset_naive(
                 tensordict,
@@ -394,8 +430,6 @@ class MAPPOPolicy(object):
                         batch_size=[],
                     )
                 )
-
-            # TODO: update TP network
 
         train_info = {k: v.mean().item() for k, v in torch.stack(train_info).items()}
         train_info["advantages_mean"] = advantages_mean.item()
@@ -503,15 +537,16 @@ def make_critic(cfg, state_spec: TensorSpec, reward_spec: TensorSpec, centralize
         return Critic(encoder, rnn, v_out, reward_spec.shape[-1:])
 
 class TP_net(nn.Module):
-    def __init__(self, input_dim, output_dim, num_layers=1):
+    def __init__(self, input_dim, output_dim):
         super(TP_net, self).__init__()
         self.hidden_dim = 64
-        self.lstm = nn.LSTM(input_dim, self.hidden_dim, num_layers, batch_first=True)
+        self.num_layers = 1
+        self.lstm = nn.LSTM(input_dim, self.hidden_dim, self.num_layers, batch_first=True)
         self.fc = nn.Linear(self.hidden_dim, output_dim)
 
     def forward(self, x):
-        h_0 = torch.zeros(2, x.size(0), self.hidden_dim).to(x.device)
-        c_0 = torch.zeros(2, x.size(0), self.hidden_dim).to(x.device)
+        h_0 = torch.zeros(self.num_layers, x.size(0), self.hidden_dim).to(x.device)
+        c_0 = torch.zeros(self.num_layers, x.size(0), self.hidden_dim).to(x.device)
 
         out, _ = self.lstm(x, (h_0, c_0))
         out = self.fc(out[:, -1, :])  # get the output of the last layer

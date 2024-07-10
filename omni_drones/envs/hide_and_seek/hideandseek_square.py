@@ -38,8 +38,8 @@ from .placement import rejection_sampling_with_validation_large_cylinder_cl, gen
 from .draw import draw_traj, draw_detection, draw_catch, draw_court
 from .draw_circle import Float3, _COLOR_ACCENT, _carb_float3_add
 import time
-from omni_drones.learning import TP_net
 import collections
+from omni_drones.learning import TP_net
 
 # drones on land by default
 # only cubes are available as walls
@@ -158,9 +158,6 @@ class HideAndSeek_square(IsaacEnv):
         self.dist_reward_coef = self.cfg.task.dist_reward_coef
         self.use_eval = self.cfg.task.use_eval
         self.use_wall_blocked = self.cfg.task.use_wall_blocked
-        # TP network
-        self.future_predcition_step = self.cfg.task.future_predcition_step
-        self.history_step = self.cfg.task.history_step
         
         self.central_env_pos = Float3(
             *self.envs_positions[self.central_env_idx].tolist()
@@ -186,7 +183,9 @@ class HideAndSeek_square(IsaacEnv):
         self.prev_actions = torch.zeros(self.num_envs, self.num_agents, 4, device=self.device)
 
         # TP net
-        self.history = collections.deque(maxlen=5)
+        self.TP = TP_net(input_dim=self.num_agents * 6, output_dim = 3 * self.future_predcition_step).to(self.device)
+        self.history_step = self.cfg.task.history_step
+        self.history_data = collections.deque(maxlen=self.history_step)
 
     def _set_specs(self):        
         drone_state_dim = self.drone.state_spec.shape.numel()
@@ -209,7 +208,11 @@ class HideAndSeek_square(IsaacEnv):
             "cylinders": UnboundedContinuousTensorSpec((1, 5)), # pos + radius + height
         }).to(self.device)
         # collect data for TP network
+        # TP network
+        self.future_predcition_step = self.cfg.task.future_predcition_step
+        self.history_step = self.cfg.task.history_step
         TP_spec = CompositeSpec({
+            # "TP_input": UnboundedContinuousTensorSpec((self.history_step, self.num_agents * 6)),
             "TP_output": UnboundedContinuousTensorSpec((1, 3 * self.future_predcition_step)),
             "TP_groundtruth": UnboundedContinuousTensorSpec((1, 3 * self.future_predcition_step)),
         }).to(self.device)
@@ -394,6 +397,10 @@ class HideAndSeek_square(IsaacEnv):
         self.info['prev_action'][env_ids, :, 3] = (0.5 * (max_thrust_ratio + cmd_init)).mean(dim=-1)
         self.prev_actions[env_ids] = self.info['prev_action'][env_ids]
 
+        # init for history, mask value
+        for i in range(self.history_step):
+            self.history_data.append(torch.ones(self.num_envs, self.num_agents * 6, device = self.device) * self.mask_value)
+        
         # for substep in range(1):
         #     self.sim.step(self._should_render(substep))
 
@@ -469,14 +476,26 @@ class HideAndSeek_square(IsaacEnv):
         t = (self.progress_buf / self.max_episode_length).unsqueeze(-1).unsqueeze(-1)
 
         # TODO: use the predicted target_rpos to replace target_rpos_masked
-        # use the history data to predict the current target pos
         # use the real target pos to supervise the TP network
         TP = TensorDict({}, [self.num_envs])
-        TP["TP_output"] = None
-        TP["TP_groundtruth"]
+        # input: the history positions and velocity of all drones
+        current_input_states = torch.concat([
+            drone_pos,
+            self.drone_states[..., 7:10],
+        ], dim=-1).reshape(self.num_envs, -1) # [num_envs, 3 * 6]
+        self.history_data.append(current_input_states)
+        TP["TP_output"] = self.TP(torch.stack(list(self.history_data), dim=1).to(self.device))
+        # clip predicted pos
+        TP["TP_output"] = torch.clamp(TP["TP_output"], min = -(0.5 * self.arena_size - 0.1), max = 0.5 * self.arena_size - 0.1)
+        TP["TP_groundtruth"] = target_pos.squeeze(1)
+        breakpoint()
+        
+        target_rpos_predicted = vmap(cpos)(drone_pos, TP["TP_output"].unsqueeze(1))
+        # if True, choose target_rpos_predicted, else target_rpos
+        obs_target_rpos = torch.where(target_mask, target_rpos_predicted, target_rpos)
 
         obs["state_self"] = torch.cat(
-            [target_rpos_masked.reshape(self.num_envs, self.num_agents, -1),
+            [obs_target_rpos.reshape(self.num_envs, self.num_agents, -1),
              self.drone_states[..., 3:10],
              self.drone_states[..., 13:19],
              t.expand(-1, self.num_agents, self.time_encoding_dim),
