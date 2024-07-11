@@ -158,6 +158,7 @@ class HideAndSeek_square(IsaacEnv):
         self.dist_reward_coef = self.cfg.task.dist_reward_coef
         self.use_eval = self.cfg.task.use_eval
         self.use_wall_blocked = self.cfg.task.use_wall_blocked
+        self.capture = torch.zeros(self.num_envs, 3, device=self.device)
         
         self.central_env_pos = Float3(
             *self.envs_positions[self.central_env_idx].tolist()
@@ -175,6 +176,16 @@ class HideAndSeek_square(IsaacEnv):
             torch.tensor([0.0, 0.0, 0.0], device=self.device) * torch.pi,
             torch.tensor([0.0, 0.0, 0.0], device=self.device) * torch.pi
         )
+
+        if self.use_eval:
+            self.init_target_pos_dist = D.Uniform(
+                torch.tensor([0.8, 0.8, 0.5], device=self.device),
+                torch.tensor([0.8, 0.8, 0.5], device=self.device)
+            )
+            self.init_rpy_dist = D.Uniform(
+                torch.tensor([0.0, 0.0, 0.0], device=self.device) * torch.pi,
+                torch.tensor([0.0, 0.0, 0.0], device=self.device) * torch.pi
+            )
 
         self.mask_value = -5.0
         self.draw = _debug_draw.acquire_debug_draw_interface()
@@ -379,6 +390,13 @@ class HideAndSeek_square(IsaacEnv):
         drone_pos = self.init_drone_pos_dist.sample((*env_ids.shape, self.num_agents))
         rpy = self.init_rpy_dist.sample((*env_ids.shape, self.num_agents))
         rot = euler_to_quaternion(rpy)
+        if self.use_eval:
+            drone_pos = torch.tensor([
+                                [-0.7, -0.7, 0.5],
+                                [-0.4, -0.4, 0.5],
+                                [-0.7, -0.4, 0.5],
+                                [-0.4, -0.7, 0.5],
+                            ], device=self.device)[:self.num_agents].unsqueeze(0).expand(self.num_envs, -1, -1)
         self.drone.set_world_poses(
             drone_pos + self.envs_positions[env_ids].unsqueeze(1), rot, env_ids
         )
@@ -522,8 +540,9 @@ class HideAndSeek_square(IsaacEnv):
         # draw drone trajectory and detection range
         if self._should_render(0) and self.use_eval:
             # self._draw_traj()
-            if self.drone_detect_radius > 0.0:
-                self._draw_detection()   
+            self._draw_catch()
+            # if self.drone_detect_radius > 0.0:
+            #     self._draw_detection()   
 
         return TensorDict(
             {
@@ -564,8 +583,8 @@ class HideAndSeek_square(IsaacEnv):
         self.stats['detect_reward'].add_(detect_reward.mean(-1).unsqueeze(-1))
         
         # capture
-        capture = (target_dist < self.catch_radius)
-        masked_capture = capture * (~ self.blocked).float()
+        self.capture = (target_dist < self.catch_radius)
+        masked_capture = self.capture * (~ self.blocked).float()
         broadcast_capture = torch.any(masked_capture, dim=-1).unsqueeze(-1).expand_as(masked_capture) # cooperative reward
         catch_reward = self.catch_reward_coef * broadcast_capture
         # if capture, current_capture_step = progress_buf
@@ -729,35 +748,68 @@ class HideAndSeek_square(IsaacEnv):
     def _draw_detection(self):
         self.draw.clear_points()
 
+        # drone detection
         drone_pos = self.drone_states[..., :3]
         drone_ori = self.drone_states[..., 3:7]
         drone_xaxis = quat_axis(drone_ori, 0)
         drone_yaxis = quat_axis(drone_ori, 1)
         drone_zaxis = quat_axis(drone_ori, 2)
-        
-        # detection
-        point_list, colors, sizes = draw_detection(
+        drone_point_list, drone_colors, drone_sizes = draw_detection(
             pos=drone_pos[self.central_env_idx, :],
             xaxis=drone_xaxis[self.central_env_idx, 0, :],
             yaxis=drone_yaxis[self.central_env_idx, 0, :],
             zaxis=drone_zaxis[self.central_env_idx, 0, :],
             drange=self.drone_detect_radius,
         )
+
+        # target detection
+        target_pos, target_ori = self.get_env_poses(self.target.get_world_poses())
+        target_xaxis = quat_axis(target_ori, 0)
+        target_yaxis = quat_axis(target_ori, 1)
+        target_zaxis = quat_axis(target_ori, 2)
+        target_point_list, target_colors, target_sizes = draw_detection(
+            pos=target_pos[self.central_env_idx, :],
+            xaxis=target_xaxis[self.central_env_idx, 0, :],
+            yaxis=target_yaxis[self.central_env_idx, 0, :],
+            zaxis=target_zaxis[self.central_env_idx, 0, :],
+            drange=self.target_detect_radius,
+        )
+        
+        point_list = drone_point_list + target_point_list
+        colors = drone_colors + target_colors
+        sizes = drone_sizes + target_sizes
         point_list = [
             _carb_float3_add(p, self.central_env_pos) for p in point_list
         ]
         self.draw.draw_points(point_list, colors, sizes)
-        
-        # # catch
-        # point_list, colors, sizes = draw_catch(
-        #     pos=drone_pos[self.central_env_idx, :],
-        #     xaxis=drone_xaxis[self.central_env_idx, 0, :],
-        #     yaxis=drone_yaxis[self.central_env_idx, 0, :],
-        #     zaxis=drone_zaxis[self.central_env_idx, 0, :],
-        #     drange=self.drone_detect_radius,
-        # )
-        # point_list = [
-        #     _carb_float3_add(p, self.central_env_pos) for p in point_list
-        # ]
-        # self.draw.draw_points(point_list, colors, sizes)
-    
+
+    def _draw_catch(self):
+        self.draw.clear_points()
+        # drone detection
+        drone_pos = self.drone_states[..., :3]
+        drone_ori = self.drone_states[..., 3:7]
+        drone_xaxis = quat_axis(drone_ori, 0)
+        drone_yaxis = quat_axis(drone_ori, 1)
+        drone_zaxis = quat_axis(drone_ori, 2)
+        # catch
+        point_list, colors, sizes = draw_catch(
+            pos=drone_pos[self.central_env_idx, :],
+            xaxis=drone_xaxis[self.central_env_idx, 0, :],
+            yaxis=drone_yaxis[self.central_env_idx, 0, :],
+            zaxis=drone_zaxis[self.central_env_idx, 0, :],
+            drange=self.catch_radius,
+        )
+        point_list = [
+            _carb_float3_add(p, self.central_env_pos) for p in point_list
+        ]
+        # catch, green
+        catch_mask = self.capture[self.central_env_idx].unsqueeze(1).expand(-1, 400).reshape(-1)
+        for idx in range(len(colors)):
+            if catch_mask[idx]:
+                colors[idx] = (0.0, 1.0, 0.0, 0.3)
+        # blocked, red
+        block_mask = self.blocked[self.central_env_idx].unsqueeze(1).expand(-1, 400).reshape(-1)
+        for idx in range(len(colors)):
+            if block_mask[idx]:
+                colors[idx] = (1.0, 0.0, 0.0, 0.3)
+        self.draw.draw_points(point_list, colors, sizes)

@@ -24,8 +24,8 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: fixedtarget_woblocked_random
-  run_name: debug
+  run_name: catch1_0_detect2_blocked_TP
+  # run_name: debug
   job_type: train
   entity: chenjy
   project: pursuit-evasion
