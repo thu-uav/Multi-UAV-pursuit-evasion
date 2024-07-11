@@ -5,7 +5,7 @@ headless: true
 sim: ${task.sim}
 env: ${task.env}
 
-# model_dir: /home/chenjy/OmniDrones/scripts/outputs/fixedtarget_woblocked/07-09_14-03/wandb/run-20240709_140343-h83pxsfs/files/checkpoint_262406144.pt
+# model_dir: /home/chenjy/OmniDrones/scripts/outputs/debug_mappo/07-11_21-42/wandb/run-20240711_214219-s7npfg2f/files/checkpoint_6400.pt
 model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
@@ -24,7 +24,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: catch1_0_detect2_blocked_TP
+  run_name: catch1_detect2_blocked_wodetectreward_distancereward_TP
   # run_name: debug
   job_type: train
   entity: chenjy

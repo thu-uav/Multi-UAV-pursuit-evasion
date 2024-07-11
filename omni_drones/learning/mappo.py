@@ -448,6 +448,7 @@ class MAPPOPolicy(object):
 
     def state_dict(self):
         state_dict = {
+            "TP": self.TP_net.state_dict(),
             "critic": self.critic.state_dict(),
             "actor_params": self.actor_params,
             "value_normalizer": self.value_normalizer.state_dict()
@@ -455,11 +456,11 @@ class MAPPOPolicy(object):
         return state_dict
     
     def load_state_dict(self, state_dict):
+        self.TP_net.load_state_dict(state_dict["TP"])
         self.actor_params = TensorDictParams(state_dict["actor_params"].to_tensordict())
         self.actor_opt = torch.optim.Adam(self.actor_params.parameters(), lr=self.cfg.actor.lr)
         self.critic.load_state_dict(state_dict["critic"])
         self.value_normalizer.load_state_dict(state_dict["value_normalizer"])
-
 
 def make_dataset_naive(
     tensordict: TensorDict, num_minibatches: int = 4, seq_len: int = 1

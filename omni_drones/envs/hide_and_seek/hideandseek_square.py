@@ -505,15 +505,15 @@ class HideAndSeek_square(IsaacEnv):
         TP["TP_input"] = torch.stack(list(self.history_data), dim=1).to(self.device)
         # target_pos_predicted, x, y -> [-0.5 * self.arena_size, 0.5 * self.arena_size]
         # z -> [0, self.arena_size]
-        target_pos_predicted = self.TP(TP["TP_input"])
-        target_pos_predicted[..., :2] = target_pos_predicted[..., :2] * 0.5 * self.arena_size
-        target_pos_predicted[..., 2] = (target_pos_predicted[..., 2] + 1.0) / 2.0 * self.arena_size
+        self.target_pos_predicted = self.TP(TP["TP_input"])
+        self.target_pos_predicted[..., :2] = self.target_pos_predicted[..., :2] * 0.5 * self.arena_size
+        self.target_pos_predicted[..., 2] = (self.target_pos_predicted[..., 2] + 1.0) / 2.0 * self.arena_size
         # TP_groundtruth: clip to (-1.0, 1.0)
         TP["TP_groundtruth"] = target_pos.squeeze(1)
         TP["TP_groundtruth"][..., :2] = TP["TP_groundtruth"][..., :2] / (0.5 * self.arena_size)
         TP["TP_groundtruth"][..., 2] = TP["TP_groundtruth"][..., 2] / self.arena_size * 2.0 - 1.0
         
-        target_rpos_predicted = vmap(cpos)(drone_pos, target_pos_predicted.unsqueeze(1))
+        target_rpos_predicted = vmap(cpos)(drone_pos, self.target_pos_predicted.unsqueeze(1))
         # if True, choose target_rpos_predicted, else target_rpos
         obs_target_rpos = torch.where(target_mask, target_rpos_predicted, target_rpos)
 
@@ -799,17 +799,22 @@ class HideAndSeek_square(IsaacEnv):
             zaxis=drone_zaxis[self.central_env_idx, 0, :],
             drange=self.catch_radius,
         )
+        # predicted target
+        point_list.append(Float3(self.target_pos_predicted[self.central_env_idx].cpu().numpy().tolist()))
+        colors.append((1.0, 1.0, 0.0, 0.3))
+        sizes.append(20.0)
+        # point_list.append()
         point_list = [
             _carb_float3_add(p, self.central_env_pos) for p in point_list
         ]
         # catch, green
         catch_mask = self.capture[self.central_env_idx].unsqueeze(1).expand(-1, 400).reshape(-1)
-        for idx in range(len(colors)):
+        for idx in range(len(catch_mask)):
             if catch_mask[idx]:
                 colors[idx] = (0.0, 1.0, 0.0, 0.3)
         # blocked, red
         block_mask = self.blocked[self.central_env_idx].unsqueeze(1).expand(-1, 400).reshape(-1)
-        for idx in range(len(colors)):
+        for idx in range(len(block_mask)):
             if block_mask[idx]:
                 colors[idx] = (1.0, 0.0, 0.0, 0.3)
         self.draw.draw_points(point_list, colors, sizes)
