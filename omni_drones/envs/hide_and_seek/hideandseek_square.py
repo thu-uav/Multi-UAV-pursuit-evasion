@@ -212,8 +212,8 @@ class HideAndSeek_square(IsaacEnv):
         self.future_predcition_step = self.cfg.task.future_predcition_step
         self.history_step = self.cfg.task.history_step
         TP_spec = CompositeSpec({
-            # "TP_input": UnboundedContinuousTensorSpec((self.history_step, self.num_agents * 6)),
-            "TP_output": UnboundedContinuousTensorSpec((1, 3 * self.future_predcition_step)),
+            "TP_input": UnboundedContinuousTensorSpec((self.history_step, self.num_agents * 6)),
+            # "TP_output": UnboundedContinuousTensorSpec((1, 3 * self.future_predcition_step)),
             "TP_groundtruth": UnboundedContinuousTensorSpec((1, 3 * self.future_predcition_step)),
         }).to(self.device)
         
@@ -484,13 +484,18 @@ class HideAndSeek_square(IsaacEnv):
             self.drone_states[..., 7:10],
         ], dim=-1).reshape(self.num_envs, -1) # [num_envs, 3 * 6]
         self.history_data.append(current_input_states)
-        TP["TP_output"] = self.TP(torch.stack(list(self.history_data), dim=1).to(self.device))
-        # clip predicted pos
-        TP["TP_output"] = torch.clamp(TP["TP_output"], min = -(0.5 * self.arena_size - 0.1), max = 0.5 * self.arena_size - 0.1)
+        TP["TP_input"] = torch.stack(list(self.history_data), dim=1).to(self.device)
+        # target_pos_predicted, x, y -> [-0.5 * self.arena_size, 0.5 * self.arena_size]
+        # z -> [0, self.arena_size]
+        target_pos_predicted = self.TP(TP["TP_input"])
+        target_pos_predicted[..., :2] = target_pos_predicted[..., :2] * 0.5 * self.arena_size
+        target_pos_predicted[..., 2] = (target_pos_predicted[..., 2] + 1.0) / 2.0 * self.arena_size
+        # TP_groundtruth: clip to (-1.0, 1.0)
         TP["TP_groundtruth"] = target_pos.squeeze(1)
-        breakpoint()
+        TP["TP_groundtruth"][..., :2] = TP["TP_groundtruth"][..., :2] / (0.5 * self.arena_size)
+        TP["TP_groundtruth"][..., 2] = TP["TP_groundtruth"][..., 2] / self.arena_size * 2.0 - 1.0
         
-        target_rpos_predicted = vmap(cpos)(drone_pos, TP["TP_output"].unsqueeze(1))
+        target_rpos_predicted = vmap(cpos)(drone_pos, target_pos_predicted.unsqueeze(1))
         # if True, choose target_rpos_predicted, else target_rpos
         obs_target_rpos = torch.where(target_mask, target_rpos_predicted, target_rpos)
 

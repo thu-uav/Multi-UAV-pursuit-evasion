@@ -89,7 +89,8 @@ class MAPPOPolicy(object):
 
         self.make_actor()
         self.make_critic()
-        self.TP_optimizer = torch.optim.Adam(TP_net.parameters(), lr=0.0001)
+        self.TP_net = TP_net
+        self.TP_optimizer = torch.optim.Adam(self.TP_net.parameters(), lr=0.0001)
         self.TP_criterion = nn.MSELoss()
 
         self.train_in_keys = list(
@@ -248,9 +249,9 @@ class MAPPOPolicy(object):
         return tensordict
 
     def update_TP(self, batch: TensorDict) -> Dict[str, Any]:
-        breakpoint()
-        TP_groundtruth = batch['next']['agents']['TP']['TP_groundtruth']
-        TP_output = batch['next']['agents']['TP']['TP_output']
+        TP_groundtruth = batch['next']['agents']['TP']['TP_groundtruth'] # range: (-1, 1)
+        TP_input = batch['next']['agents']['TP']['TP_input']
+        TP_output = self.TP_net(TP_input) # range: (-1, 1)
         loss = self.TP_criterion(TP_output, TP_groundtruth)
         
         self.TP_optimizer.zero_grad()
@@ -395,6 +396,7 @@ class MAPPOPolicy(object):
             )
 
         train_info = []
+        TP_info = []
         
         # TODO: update TP network
         for _ in range(self.TP_epoch):
@@ -404,14 +406,14 @@ class MAPPOPolicy(object):
                 self.minibatch_seq_len if hasattr(self, "minibatch_seq_len") else 1,
             )   
             for minibatch in dataset:
-                train_info.append(
+                TP_info.append(
                     TensorDict(
                         {
                             **self.update_TP(minibatch),
                         },
                         batch_size=[],
                     )
-                ) 
+                )
         
         # RL_update
         for ppo_epoch in range(self.ppo_epoch):
@@ -430,8 +432,10 @@ class MAPPOPolicy(object):
                         batch_size=[],
                     )
                 )
-
+        
+        TP_info = {k: v.mean().item() for k, v in torch.stack(TP_info).items()}
         train_info = {k: v.mean().item() for k, v in torch.stack(train_info).items()}
+        train_info.update(TP_info)
         train_info["advantages_mean"] = advantages_mean.item()
         train_info["advantages_std"] = advantages_std.item()
         if isinstance(self.agent_spec.action_spec, (BoundedTensorSpec, UnboundedTensorSpec)):
@@ -550,7 +554,8 @@ class TP_net(nn.Module):
 
         out, _ = self.lstm(x, (h_0, c_0))
         out = self.fc(out[:, -1, :])  # get the output of the last layer
-        return out
+        # norm: -1 ~ 1
+        return torch.tanh(out)
 
 class Actor(nn.Module):
     def __init__(
