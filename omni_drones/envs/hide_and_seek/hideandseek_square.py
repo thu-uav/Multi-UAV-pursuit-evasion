@@ -267,6 +267,7 @@ class HideAndSeek_square(IsaacEnv):
             "return": UnboundedContinuousTensorSpec(1),
             "action_error_order1_mean": UnboundedContinuousTensorSpec(1),
             "action_error_order1_max": UnboundedContinuousTensorSpec(1),
+            "target_predicted_error": UnboundedContinuousTensorSpec(1),
         }).expand(self.num_envs).to(self.device)
         info_spec = CompositeSpec({
             "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13), device=self.device),
@@ -513,6 +514,8 @@ class HideAndSeek_square(IsaacEnv):
         TP["TP_groundtruth"][..., :2] = TP["TP_groundtruth"][..., :2] / (0.5 * self.arena_size)
         TP["TP_groundtruth"][..., 2] = TP["TP_groundtruth"][..., 2] / self.arena_size * 2.0 - 1.0
         
+        self.stats["target_predicted_error"].add_(torch.norm(self.target_pos_predicted - target_pos.squeeze(1), dim=-1).unsqueeze(-1))
+        
         target_rpos_predicted = vmap(cpos)(drone_pos, self.target_pos_predicted.unsqueeze(1))
         # if True, choose target_rpos_predicted, else target_rpos
         obs_target_rpos = torch.where(target_mask, target_rpos_predicted, target_rpos)
@@ -632,6 +635,9 @@ class HideAndSeek_square(IsaacEnv):
         )
 
         ep_len = self.progress_buf.unsqueeze(-1)
+        self.stats["target_predicted_error"].div_(
+            torch.where(done, ep_len, torch.ones_like(ep_len))
+        )
         self.stats["distance_reward"].div_(
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )

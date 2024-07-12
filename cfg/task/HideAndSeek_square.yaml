@@ -31,13 +31,13 @@ v_drone: 1.0
 v_prey: 1.3
 
 dist_reward_coef: 0.0
-catch_reward_coef: 10.0
-detect_reward_coef: 0.0
+catch_reward_coef: 0.0
+detect_reward_coef: 10.0
 collision_coef: 100.0
 speed_coef: 50.0
 catch_radius: 1.0
-drone_detect_radius: 2.0
-target_detect_radius: 2.0
+drone_detect_radius: 1.0
+target_detect_radius: 1.2
 collision_radius: 0.1
 
 cylinder:
