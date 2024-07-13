@@ -194,18 +194,22 @@ class HideAndSeek_square(IsaacEnv):
         self.prev_actions = torch.zeros(self.num_envs, self.num_agents, 4, device=self.device)
 
         # TP net
-        self.TP = TP_net(input_dim=self.num_agents * 6, output_dim = 3 * self.future_predcition_step).to(self.device)
+        # self.TP = TP_net(input_dim=self.num_agents * 6, output_dim = 3 * self.future_predcition_step).to(self.device)
+        # TODO: use history target
+        self.TP = TP_net(input_dim=3, output_dim = 3 * self.future_predcition_step, future_predcition_step = self.future_predcition_step).to(self.device)
         self.history_step = self.cfg.task.history_step
         self.history_data = collections.deque(maxlen=self.history_step)
 
     def _set_specs(self):        
         drone_state_dim = self.drone.state_spec.shape.numel()
         if self.cfg.task.time_encoding:
-            self.time_encoding_dim = 4       
+            self.time_encoding_dim = 4
+        self.future_predcition_step = self.cfg.task.future_predcition_step
+        self.history_step = self.cfg.task.history_step
 
         if self.drone.n > 1:
             observation_spec = CompositeSpec({
-                "state_self": UnboundedContinuousTensorSpec((1, 3 + self.time_encoding_dim + 13)),
+                "state_self": UnboundedContinuousTensorSpec((1, 3 * self.future_predcition_step + self.time_encoding_dim + 13)),
                 "state_others": UnboundedContinuousTensorSpec((self.drone.n-1, 3)), # pos
                 "cylinders": UnboundedContinuousTensorSpec((1, 5)), # pos + radius + height
             }).to(self.device)
@@ -218,14 +222,12 @@ class HideAndSeek_square(IsaacEnv):
             "state_drones": UnboundedContinuousTensorSpec((self.drone.n, 3 + drone_state_dim)),
             "cylinders": UnboundedContinuousTensorSpec((1, 5)), # pos + radius + height
         }).to(self.device)
-        # collect data for TP network
         # TP network
-        self.future_predcition_step = self.cfg.task.future_predcition_step
-        self.history_step = self.cfg.task.history_step
+        # TODO: use the history target(easy), use the obs of drones(hard)
         TP_spec = CompositeSpec({
-            "TP_input": UnboundedContinuousTensorSpec((self.history_step, self.num_agents * 6)),
-            # "TP_output": UnboundedContinuousTensorSpec((1, 3 * self.future_predcition_step)),
-            "TP_groundtruth": UnboundedContinuousTensorSpec((1, 3 * self.future_predcition_step)),
+            # "TP_input": UnboundedContinuousTensorSpec((self.history_step, self.num_agents * 6)),
+            "TP_input": UnboundedContinuousTensorSpec((self.history_step, 3)),
+            "TP_groundtruth": UnboundedContinuousTensorSpec((1, 3)),
         }).to(self.device)
         
         self.observation_spec = CompositeSpec({
@@ -416,9 +418,12 @@ class HideAndSeek_square(IsaacEnv):
         self.info['prev_action'][env_ids, :, 3] = (0.5 * (max_thrust_ratio + cmd_init)).mean(dim=-1)
         self.prev_actions[env_ids] = self.info['prev_action'][env_ids]
 
-        # init for history, mask value
+        # # init for history, mask value
+        # for i in range(self.history_step):
+        #     self.history_data.append(torch.ones(self.num_envs, self.num_agents * 6, device = self.device) * self.mask_value)
+        # TODO: debug, use the history states of target
         for i in range(self.history_step):
-            self.history_data.append(torch.ones(self.num_envs, self.num_agents * 6, device = self.device) * self.mask_value)
+            self.history_data.append(torch.ones(self.num_envs, 3, device = self.device) * self.mask_value)
         
         # for substep in range(1):
         #     self.sim.step(self._should_render(substep))
@@ -497,16 +502,18 @@ class HideAndSeek_square(IsaacEnv):
         # TODO: use the predicted target_rpos to replace target_rpos_masked
         # use the real target pos to supervise the TP network
         TP = TensorDict({}, [self.num_envs])
-        # input: the history positions and velocity of all drones
-        current_input_states = torch.concat([
-            drone_pos,
-            self.drone_states[..., 7:10],
-        ], dim=-1).reshape(self.num_envs, -1) # [num_envs, 3 * 6]
-        self.history_data.append(current_input_states)
+        # # input: the history positions and velocity of all drones
+        # current_input_states = torch.concat([
+        #     drone_pos,
+        #     self.drone_states[..., 7:10],
+        # ], dim=-1).reshape(self.num_envs, -1) # [num_envs, 3 * 6]
+        # self.history_data.append(current_input_states)
         TP["TP_input"] = torch.stack(list(self.history_data), dim=1).to(self.device)
+        # TODO: debug, use the history states of target
+        self.history_data.append(target_pos.squeeze(1))
         # target_pos_predicted, x, y -> [-0.5 * self.arena_size, 0.5 * self.arena_size]
         # z -> [0, self.arena_size]
-        self.target_pos_predicted = self.TP(TP["TP_input"])
+        self.target_pos_predicted = self.TP(TP["TP_input"]).reshape(self.num_envs, self.future_predcition_step, -1) # [num_envs, 3 * future_step]
         self.target_pos_predicted[..., :2] = self.target_pos_predicted[..., :2] * 0.5 * self.arena_size
         self.target_pos_predicted[..., 2] = (self.target_pos_predicted[..., 2] + 1.0) / 2.0 * self.arena_size
         # TP_groundtruth: clip to (-1.0, 1.0)
@@ -514,14 +521,16 @@ class HideAndSeek_square(IsaacEnv):
         TP["TP_groundtruth"][..., :2] = TP["TP_groundtruth"][..., :2] / (0.5 * self.arena_size)
         TP["TP_groundtruth"][..., 2] = TP["TP_groundtruth"][..., 2] / self.arena_size * 2.0 - 1.0
         
-        self.stats["target_predicted_error"].add_(torch.norm(self.target_pos_predicted - target_pos.squeeze(1), dim=-1).unsqueeze(-1))
-        
-        target_rpos_predicted = vmap(cpos)(drone_pos, self.target_pos_predicted.unsqueeze(1))
+        # only comnpare the first predicted target_pos
+        self.stats["target_predicted_error"].add_(torch.norm(self.target_pos_predicted[:, 0] - target_pos.squeeze(1), dim=-1).unsqueeze(-1))
+                
+        target_rpos_predicted = (drone_pos.unsqueeze(2) - self.target_pos_predicted.unsqueeze(1)).view(self.num_envs, self.num_agents, -1)
+        # target_rpos_predicted = vmap(cpos)(drone_pos, self.target_pos_predicted.unsqueeze(1))
         # if True, choose target_rpos_predicted, else target_rpos
-        obs_target_rpos = torch.where(target_mask, target_rpos_predicted, target_rpos)
+        # obs_target_rpos = torch.where(target_mask, target_rpos_predicted, target_rpos)
 
         obs["state_self"] = torch.cat(
-            [obs_target_rpos.reshape(self.num_envs, self.num_agents, -1),
+            [target_rpos_predicted,
              self.drone_states[..., 3:10],
              self.drone_states[..., 13:19],
              t.expand(-1, self.num_agents, self.time_encoding_dim),

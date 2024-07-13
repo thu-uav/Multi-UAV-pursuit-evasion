@@ -249,8 +249,8 @@ class MAPPOPolicy(object):
         return tensordict
 
     def update_TP(self, batch: TensorDict) -> Dict[str, Any]:
-        TP_groundtruth = batch['next']['agents']['TP']['TP_groundtruth'] # range: (-1, 1)
-        TP_input = batch['next']['agents']['TP']['TP_input']
+        TP_groundtruth = batch['TP_groundtruth'].reshape(batch['TP_groundtruth'].shape[0], -1) # range: (-1, 1)
+        TP_input = batch['TP_input']
         TP_output = self.TP_net(TP_input) # range: (-1, 1)
         loss = self.TP_criterion(TP_output, TP_groundtruth)
         
@@ -398,10 +398,23 @@ class MAPPOPolicy(object):
         train_info = []
         TP_info = []
         
-        # TODO: update TP network
+        # expand TP_groundtruth
+        TP_groundtruth = tensordict['next']['agents']['TP']['TP_groundtruth']
+        TP_input = tensordict['next']['agents']['TP']['TP_input']
+        window_size = self.TP_net.future_predcition_step
+        windows = TP_groundtruth.unfold(dimension=1, size=window_size, step=1).transpose(2, 3)
+        TP_tensordict = TensorDict(
+            {
+                "TP_input": TP_input[:, :windows.shape[1]],
+                "TP_groundtruth": windows,
+            },
+            windows.shape[:2], # [num_envs, time_step - window_size + 1]
+        )
+        
         for _ in range(self.TP_epoch):
             dataset = make_dataset_naive(
-                tensordict,
+                TP_tensordict,
+                # tensordict,
                 int(self.cfg.num_minibatches),
                 self.minibatch_seq_len if hasattr(self, "minibatch_seq_len") else 1,
             )   
@@ -542,10 +555,11 @@ def make_critic(cfg, state_spec: TensorSpec, reward_spec: TensorSpec, centralize
         return Critic(encoder, rnn, v_out, reward_spec.shape[-1:])
 
 class TP_net(nn.Module):
-    def __init__(self, input_dim, output_dim):
+    def __init__(self, input_dim, output_dim, future_predcition_step):
         super(TP_net, self).__init__()
         self.hidden_dim = 64
         self.num_layers = 1
+        self.future_predcition_step = future_predcition_step # for data unfold
         self.lstm = nn.LSTM(input_dim, self.hidden_dim, self.num_layers, batch_first=True)
         self.fc = nn.Linear(self.hidden_dim, output_dim)
 
