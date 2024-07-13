@@ -196,7 +196,7 @@ class HideAndSeek_square(IsaacEnv):
         # TP net
         # self.TP = TP_net(input_dim=self.num_agents * 6, output_dim = 3 * self.future_predcition_step).to(self.device)
         # TODO: use history target
-        self.TP = TP_net(input_dim=3, output_dim = 3 * self.future_predcition_step, future_predcition_step = self.future_predcition_step).to(self.device)
+        self.TP = TP_net(input_dim=3 + 3 * self.num_agents, output_dim = 3 * self.future_predcition_step, future_predcition_step = self.future_predcition_step).to(self.device)
         self.history_step = self.cfg.task.history_step
         self.history_data = collections.deque(maxlen=self.history_step)
 
@@ -423,7 +423,8 @@ class HideAndSeek_square(IsaacEnv):
         #     self.history_data.append(torch.ones(self.num_envs, self.num_agents * 6, device = self.device) * self.mask_value)
         # TODO: debug, use the history states of target
         for i in range(self.history_step):
-            self.history_data.append(torch.ones(self.num_envs, 3, device = self.device) * self.mask_value)
+            # target pos, target rpos flatten
+            self.history_data.append(torch.ones(self.num_envs, 3 + 3 * self.num_agents, device = self.device) * self.mask_value)
         
         # for substep in range(1):
         #     self.sim.step(self._should_render(substep))
@@ -510,7 +511,11 @@ class HideAndSeek_square(IsaacEnv):
         # self.history_data.append(current_input_states)
         TP["TP_input"] = torch.stack(list(self.history_data), dim=1).to(self.device)
         # TODO: debug, use the history states of target
-        self.history_data.append(target_pos.squeeze(1))
+        frame_state = torch.concat([
+            target_pos.squeeze(1),
+            target_rpos_masked.reshape(self.num_envs, -1)
+        ], dim=-1)
+        self.history_data.append(frame_state)
         # target_pos_predicted, x, y -> [-0.5 * self.arena_size, 0.5 * self.arena_size]
         # z -> [0, self.arena_size]
         self.target_pos_predicted = self.TP(TP["TP_input"]).reshape(self.num_envs, self.future_predcition_step, -1) # [num_envs, 3 * future_step]
