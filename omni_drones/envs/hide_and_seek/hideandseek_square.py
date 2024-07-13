@@ -644,6 +644,9 @@ class HideAndSeek_square(IsaacEnv):
         )
 
         ep_len = self.progress_buf.unsqueeze(-1)
+        self.stats["action_error_order1_mean"].div_(
+            torch.where(done, ep_len, torch.ones_like(ep_len))
+        )
         self.stats["target_predicted_error"].div_(
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
@@ -815,9 +818,10 @@ class HideAndSeek_square(IsaacEnv):
             drange=self.catch_radius,
         )
         # predicted target
-        point_list.append(Float3(self.target_pos_predicted[self.central_env_idx].cpu().numpy().tolist()))
-        colors.append((1.0, 1.0, 0.0, 0.3))
-        sizes.append(20.0)
+        for step in range(self.target_pos_predicted.shape[1]):
+            point_list.append(Float3(self.target_pos_predicted[self.central_env_idx, step].cpu().numpy().tolist()))
+            colors.append((1.0, 1.0, 0.0, 0.3))
+            sizes.append(20.0)
         # point_list.append()
         point_list = [
             _carb_float3_add(p, self.central_env_pos) for p in point_list
