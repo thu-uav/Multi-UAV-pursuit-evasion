@@ -85,9 +85,18 @@ class EpisodeStats:
     def __len__(self):
         return len(self._stats)
 
+def set_seed(seed):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 @hydra.main(version_base=None, config_path=CONFIG_PATH, config_name="train")
 def main(cfg):
+    seed = 42
+    set_seed(seed)
+
     OmegaConf.register_new_resolver("eval", eval)
     OmegaConf.resolve(cfg)
     OmegaConf.set_struct(cfg, False)

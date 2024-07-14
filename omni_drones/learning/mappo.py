@@ -91,7 +91,7 @@ class MAPPOPolicy(object):
         self.make_critic()
         self.TP_net = TP_net
         self.TP_optimizer = torch.optim.Adam(self.TP_net.parameters(), lr=0.0001)
-        self.TP_criterion = nn.MSELoss()
+        # self.TP_criterion = nn.MSELoss()
 
         self.train_in_keys = list(
             set(
@@ -249,10 +249,13 @@ class MAPPOPolicy(object):
         return tensordict
 
     def update_TP(self, batch: TensorDict) -> Dict[str, Any]:
-        TP_groundtruth = batch['TP_groundtruth'].reshape(batch['TP_groundtruth'].shape[0], -1) # range: (-1, 1)
+        future_step = batch['TP_groundtruth'].shape[1]
+        pos_dim = batch['TP_groundtruth'].shape[2]
+        TP_groundtruth = batch['TP_groundtruth'] # range: (-1, 1)
         TP_input = batch['TP_input']
-        TP_output = self.TP_net(TP_input) # range: (-1, 1)
-        loss = self.TP_criterion(TP_output, TP_groundtruth)
+        TP_output = self.TP_net(TP_input).reshape(-1, future_step, pos_dim) # range: (-1, 1)
+        # loss = self.TP_criterion(TP_output, TP_groundtruth)
+        loss = torch.mean(torch.norm(TP_output - TP_groundtruth, dim=-1).mean(1), dim=0)
         
         self.TP_optimizer.zero_grad()
         loss.backward()
@@ -405,7 +408,6 @@ class MAPPOPolicy(object):
         window_step = self.TP_net.window_step
         # use the future groundtruth
         windows = TP_groundtruth.unfold(dimension=1, size=window_size + 1, step=window_step).transpose(2, 3)[:,:, 1:]
-        breakpoint()
         TP_tensordict = TensorDict(
             {
                 "TP_input": TP_input[:, :windows.shape[1]],

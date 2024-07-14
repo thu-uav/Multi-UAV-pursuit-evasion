@@ -540,7 +540,7 @@ class HideAndSeek_square(IsaacEnv):
         self.target_pos_predicted[..., :2] = self.target_pos_predicted[..., :2] * 0.5 * self.arena_size
         self.target_pos_predicted[..., 2] = (self.target_pos_predicted[..., 2] + 1.0) / 2.0 * self.arena_size
         # TP_groundtruth: clip to (-1.0, 1.0)
-        TP["TP_groundtruth"] = target_pos.squeeze(1)
+        TP["TP_groundtruth"] = target_pos.squeeze(1).clone()
         TP["TP_groundtruth"][..., :2] = TP["TP_groundtruth"][..., :2] / (0.5 * self.arena_size)
         TP["TP_groundtruth"][..., 2] = TP["TP_groundtruth"][..., 2] / self.arena_size * 2.0 - 1.0
          

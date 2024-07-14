@@ -5,8 +5,8 @@ headless: true
 sim: ${task.sim}
 env: ${task.env}
 
-model_dir: /home/chenjy/OmniDrones/scripts/outputs/catch0_5_target1_history10_future5_windowstep10_TP/07-14_15-20/wandb/run-20240714_152006-jorj66tl/files/checkpoint_157548544.pt
-# model_dir: null
+# model_dir: /home/chenjy/OmniDrones/scripts/outputs/catch0_5_target1_history10_future5_windowstep10_TP/07-14_15-20/wandb/run-20240714_152006-jorj66tl/files/checkpoint_157548544.pt
+model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
 max_iters: -1
@@ -24,13 +24,13 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: catch0_5_target1_history10_future5_windowstep10_TP
-  run_name: debug
+  run_name: catch1_0_target1_3_TP
+  # run_name: debug
   job_type: train
   entity: chenjy
   project: pursuit-evasion
-  mode: disabled
-  # mode: online # set to 'disabled' when debugging locally, online
+  # mode: disabled
+  mode: online # set to 'disabled' when debugging locally, online
   run_id: 
   monitor_gym: True
   tags: 
