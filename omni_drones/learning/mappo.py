@@ -402,7 +402,8 @@ class MAPPOPolicy(object):
         TP_groundtruth = tensordict['next']['agents']['TP']['TP_groundtruth']
         TP_input = tensordict['next']['agents']['TP']['TP_input']
         window_size = self.TP_net.future_predcition_step
-        windows = TP_groundtruth.unfold(dimension=1, size=window_size, step=1).transpose(2, 3)
+        window_step = self.TP_net.window_step
+        windows = TP_groundtruth.unfold(dimension=1, size=window_size, step=window_step).transpose(2, 3)
         TP_tensordict = TensorDict(
             {
                 "TP_input": TP_input[:, :windows.shape[1]],
@@ -555,11 +556,12 @@ def make_critic(cfg, state_spec: TensorSpec, reward_spec: TensorSpec, centralize
         return Critic(encoder, rnn, v_out, reward_spec.shape[-1:])
 
 class TP_net(nn.Module):
-    def __init__(self, input_dim, output_dim, future_predcition_step):
+    def __init__(self, input_dim, output_dim, future_predcition_step, window_step):
         super(TP_net, self).__init__()
         self.hidden_dim = 64
         self.num_layers = 1
         self.future_predcition_step = future_predcition_step # for data unfold
+        self.window_step = window_step
         self.lstm = nn.LSTM(input_dim, self.hidden_dim, self.num_layers, batch_first=True)
         self.fc = nn.Linear(self.hidden_dim, output_dim)
 

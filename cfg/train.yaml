@@ -5,7 +5,7 @@ headless: true
 sim: ${task.sim}
 env: ${task.env}
 
-# model_dir: /home/chenjy/OmniDrones/scripts/outputs/fully_TP_catch0_5_history5_future5/07-13_20-55/wandb/run-20240713_205507-jrgcews2/files/checkpoint_262406144.pt
+# model_dir: /home/chenjy/OmniDrones/scripts/outputs/fully_TP_catch0_5_history5_future5_newstate/07-13_22-30/wandb/run-20240713_223003-ztqu2duc/files/checkpoint_2647916544.pt
 model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
@@ -24,7 +24,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: fully_TP_catch0_5_history5_future5_newstate
+  run_name: fully_TP_catch0_5_history5_future5_windowstep10
   # run_name: debug
   job_type: train
   entity: chenjy

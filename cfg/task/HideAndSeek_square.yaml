@@ -25,6 +25,7 @@ num_agents: 3
 use_wall_blocked: 0
 history_step: 5
 future_predcition_step: 5
+window_step: 10
 
 arena_size: 2.0
 v_drone: 1.0

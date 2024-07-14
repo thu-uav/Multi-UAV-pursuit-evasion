@@ -196,7 +196,7 @@ class HideAndSeek_square(IsaacEnv):
         # TP net
         # self.TP = TP_net(input_dim=self.num_agents * 6, output_dim = 3 * self.future_predcition_step).to(self.device)
         # TODO: use history target
-        self.TP = TP_net(input_dim=3 + 3 * self.num_agents, output_dim = 3 * self.future_predcition_step, future_predcition_step = self.future_predcition_step).to(self.device)
+        self.TP = TP_net(input_dim=3 + 3 * self.num_agents, output_dim = 3 * self.future_predcition_step, future_predcition_step = self.future_predcition_step, window_step=self.window_step).to(self.device)
         self.history_step = self.cfg.task.history_step
         self.history_data = collections.deque(maxlen=self.history_step)
 
@@ -206,6 +206,7 @@ class HideAndSeek_square(IsaacEnv):
             self.time_encoding_dim = 4
         self.future_predcition_step = self.cfg.task.future_predcition_step
         self.history_step = self.cfg.task.history_step
+        self.window_step = self.cfg.task.window_step
 
         if self.drone.n > 1:
             observation_spec = CompositeSpec({
@@ -262,6 +263,9 @@ class HideAndSeek_square(IsaacEnv):
             "distance_reward": UnboundedContinuousTensorSpec(1),
             "speed_reward": UnboundedContinuousTensorSpec(1),
             "collision_reward": UnboundedContinuousTensorSpec(1),
+            "collision_wall": UnboundedContinuousTensorSpec(1),
+            "collision_cylinder": UnboundedContinuousTensorSpec(1),
+            "collision_drone": UnboundedContinuousTensorSpec(1),
             "detect_reward": UnboundedContinuousTensorSpec(1),
             "catch_reward": UnboundedContinuousTensorSpec(1),
             "first_capture_step": UnboundedContinuousTensorSpec(1),
@@ -622,17 +626,24 @@ class HideAndSeek_square(IsaacEnv):
         # TODO: consider the z-axis
         nearest_cylinder_state = self.cylinders_state.gather(2, self.min_distance_idx_expanded)
         cylinder_pos_dist = torch.norm(nearest_cylinder_state[..., :2], dim= -1).squeeze(-1)
-        collision_reward = - self.collision_coef * (cylinder_pos_dist - self.cylinder_size < self.collision_radius).float()
+        collision_cylinder = (cylinder_pos_dist - self.cylinder_size < self.collision_radius).float()
+        collision_reward = - self.collision_coef * collision_cylinder
+        self.stats['collision_cylinder'].add_(collision_cylinder.mean(-1).unsqueeze(-1))
         # for drones
         drone_pos_dist = torch.norm(self.drone_rpos, dim=-1)
-        collision_reward += - self.collision_coef * (drone_pos_dist < 2.0 * self.collision_radius).float().sum(-1)
+        collision_drone = (drone_pos_dist < 2.0 * self.collision_radius).float().sum(-1)
+        collision_reward += - self.collision_coef * collision_drone
+        self.stats['collision_drone'].add_(collision_drone.mean(-1).unsqueeze(-1))
         # for wall
-        collision_reward += - self.collision_coef * (drone_pos[..., 0] > 0.5 * self.arena_size - self.collision_radius).type(torch.float32)
-        collision_reward += - self.collision_coef * (drone_pos[..., 0] < - (0.5 * self.arena_size - self.collision_radius)).type(torch.float32)
-        collision_reward += - self.collision_coef * (drone_pos[..., 1] > 0.5 * self.arena_size - self.collision_radius).type(torch.float32)
-        collision_reward += - self.collision_coef * (drone_pos[..., 1] < - (0.5 * self.arena_size - self.collision_radius)).type(torch.float32)
-        collision_reward += - self.collision_coef * (drone_pos[..., 2] < - (0.0 - self.collision_radius)).type(torch.float32)
-        collision_reward += - self.collision_coef * (drone_pos[..., 2] > self.arena_size - self.collision_radius).type(torch.float32)
+        collision_wall = torch.zeros_like(collision_reward)
+        collision_wall += (drone_pos[..., 0] > 0.5 * self.arena_size - self.collision_radius).type(torch.float32)
+        collision_wall += (drone_pos[..., 0] < - (0.5 * self.arena_size - self.collision_radius)).type(torch.float32)
+        collision_wall += (drone_pos[..., 1] > 0.5 * self.arena_size - self.collision_radius).type(torch.float32)
+        collision_wall += (drone_pos[..., 1] < - (0.5 * self.arena_size - self.collision_radius)).type(torch.float32)
+        collision_wall += (drone_pos[..., 2] < - (0.0 - self.collision_radius)).type(torch.float32)
+        collision_wall += (drone_pos[..., 2] > self.arena_size - self.collision_radius).type(torch.float32)
+        collision_reward += - self.collision_coef * collision_wall
+        self.stats['collision_wall'].add_(collision_wall.mean(-1).unsqueeze(-1))
 
         self.stats['collision_reward'].add_(collision_reward.mean(-1).unsqueeze(-1))
         
@@ -665,6 +676,15 @@ class HideAndSeek_square(IsaacEnv):
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
         self.stats["collision_reward"].div_(
+            torch.where(done, ep_len, torch.ones_like(ep_len))
+        )
+        self.stats["collision_wall"].div_(
+            torch.where(done, ep_len, torch.ones_like(ep_len))
+        )
+        self.stats["collision_drone"].div_(
+            torch.where(done, ep_len, torch.ones_like(ep_len))
+        )
+        self.stats["collision_cylinder"].div_(
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
         self.stats["speed_reward"].div_(
