@@ -405,6 +405,7 @@ class MAPPOPolicy(object):
         window_step = self.TP_net.window_step
         # use the future groundtruth
         windows = TP_groundtruth.unfold(dimension=1, size=window_size + 1, step=window_step).transpose(2, 3)[:,:, 1:]
+        breakpoint()
         TP_tensordict = TensorDict(
             {
                 "TP_input": TP_input[:, :windows.shape[1]],

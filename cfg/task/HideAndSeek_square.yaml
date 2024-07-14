@@ -6,7 +6,7 @@ defaults:
   - /base/sim_base@_here_
 
 env:
-  num_envs: 4096
+  num_envs: 10
   max_episode_length: 800
 
 drone_model: Crazyflie
@@ -15,7 +15,7 @@ time_encoding: true
 
 action_transform: PIDrate
 
-use_eval: 0
+use_eval: 1
 
 # # evalution scenario
 # evaluation_flag: null # '3_cylineder_line', '5_cylineder_line', '8_cylineder_ring', '7_cylineder_ring'
