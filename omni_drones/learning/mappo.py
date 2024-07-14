@@ -403,7 +403,8 @@ class MAPPOPolicy(object):
         TP_input = tensordict['next']['agents']['TP']['TP_input']
         window_size = self.TP_net.future_predcition_step
         window_step = self.TP_net.window_step
-        windows = TP_groundtruth.unfold(dimension=1, size=window_size, step=window_step).transpose(2, 3)
+        # use the future groundtruth
+        windows = TP_groundtruth.unfold(dimension=1, size=window_size + 1, step=window_step).transpose(2, 3)[:,:, 1:]
         TP_tensordict = TensorDict(
             {
                 "TP_input": TP_input[:, :windows.shape[1]],
