@@ -178,6 +178,10 @@ class HideAndSeek_square_partial(IsaacEnv):
         )
 
         if self.use_eval:
+            # self.init_target_pos_dist = D.Uniform(
+            #     torch.tensor([-0.8, -0.8, 0.5], device=self.device),
+            #     torch.tensor([-0.8, -0.8, 0.5], device=self.device)
+            # )
             self.init_target_pos_dist = D.Uniform(
                 torch.tensor([0.8, 0.8, 0.5], device=self.device),
                 torch.tensor([0.8, 0.8, 0.5], device=self.device)
