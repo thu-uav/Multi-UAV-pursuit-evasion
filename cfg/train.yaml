@@ -5,7 +5,7 @@ headless: true
 sim: ${task.sim}
 env: ${task.env}
 
-# model_dir: /home/jiayu/OmniDrones/scripts/outputs/catch0_5_target1_3_TP_blocked/07-15_12-21/wandb/run-20240715_122106-fo2aufmj/files/checkpoint_524550144.pt
+# model_dir: /home/jiayu/OmniDrones/scripts/outputs/catch0_5_target1_3_TP_blocked_future5_window10_distance5/07-15_15-48/wandb/run-20240715_154806-evmm8xzn/files/checkpoint_708050944.pt
 model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
@@ -16,15 +16,17 @@ seed: 0
 
 viewer:
   resolution: [960, 720]
-  # front
-  eye: [0., -0.005, 4.]
-  lookat: [0., 0., 1.]
+  # # front
+  # eye: [0., -0.005, 6.]
+  # lookat: [0., 0., 1.]
+  eye: [0., -1.0, 5.]
+  lookat: [0., 0.0, 1.]
   # eye: [0., -5.0, 10.]
   # lookat: [0., 4.0, 1.]
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: catch0_5_target1_3_TP_blocked_future5_window10
+  run_name: catch0_2_TP_blocked
   # run_name: debug
   job_type: train
   entity: chenjy

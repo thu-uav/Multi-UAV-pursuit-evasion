@@ -44,6 +44,26 @@ from omni_drones.learning import TP_net
 # drones on land by default
 # only cubes are available as walls
 
+def is_perpendicular_line_intersecting_segment(a, b, c):
+    # a: drones, b: target, c: cylinders
+    
+    # the direction of ab
+    dx = b[:, :, 0] - a[:, :, 0]  # [batch, num_drones]
+    dy = b[:, :, 1] - a[:, :, 1]  # [batch, num_drones]
+    
+    # c to ab, cd is perpendicular to ab
+    num = (c[:, :, 0].unsqueeze(1) - a[:, :, 0].unsqueeze(2)) * dx.unsqueeze(2) + \
+          (c[:, :, 1].unsqueeze(1) - a[:, :, 1].unsqueeze(2)) * dy.unsqueeze(2)  # [batch, num_drones, num_cylinders]
+    
+    denom = dx.unsqueeze(2)**2 + dy.unsqueeze(2)**2  # [batch, num_drones, 1]
+    
+    t = num / denom  # [batch, num_drones, num_cylinders]
+    
+    # check d in or not in ab
+    is_on_segment = (t >= 0) & (t <= 1)  # [batch, num_drones, num_cylinders]
+    
+    return is_on_segment
+
 def is_line_blocked_by_cylinder(drone_pos, target_pos, cylinder_pos, cylinder_size):
     '''
         # 1. compute_reward: for catch reward, not blocked
@@ -67,6 +87,10 @@ def is_line_blocked_by_cylinder(drone_pos, target_pos, cylinder_pos, cylinder_si
     # which cylinder blocks the line between the ith drone and the target
     # blocked: [num_envs, num_agents, num_cylinders]
     blocked = dist_to_line <= cylinder_size
+    
+    # whether the cylinder between the drone and the target
+    flag = is_perpendicular_line_intersecting_segment(drone_pos, target_pos, cylinder_pos)
+    blocked = blocked * flag
 
     return blocked.any(dim=(-1))
 
@@ -671,7 +695,7 @@ class HideAndSeek_square_partial(IsaacEnv):
         collision_reward += - self.collision_coef * collision_wall
         
         collision_flag = torch.any(collision_reward < 0, dim=1)
-        self.stats["collision"] = torch.logical_or(collision_flag.unsqueeze(1), self.stats["collision"]).float()
+        self.stats["collision"].add_(collision_flag.unsqueeze(1))
         
         self.stats['collision_wall'].add_(collision_wall.mean(-1).unsqueeze(-1))
         self.stats['collision_reward'].add_(collision_reward.mean(-1).unsqueeze(-1))
@@ -689,6 +713,9 @@ class HideAndSeek_square_partial(IsaacEnv):
         )
 
         ep_len = self.progress_buf.unsqueeze(-1)
+        self.stats["collision"].div_(
+            torch.where(done, ep_len, torch.ones_like(ep_len))
+        )
         self.stats["action_error_order1_mean"].div_(
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
