@@ -70,7 +70,7 @@ def is_line_blocked_by_cylinder(drone_pos, target_pos, cylinder_pos, cylinder_si
 
     return blocked.any(dim=(-1))
 
-class HideAndSeek_square(IsaacEnv): 
+class HideAndSeek_square_partial(IsaacEnv): 
     """
     HideAndSeek environment designed for curriculum learning.
 
@@ -260,7 +260,8 @@ class HideAndSeek_square(IsaacEnv):
 
         # stats and infos
         stats_spec = CompositeSpec({
-            "capture": UnboundedContinuousTensorSpec(1),
+            "success": UnboundedContinuousTensorSpec(1),
+            "collision": UnboundedContinuousTensorSpec(1),
             "distance_reward": UnboundedContinuousTensorSpec(1),
             "speed_reward": UnboundedContinuousTensorSpec(1),
             "collision_reward": UnboundedContinuousTensorSpec(1),
@@ -423,7 +424,7 @@ class HideAndSeek_square(IsaacEnv):
         self.info['prev_action'][env_ids, :, 3] = (0.5 * (max_thrust_ratio + cmd_init)).mean(dim=-1)
         self.prev_actions[env_ids] = self.info['prev_action'][env_ids]
 
-        # TODO: debug, use the history states of target
+        cylinders_pos, _ = self.get_env_poses(self.cylinders.get_world_poses())
         target_rpos = vmap(cpos)(drone_pos, target_pos) # [num_envs, num_agents, 1, 3]
         # self.blocked use in the _compute_reward_and_done
         if self.use_wall_blocked:
@@ -631,6 +632,7 @@ class HideAndSeek_square(IsaacEnv):
         # if capture, current_capture_step = progress_buf
         # else, current_capture_step = max_episode_length
         capture_flag = torch.any(catch_reward, dim=1)
+        self.stats["success"] = torch.logical_or(capture_flag.unsqueeze(1), self.stats["success"]).float()
         current_capture_step = capture_flag.float() * self.progress_buf + (~capture_flag).float() * self.max_episode_length
         self.stats['first_capture_step'] = torch.min(self.stats['first_capture_step'], current_capture_step.unsqueeze(1))
         self.stats['catch_reward'].add_(catch_reward.mean(-1).unsqueeze(-1))
@@ -663,8 +665,11 @@ class HideAndSeek_square(IsaacEnv):
         collision_wall += (drone_pos[..., 2] < - (0.0 - self.collision_radius)).type(torch.float32)
         collision_wall += (drone_pos[..., 2] > self.arena_size - self.collision_radius).type(torch.float32)
         collision_reward += - self.collision_coef * collision_wall
+        
+        collision_flag = torch.any(collision_reward < 0, dim=1)
+        self.stats["collision"] = torch.logical_or(collision_flag.unsqueeze(1), self.stats["collision"]).float()
+        
         self.stats['collision_wall'].add_(collision_wall.mean(-1).unsqueeze(-1))
-
         self.stats['collision_reward'].add_(collision_reward.mean(-1).unsqueeze(-1))
         
         reward = (

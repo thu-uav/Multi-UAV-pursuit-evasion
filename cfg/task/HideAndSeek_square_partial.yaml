@@ -1,4 +1,4 @@
-name: HideAndSeek_square
+name: HideAndSeek_square_partial
 
 defaults:
   # see https://hydra.cc/docs/advanced/overriding_packages/
@@ -22,7 +22,7 @@ use_eval: 0
 
 # exp
 num_agents: 3
-use_wall_blocked: 0
+use_wall_blocked: 1
 history_step: 10
 future_predcition_step: 5
 window_step: 1
@@ -36,9 +36,9 @@ catch_reward_coef: 10.0
 detect_reward_coef: 0.0
 collision_coef: 100.0
 speed_coef: 50.0
-catch_radius: 1.0
-drone_detect_radius: 5.0
-target_detect_radius: 5.0
+catch_radius: 0.5
+drone_detect_radius: 100.0
+target_detect_radius: 100.0
 collision_radius: 0.1
 
 cylinder:
