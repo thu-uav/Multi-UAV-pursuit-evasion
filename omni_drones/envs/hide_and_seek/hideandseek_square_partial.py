@@ -94,6 +94,60 @@ def is_line_blocked_by_cylinder(drone_pos, target_pos, cylinder_pos, cylinder_si
 
     return blocked.any(dim=(-1))
 
+# grid initialization
+def select_unoccupied_positions(occupancy_matrix, n):
+    batch_size, height, width = occupancy_matrix.shape
+    all_chosen_coords = []
+    for i in range(batch_size):
+        available_coords = torch.nonzero(occupancy_matrix[i] == 0, as_tuple=False)
+
+        if available_coords.size(0) < n:
+            raise ValueError(f"Not enough available coordinates in batch {i} to choose from")
+
+        chosen_coords = available_coords[torch.randperm(available_coords.size(0))[:n]]
+        all_chosen_coords.append(chosen_coords)  
+    return torch.stack(all_chosen_coords)   
+
+def grid_to_continuous(grid_coords, grid_size, center_pos, center_grid):
+    """
+    Convert grid coordinates to continuous coordinates.
+    
+    Args:
+    grid_center (torch.Tensor): A 2D tensor of shape (2,) representing the center coordinates of the grid.
+    grid_size (float): The size of each grid cell.
+    grid_coords (torch.Tensor): A 2D tensor of shape (num_agents, 2) containing the grid coordinates.
+    
+    Returns:
+    torch.Tensor: A 2D tensor of shape (num_agents, 2) containing the continuous coordinates.
+    """
+    # Calculate the offset from the center of the grid
+    offset = (grid_coords - center_grid) * grid_size
+    
+    # Add the offset to the center coordinates to get the continuous coordinates
+    continuous_coords = center_pos + offset
+    
+    return continuous_coords
+
+def continuous_to_grid(continuous_coords, grid_size, center_pos, center_grid):
+    """
+    Convert continuous coordinates to grid coordinates.
+    
+    Args:
+    continuous_coords (torch.Tensor): A 2D tensor of shape (num_agents, 2) containing the continuous coordinates.
+    grid_size (float): The size of each grid cell.
+    grid_center (torch.Tensor): A 2D tensor of shape (2,) representing the center coordinates of the grid.
+    
+    Returns:
+    torch.Tensor: A 2D tensor of shape (num_agents, 2) containing the grid coordinates.
+    """
+    # Calculate the offset from the center of the grid
+    offset = continuous_coords - center_pos
+    
+    # Convert the offset to grid coordinates
+    grid_coords = torch.round(offset / grid_size).int() + center_grid
+    
+    return grid_coords
+
 class HideAndSeek_square_partial(IsaacEnv): 
     """
     HideAndSeek environment designed for curriculum learning.
@@ -188,14 +242,23 @@ class HideAndSeek_square_partial(IsaacEnv):
             *self.envs_positions[self.central_env_idx].tolist()
         )
 
-        self.init_drone_pos_dist = D.Uniform(
-            torch.tensor([-(0.5 * self.arena_size - 0.1), -(0.5 * self.arena_size - 0.1), 0.5], device=self.device),
-            torch.tensor([0.5 * self.arena_size - 0.1, 0.5 * self.arena_size - 0.1, self.max_height - 0.5], device=self.device)
+        self.init_drone_pos_dist_z = D.Uniform(
+            torch.tensor([0.5], device=self.device),
+            torch.tensor([self.max_height - 0.5], device=self.device)
         )
-        self.init_target_pos_dist = D.Uniform(
-            torch.tensor([-(0.5 * self.arena_size - 0.1), -(0.5 * self.arena_size - 0.1), 0.5], device=self.device),
-            torch.tensor([0.5 * self.arena_size - 0.1, 0.5 * self.arena_size - 0.1, self.max_height - 0.5], device=self.device)
+        self.init_target_pos_dist_z = D.Uniform(
+            torch.tensor([0.5], device=self.device),
+            torch.tensor([self.max_height - 0.5], device=self.device)
         )
+
+        # self.init_drone_pos_dist = D.Uniform(
+        #     torch.tensor([-(0.5 * self.arena_size - 0.1), -(0.5 * self.arena_size - 0.1), 0.5], device=self.device),
+        #     torch.tensor([0.5 * self.arena_size - 0.1, 0.5 * self.arena_size - 0.1, self.max_height - 0.5], device=self.device)
+        # )
+        # self.init_target_pos_dist = D.Uniform(
+        #     torch.tensor([-(0.5 * self.arena_size - 0.1), -(0.5 * self.arena_size - 0.1), 0.5], device=self.device),
+        #     torch.tensor([0.5 * self.arena_size - 0.1, 0.5 * self.arena_size - 0.1, self.max_height - 0.5], device=self.device)
+        # )
         self.init_rpy_dist = D.Uniform(
             torch.tensor([0.0, 0.0, 0.0], device=self.device) * torch.pi,
             torch.tensor([0.0, 0.0, 0.0], device=self.device) * torch.pi
@@ -350,9 +413,13 @@ class HideAndSeek_square_partial(IsaacEnv):
 
         # cylinders with physcical properties
         self.cylinders_size = []
+        # cylinders_pos = torch.tensor([
+        #                     [0.0, self.cylinder_size, 0.5 * self.cylinder_height],
+        #                     [0.0, - self.cylinder_size, 0.5 * self.cylinder_height],
+        #                 ], device=self.device)[:self.num_cylinders]
         cylinders_pos = torch.tensor([
-                            [0.0, self.cylinder_size, 0.5 * self.cylinder_height],
-                            [0.0, - self.cylinder_size, 0.5 * self.cylinder_height],
+                            [0.0, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                            [0.0, - 2 * self.cylinder_size, 0.5 * self.cylinder_height],
                         ], device=self.device)[:self.num_cylinders]
         for idx in range(self.num_cylinders):
             # orientation = None
@@ -421,10 +488,38 @@ class HideAndSeek_square_partial(IsaacEnv):
 
         return ["/World/defaultGroundPlane"]
 
+    def rejection_sampling_for_init(self, cylinders_pos, env_ids: torch.Tensor):
+        # init for drones and target
+        grid_size = 2 * self.cylinder_size
+        num_grid = int(self.arena_size / grid_size)
+        grid_map = torch.zeros((len(env_ids), num_grid, num_grid), device=self.device, dtype=torch.int)
+        center_pos = torch.zeros((len(env_ids), 1, 2), device=self.device)
+        center_grid = torch.ones((len(env_ids), 1, 2), device=self.device, dtype=torch.int) * int(num_grid / 2)
+        cylinders_grid = continuous_to_grid(cylinders_pos[..., :2][env_ids], grid_size, center_pos, center_grid)
+        
+        batch_indices = env_ids.unsqueeze(1).unsqueeze(2)
+        # flatten index_matrix
+        flat_indices = cylinders_grid.view(len(env_ids), -1, 2).to(torch.long)
+        # set occupied
+        grid_map[batch_indices, flat_indices[:, :, 0], flat_indices[:, :, 1]] = 1
+        objects_grid = select_unoccupied_positions(grid_map, self.num_agents + 1)
+        objects_pos = grid_to_continuous(objects_grid, grid_size, center_pos, center_grid)
+        return objects_pos[:, :self.num_agents], objects_pos[:, self.num_agents:]
+
     def _reset_idx(self, env_ids: torch.Tensor):
         self.drone._reset_idx(env_ids)
+        
+        # TODO, randomly set cylinders
+        # init cylinder
+        cylinders_pos, _ = self.get_env_poses(self.cylinders.get_world_poses())
+        
+        drone_pos_xy, target_pos_xy = self.rejection_sampling_for_init(cylinders_pos, env_ids)
+        drone_pos_z = self.init_drone_pos_dist_z.sample((*env_ids.shape, self.num_agents))
+        target_pos_z = self.init_target_pos_dist_z.sample((*env_ids.shape, 1))
+        drone_pos = torch.concat([drone_pos_xy, drone_pos_z], dim=-1)
+        target_pos = torch.concat([target_pos_xy, target_pos_z], dim=-1)
     
-        drone_pos = self.init_drone_pos_dist.sample((*env_ids.shape, self.num_agents))
+        # drone_pos = self.init_drone_pos_dist.sample((*env_ids.shape, self.num_agents))
         rpy = self.init_rpy_dist.sample((*env_ids.shape, self.num_agents))
         rot = euler_to_quaternion(rpy)
         if self.use_eval:
@@ -440,7 +535,7 @@ class HideAndSeek_square_partial(IsaacEnv):
         drone_init_velocities = torch.zeros_like(self.drone.get_velocities())
         self.drone.set_velocities(drone_init_velocities, env_ids)
 
-        target_pos = self.init_target_pos_dist.sample((*env_ids.shape, 1))
+        # target_pos = self.init_target_pos_dist.sample((*env_ids.shape, 1))
         self.target.set_world_poses(positions=target_pos + self.envs_positions[env_ids].unsqueeze(1), env_indices=env_ids)
 
         # reset stats
@@ -452,7 +547,6 @@ class HideAndSeek_square_partial(IsaacEnv):
         self.info['prev_action'][env_ids, :, 3] = (0.5 * (max_thrust_ratio + cmd_init)).mean(dim=-1)
         self.prev_actions[env_ids] = self.info['prev_action'][env_ids]
 
-        cylinders_pos, _ = self.get_env_poses(self.cylinders.get_world_poses())
         target_rpos = vmap(cpos)(drone_pos, target_pos) # [num_envs, num_agents, 1, 3]
         # self.blocked use in the _compute_reward_and_done
         if self.use_wall_blocked:

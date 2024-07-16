@@ -36,7 +36,7 @@ catch_reward_coef: 10.0
 detect_reward_coef: 0.0
 collision_coef: 100.0
 speed_coef: 50.0
-catch_radius: 0.2
+catch_radius: 0.5
 drone_detect_radius: 100.0
 target_detect_radius: 100.0
 collision_radius: 0.1
