@@ -27,7 +27,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: catch0_5_TP_blocked
+  run_name: catch0_5_TP_blocked_rejection
   # run_name: debug
   job_type: train
   entity: chenjy
