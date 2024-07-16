@@ -20,6 +20,8 @@ use_eval: 0
 # # evalution scenario
 # evaluation_flag: null # '3_cylineder_line', '5_cylineder_line', '8_cylineder_ring', '7_cylineder_ring'
 
+scenario_flag: '2cylinders' # '4rooms'
+
 # exp
 num_agents: 3
 use_wall_blocked: 1
