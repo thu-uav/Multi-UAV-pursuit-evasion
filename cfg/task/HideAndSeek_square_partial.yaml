@@ -27,7 +27,7 @@ history_step: 10
 future_predcition_step: 5
 window_step: 10
 
-arena_size: 2.0
+arena_size: 2.2
 v_drone: 1.0
 v_prey: 1.3
 
