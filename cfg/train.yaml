@@ -27,13 +27,13 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: catch1_0_TP_blocked_worejection
-  run_name: debug
+  run_name: catch0_5_TP_blocked_near5cylinders
+  # run_name: debug
   job_type: train
   entity: chenjy
   project: pursuit-evasion
-  mode: disabled
-  # mode: online # set to 'disabled' when debugging locally, online
+  # mode: disabled
+  mode: online # set to 'disabled' when debugging locally, online
   run_id: 
   monitor_gym: True
   tags: 
