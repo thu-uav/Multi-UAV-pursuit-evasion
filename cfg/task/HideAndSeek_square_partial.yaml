@@ -20,7 +20,7 @@ use_eval: 0
 # # evalution scenario
 # evaluation_flag: null # '3_cylineder_line', '5_cylineder_line', '8_cylineder_ring', '7_cylineder_ring'
 
-scenario_flag: '2cylinders' # '4rooms'
+scenario_flag: '2cylinders' # '2cylinders', '4rooms', 'debug'
 
 # exp
 num_agents: 3
@@ -46,6 +46,7 @@ collision_radius: 0.1
 cylinder:
   size: 0.1
   num: 2
+  obs_max_cylinder: 5
   # max_active: 3
   # min_active: 0
   # random_active: False # if False, only train max_active
