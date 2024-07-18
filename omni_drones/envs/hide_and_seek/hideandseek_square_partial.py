@@ -306,8 +306,9 @@ class HideAndSeek_square_partial(IsaacEnv):
         self.history_step = self.cfg.task.history_step
         self.window_step = self.cfg.task.window_step
         self.obs_max_cylinder = self.cfg.task.cylinder.obs_max_cylinder
+        self.use_prediction_net = self.cfg.task.use_prediction_net
 
-        if self.drone.n > 1:
+        if self.use_prediction_net:
             observation_spec = CompositeSpec({
                 "state_self": UnboundedContinuousTensorSpec((1, 3 + 3 * self.future_predcition_step + self.time_encoding_dim + 13)),
                 "state_others": UnboundedContinuousTensorSpec((self.drone.n-1, 3)), # pos
@@ -316,6 +317,7 @@ class HideAndSeek_square_partial(IsaacEnv):
         else:
             observation_spec = CompositeSpec({
                 "state_self": UnboundedContinuousTensorSpec((1, 3 + self.time_encoding_dim + 13)),
+                "state_others": UnboundedContinuousTensorSpec((self.drone.n-1, 3)), # pos
                 "cylinders": UnboundedContinuousTensorSpec((self.obs_max_cylinder, 5)), # pos + radius + height
             }).to(self.device)
         state_spec = CompositeSpec({
@@ -753,29 +755,48 @@ class HideAndSeek_square_partial(IsaacEnv):
         self.stats["target_predicted_error"].add_(torch.norm(self.predicted_next - target_pos.squeeze(1), dim=-1).unsqueeze(-1))
         self.predicted_next = self.target_pos_predicted[:, 0].clone() # update
 
-        obs["state_self"] = torch.cat(
-            [
-             target_rpos_masked.reshape(self.num_envs, self.num_agents, -1),
-             target_rpos_predicted,
-             self.drone_states[..., 3:10],
-             self.drone_states[..., 13:19],
-             t.expand(-1, self.num_agents, self.time_encoding_dim),
-             ], dim=-1
-        ).unsqueeze(2)
+        if self.use_prediction_net:
+            obs["state_self"] = torch.cat(
+                [
+                target_rpos_masked.reshape(self.num_envs, self.num_agents, -1),
+                target_rpos_predicted,
+                self.drone_states[..., 3:10],
+                self.drone_states[..., 13:19],
+                t.expand(-1, self.num_agents, self.time_encoding_dim),
+                ], dim=-1
+            ).unsqueeze(2)
+        else:
+            obs["state_self"] = torch.cat(
+                [
+                target_rpos_masked.reshape(self.num_envs, self.num_agents, -1),
+                self.drone_states[..., 3:10],
+                self.drone_states[..., 13:19],
+                t.expand(-1, self.num_agents, self.time_encoding_dim),
+                ], dim=-1
+            ).unsqueeze(2)
                          
         # state_others
         if self.drone.n > 1:
             obs["state_others"] = self.drone_rpos
         
         state = TensorDict({}, [self.num_envs])
-        state["state_drones"] = torch.cat(
-            [target_rpos.reshape(self.num_envs, self.num_agents, -1),
-             target_rpos_predicted,
-             self.drone_states[..., 3:10],
-             self.drone_states[..., 13:19],
-             t.expand(-1, self.num_agents, self.time_encoding_dim),
-             ], dim=-1
-        )   # [num_envs, drone.n, drone_state_dim]
+        if self.use_prediction_net:
+            state["state_drones"] = torch.cat(
+                [target_rpos.reshape(self.num_envs, self.num_agents, -1),
+                target_rpos_predicted,
+                self.drone_states[..., 3:10],
+                self.drone_states[..., 13:19],
+                t.expand(-1, self.num_agents, self.time_encoding_dim),
+                ], dim=-1
+            )   # [num_envs, drone.n, drone_state_dim]
+        else:
+            state["state_drones"] = torch.cat(
+                [target_rpos.reshape(self.num_envs, self.num_agents, -1),
+                self.drone_states[..., 3:10],
+                self.drone_states[..., 13:19],
+                t.expand(-1, self.num_agents, self.time_encoding_dim),
+                ], dim=-1
+            )   # [num_envs, drone.n, drone_state_dim]
         state["cylinders"] = self.k_nearest_cylinders
 
         # draw drone trajectory and detection range
@@ -808,8 +829,10 @@ class HideAndSeek_square_partial(IsaacEnv):
         # guidance, share distance reward
         min_dist = torch.min(target_dist, dim=-1).values.unsqueeze(-1).expand_as(target_dist)
         active_distance_reward = (min_dist > self.catch_radius).float()
-        # share distance reward
-        distance_reward = - self.dist_reward_coef * min_dist * active_distance_reward
+        # # share distance reward
+        # distance_reward = - self.dist_reward_coef * min_dist * active_distance_reward
+        # individual distance reward
+        distance_reward = - self.dist_reward_coef * target_dist * active_distance_reward
         self.stats['distance_reward'].add_(distance_reward.mean(-1).unsqueeze(-1))
         
         # detect

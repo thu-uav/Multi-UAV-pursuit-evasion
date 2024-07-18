@@ -25,6 +25,7 @@ scenario_flag: '2cylinders' # '2cylinders', '4rooms', 'debug'
 # exp
 num_agents: 3
 use_wall_blocked: 1
+use_prediction_net: 1
 history_step: 10
 future_predcition_step: 5
 window_step: 10
