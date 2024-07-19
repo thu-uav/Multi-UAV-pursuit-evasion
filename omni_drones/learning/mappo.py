@@ -91,7 +91,7 @@ class MAPPOPolicy(object):
         self.make_critic()
         self.TP_net = TP_net
         self.TP_optimizer = torch.optim.Adam(self.TP_net.parameters(), lr=0.0001)
-        # self.TP_criterion = nn.MSELoss()
+        self.TP_criterion = nn.MSELoss()
 
         self.train_in_keys = list(
             set(
@@ -251,11 +251,15 @@ class MAPPOPolicy(object):
     def update_TP(self, batch: TensorDict) -> Dict[str, Any]:
         future_step = batch['TP_groundtruth'].shape[1]
         pos_dim = batch['TP_groundtruth'].shape[2]
-        TP_groundtruth = batch['TP_groundtruth'] # range: (-1, 1)
+        batch_size = batch['TP_groundtruth'].shape[0]
         TP_input = batch['TP_input']
-        TP_output = self.TP_net(TP_input).reshape(-1, future_step, pos_dim) # range: (-1, 1)
-        # loss = self.TP_criterion(TP_output, TP_groundtruth)
-        loss = torch.mean(torch.norm(TP_output - TP_groundtruth, dim=-1).mean(1), dim=0)
+        TP_groundtruth = batch['TP_groundtruth'] # range: (-1, 1)
+        
+        # TP_output = self.TP_net(TP_input).reshape(-1, future_step, pos_dim) # range: (-1, 1)
+        # loss = torch.mean(torch.norm(TP_output - TP_groundtruth, dim=-1).mean(1), dim=0)
+        
+        TP_output = self.TP_net(TP_input)
+        loss = self.TP_criterion(TP_output, TP_groundtruth.reshape(batch_size, -1))
         
         self.TP_optimizer.zero_grad()
         loss.backward()

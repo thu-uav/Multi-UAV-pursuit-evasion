@@ -5,8 +5,8 @@ headless: true
 sim: ${task.sim}
 env: ${task.env}
 
-# model_dir: /home/jiayu/OmniDrones/scripts/outputs/catch0_5_individual_distance_reward/07-18_15-57/wandb/run-20240718_155742-ek1le0el/files/checkpoint_812908544.pt
-# model_dir: /home/jiayu/OmniDrones/scripts/outputs/catch1_0_TP_blocked_near5cylinders_arena5/07-17_22-13/wandb/run-20240717_221354-itzcp4f6/files/checkpoint_2700345344.pt
+# model_dir: /home/jiayu/OmniDrones/scripts/outputs/catch0_5_TP_window1/07-19_12-00/wandb/run-20240719_120034-qehz35x7/files/checkpoint_629407744.pt
+# model_dir: /home/jiayu/OmniDrones/scripts/outputs/catch0_5_woTP/07-18_20-21/wandb/run-20240718_202134-1ojwouuo/files/checkpoint_1101266944.pt
 model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
@@ -27,13 +27,13 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: catch0_5_individual_distance_reward_eval
-  run_name: debug
+  run_name: catch0_5_TP_window1_allfutureMSEloss
+  # run_name: debug
   job_type: train
   entity: chenjy
   project: pursuit-evasion
-  mode: disabled
-  # mode: online # set to 'disabled' when debugging locally, online
+  # mode: disabled
+  mode: online # set to 'disabled' when debugging locally, online
   run_id: 
   monitor_gym: True
   tags: 
