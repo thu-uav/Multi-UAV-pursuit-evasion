@@ -426,7 +426,7 @@ class MAPPOPolicy(object):
                 # tensordict,
                 int(self.cfg.num_minibatches),
                 self.minibatch_seq_len if hasattr(self, "minibatch_seq_len") else 1,
-            )   
+            )
             for minibatch in dataset:
                 TP_info.append(
                     TensorDict(

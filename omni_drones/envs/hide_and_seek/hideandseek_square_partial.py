@@ -243,6 +243,7 @@ class HideAndSeek_square_partial(IsaacEnv):
         self.use_eval = self.cfg.task.use_eval
         self.use_wall_blocked = self.cfg.task.use_wall_blocked
         self.capture = torch.zeros(self.num_envs, 3, device=self.device)
+        self.use_target_groundtruth = self.cfg.task.use_target_groundtruth
         
         self.central_env_pos = Float3(
             *self.envs_positions[self.central_env_idx].tolist()
@@ -293,7 +294,12 @@ class HideAndSeek_square_partial(IsaacEnv):
         # TP net
         # self.TP = TP_net(input_dim=self.num_agents * 6, output_dim = 3 * self.future_predcition_step).to(self.device)
         # TODO: use history target
-        self.TP = TP_net(input_dim = 3 + 3 * self.num_agents, output_dim = 3 * self.future_predcition_step, future_predcition_step = self.future_predcition_step, window_step=self.window_step).to(self.device)
+        if self.use_target_groundtruth:
+            # target pos, target vel, target_rpos_mask
+            self.TP = TP_net(input_dim = 3 + 3 + 3 * self.num_agents, output_dim = 3 * self.future_predcition_step, future_predcition_step = self.future_predcition_step, window_step=self.window_step).to(self.device)
+        else:
+            # target vel, target_rpos_mask
+            self.TP = TP_net(input_dim = 3 + 3 * self.num_agents, output_dim = 3 * self.future_predcition_step, future_predcition_step = self.future_predcition_step, window_step=self.window_step).to(self.device)
         self.history_step = self.cfg.task.history_step
         self.history_data = collections.deque(maxlen=self.history_step)
         self.predicted_next = torch.zeros(self.num_envs, 3, device=self.device) # only one step
@@ -307,6 +313,7 @@ class HideAndSeek_square_partial(IsaacEnv):
         self.window_step = self.cfg.task.window_step
         self.obs_max_cylinder = self.cfg.task.cylinder.obs_max_cylinder
         self.use_prediction_net = self.cfg.task.use_prediction_net
+        self.use_target_groundtruth = self.cfg.task.use_target_groundtruth
 
         if self.use_prediction_net:
             observation_spec = CompositeSpec({
@@ -326,11 +333,16 @@ class HideAndSeek_square_partial(IsaacEnv):
         }).to(self.device)
         # TP network
         # TODO: use the history target(easy), use the obs of drones(hard)
-        TP_spec = CompositeSpec({
-            # "TP_input": UnboundedContinuousTensorSpec((self.history_step, self.num_agents * 6)),
-            "TP_input": UnboundedContinuousTensorSpec((self.history_step, 3)),
-            "TP_groundtruth": UnboundedContinuousTensorSpec((1, 3)),
-        }).to(self.device)
+        if self.use_target_groundtruth:
+            TP_spec = CompositeSpec({
+                "TP_input": UnboundedContinuousTensorSpec((self.history_step, 3 + 3 + self.num_agents * 3)),
+                "TP_groundtruth": UnboundedContinuousTensorSpec((1, 3)),
+            }).to(self.device)
+        else:
+            TP_spec = CompositeSpec({
+                "TP_input": UnboundedContinuousTensorSpec((self.history_step, 3 + self.num_agents * 3)),
+                "TP_groundtruth": UnboundedContinuousTensorSpec((1, 3)),
+            }).to(self.device)
         
         self.observation_spec = CompositeSpec({
             "agents": CompositeSpec({
@@ -617,6 +629,7 @@ class HideAndSeek_square_partial(IsaacEnv):
 
         # target_pos = self.init_target_pos_dist.sample((*env_ids.shape, 1))
         self.target.set_world_poses(positions=target_pos + self.envs_positions[env_ids].unsqueeze(1), env_indices=env_ids)
+        target_vel = self.target.get_velocities()
 
         # reset stats
         self.stats[env_ids] = 0.
@@ -638,17 +651,26 @@ class HideAndSeek_square_partial(IsaacEnv):
         detect = in_detection_range * (~ self.blocked.unsqueeze(-1))
         # broadcast the detect info to all drones
         broadcast_detect = torch.any(detect, dim=1).unsqueeze(1).expand(-1, self.num_agents, -1)
-        target_mask = (~ broadcast_detect).unsqueeze(-1).expand_as(target_rpos) # [num_envs, num_agents, 1, 3]
+        target_pos_mask = (~ broadcast_detect).unsqueeze(-1).expand_as(target_rpos) # [num_envs, num_agents, 1, 3]
         target_rpos_masked = target_rpos.clone()
-        target_rpos_masked.masked_fill_(target_mask, self.mask_value)
+        target_rpos_masked.masked_fill_(target_pos_mask, self.mask_value)
+        target_vel_masked = target_vel[..., :3].clone()
+        target_vel_mask = torch.any(detect, dim=1).unsqueeze(-1).expand_as(target_vel_masked)
+        target_vel_masked.masked_fill_(target_vel_mask, self.mask_value)
         for i in range(self.history_step):
             # target pos, target rpos flatten
-            frame_state = torch.concat([
-                target_pos.squeeze(1),
-                target_rpos_masked.reshape(self.num_envs, -1)
-            ], dim=-1)
+            if self.use_target_groundtruth:
+                frame_state = torch.concat([
+                    target_pos.squeeze(1),
+                    target_vel_mask.squeeze(1),
+                    target_rpos_masked.reshape(self.num_envs, -1)
+                ], dim=-1)
+            else:
+                frame_state = torch.concat([
+                    target_vel_mask.squeeze(1),
+                    target_rpos_masked.reshape(self.num_envs, -1)
+                ], dim=-1)
             self.history_data.append(frame_state)
-            # self.history_data.append(torch.ones(self.num_envs, 3 + 3 * self.num_agents, device = self.device) * self.mask_value)
 
     def _pre_sim_step(self, tensordict: TensorDictBase):   
         actions = tensordict[("agents", "action")]
@@ -714,6 +736,7 @@ class HideAndSeek_square_partial(IsaacEnv):
 
         # state_self
         target_pos, _ = self.get_env_poses(self.target.get_world_poses())
+        target_vel = self.target.get_velocities()
         target_rpos = vmap(cpos)(drone_pos, target_pos) # [num_envs, num_agents, 1, 3]
         # self.blocked use in the _compute_reward_and_done
         # _get_dummy_policy_prey: recompute the blocked
@@ -726,26 +749,29 @@ class HideAndSeek_square_partial(IsaacEnv):
         detect = in_detection_range * (~ self.blocked.unsqueeze(-1))
         # broadcast the detect info to all drones
         broadcast_detect = torch.any(detect, dim=1).unsqueeze(1).expand(-1, self.num_agents, -1)
-        target_mask = (~ broadcast_detect).unsqueeze(-1).expand_as(target_rpos) # [num_envs, num_agents, 1, 3]
+        target_pos_mask = (~ broadcast_detect).unsqueeze(-1).expand_as(target_rpos) # [num_envs, num_agents, 1, 3]
         target_rpos_masked = target_rpos.clone()
-        target_rpos_masked.masked_fill_(target_mask, self.mask_value)
-
+        target_rpos_masked.masked_fill_(target_pos_mask, self.mask_value)
+        target_vel_masked = target_vel[..., :3].clone()
+        target_vel_mask = torch.any(detect, dim=1).unsqueeze(-1).expand_as(target_vel_masked)
+        target_vel_masked.masked_fill_(target_vel_mask, self.mask_value)        
+        
         t = (self.progress_buf / self.max_episode_length).unsqueeze(-1).unsqueeze(-1)
 
-        # TODO: use the predicted target_rpos to replace target_rpos_masked
         # use the real target pos to supervise the TP network
         TP = TensorDict({}, [self.num_envs])
-        # # input: the history positions and velocity of all drones
-        # current_input_states = torch.concat([
-        #     drone_pos,
-        #     self.drone_states[..., 7:10],
-        # ], dim=-1).reshape(self.num_envs, -1) # [num_envs, 3 * 6]
-        # self.history_data.append(current_input_states)
-        # TODO: debug, use the history states of target
-        frame_state = torch.concat([
-            target_pos.squeeze(1),
-            target_rpos_masked.reshape(self.num_envs, -1)
-        ], dim=-1)
+        if self.use_target_groundtruth:
+            frame_state = torch.concat([
+                target_pos.squeeze(1),
+                target_vel_masked.squeeze(1),
+                target_rpos_masked.reshape(self.num_envs, -1)
+            ], dim=-1)
+        else:
+            frame_state = torch.concat([
+                # target_pos.squeeze(1),
+                target_vel_masked.squeeze(1),
+                target_rpos_masked.reshape(self.num_envs, -1)
+            ], dim=-1)
         self.history_data.append(frame_state)
         TP["TP_input"] = torch.stack(list(self.history_data), dim=1).to(self.device)
         # target_pos_predicted, x, y -> [-0.5 * self.arena_size, 0.5 * self.arena_size]
