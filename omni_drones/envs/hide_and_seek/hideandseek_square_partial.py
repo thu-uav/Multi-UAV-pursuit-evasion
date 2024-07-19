@@ -428,6 +428,15 @@ class HideAndSeek_square_partial(IsaacEnv):
                                 [0.0, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
                                 [0.0, - 2 * self.cylinder_size, 0.5 * self.cylinder_height],
                             ], device=self.device)
+        elif self.scenario_flag == '6cylinders':
+            cylinders_pos = torch.tensor([
+                                [0.0, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                [0.0, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                [0.0, 6 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                [0.0, - 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                [0.0, - 4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                [0.0, - 6 * self.cylinder_size, 0.5 * self.cylinder_height],
+                            ], device=self.device)
         elif self.scenario_flag == '4rooms':
             # 4 rooms
             corner_center = 0.5
@@ -596,6 +605,9 @@ class HideAndSeek_square_partial(IsaacEnv):
                                 [-0.4, -0.4, 0.5],
                                 [-0.7, -0.4, 0.5],
                                 [-0.4, -0.7, 0.5],
+                            ], device=self.device)[:self.num_agents].unsqueeze(0).expand(self.num_envs, -1, -1)
+            target_pos = torch.tensor([
+                                [0.8, 0.8, 0.5],
                             ], device=self.device)[:self.num_agents].unsqueeze(0).expand(self.num_envs, -1, -1)
         self.drone.set_world_poses(
             drone_pos + self.envs_positions[env_ids].unsqueeze(1), rot, env_ids
