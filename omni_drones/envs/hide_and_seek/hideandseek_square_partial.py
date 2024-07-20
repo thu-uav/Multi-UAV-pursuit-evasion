@@ -434,6 +434,102 @@ class HideAndSeek_square_partial(IsaacEnv):
                                     [0.0, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
                                     [0.0, - 2 * self.cylinder_size, 0.5 * self.cylinder_height],
                                 ], device=self.device)
+            elif self.scenario_flag == 'cross': # 17 cylinders, size = 3
+                cylinders_pos = torch.tensor([
+                                    [0.0, 0.0, 0.5 * self.cylinder_height],
+                                    [0.0, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [0.0, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [0.0, - 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [0.0, - 4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [2 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
+                                    [4 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
+                                    [- 2 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
+                                    [- 4 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
+                                    [10.0 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
+                                    [12.0 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
+                                    [-10.0 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
+                                    [-12.0 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
+                                    [0.0, 10.0 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [0.0, 12.0 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [0.0, - 10.0 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [0.0, - 12.0 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                ], device=self.device)
+            elif self.scenario_flag == 'corner': # 20 cylinders, size = 3 
+                cylinders_pos = torch.tensor([
+                                    [4 * self.cylinder_size, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [4 * self.cylinder_size, 6 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [4 * self.cylinder_size, 8 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [6 * self.cylinder_size, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [8 * self.cylinder_size, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-4 * self.cylinder_size, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-4 * self.cylinder_size, 6 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-4 * self.cylinder_size, 8 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-6 * self.cylinder_size, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-8 * self.cylinder_size, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [4 * self.cylinder_size, -4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [4 * self.cylinder_size, -6 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [4 * self.cylinder_size, -8 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [6 * self.cylinder_size, -4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [8 * self.cylinder_size, -4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-4 * self.cylinder_size, -4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-4 * self.cylinder_size, -6 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-4 * self.cylinder_size, -8 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-6 * self.cylinder_size, -4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-8 * self.cylinder_size, -4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                ], device=self.device)
+            elif self.scenario_flag == 'narrow': # 10 cylinders, size = 3
+                cylinders_pos = torch.tensor([
+                                    [4 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
+                                    [6 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
+                                    [8 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
+                                    [10 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
+                                    [12 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
+                                    [-4 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
+                                    [-6 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
+                                    [-8 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
+                                    [-10 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
+                                    [-12 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
+                                ], device=self.device)
+            elif self.scenario_flag == 'maze': # 37 cylinders, size = 3
+                cylinders_pos = torch.tensor([
+                                    [2 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
+                                    [2 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [2 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [0.0, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-2 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-4 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-6 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-8 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-8 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
+                                    [-8 * self.cylinder_size, -2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-8 * self.cylinder_size, -4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-8 * self.cylinder_size, -6 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-8 * self.cylinder_size, -8 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-6 * self.cylinder_size, -8 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-4 * self.cylinder_size, -8 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-2 * self.cylinder_size, -8 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [0 * self.cylinder_size, -8 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [2 * self.cylinder_size, -8 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [4 * self.cylinder_size, -8 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [6 * self.cylinder_size, -8 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [8 * self.cylinder_size, -8 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [8 * self.cylinder_size, -6 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [8 * self.cylinder_size, -4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [8 * self.cylinder_size, -2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [8 * self.cylinder_size, 0 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [8 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [8 * self.cylinder_size, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [8 * self.cylinder_size, 6 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [8 * self.cylinder_size, 8 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [6 * self.cylinder_size, 8 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [4 * self.cylinder_size, 8 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [2 * self.cylinder_size, 8 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [0 * self.cylinder_size, 8 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-2 * self.cylinder_size, 8 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-4 * self.cylinder_size, 8 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-6 * self.cylinder_size, 8 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-8 * self.cylinder_size, 8 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                ], device=self.device)          
             elif self.scenario_flag == '6cylinders':
                 cylinders_pos = torch.tensor([
                                     [0.0, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
@@ -443,51 +539,6 @@ class HideAndSeek_square_partial(IsaacEnv):
                                     [0.0, - 4 * self.cylinder_size, 0.5 * self.cylinder_height],
                                     [0.0, - 6 * self.cylinder_size, 0.5 * self.cylinder_height],
                                 ], device=self.device)
-            elif self.scenario_flag == '4rooms':
-                # 4 rooms
-                corner_center = 0.5
-                cylinders_pos_room1 = torch.tensor([
-                                    [corner_center, corner_center, 0.5 * self.cylinder_height],
-                                    [corner_center, corner_center + 2 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                    [corner_center, corner_center + 4 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                    [corner_center, corner_center + 6 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                    [corner_center + 2 * self.cylinder_size, corner_center, 0.5 * self.cylinder_height],
-                                    [corner_center + 4 * self.cylinder_size, corner_center, 0.5 * self.cylinder_height],
-                                    [corner_center + 6 * self.cylinder_size, corner_center, 0.5 * self.cylinder_height],
-                                ], device=self.device)
-                cylinders_pos_room2 = torch.tensor([
-                                    [corner_center, -corner_center, 0.5 * self.cylinder_height],
-                                    [corner_center, -corner_center - 2 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                    [corner_center, -corner_center - 4 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                    [corner_center, -corner_center - 6 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                    [corner_center + 2 * self.cylinder_size, -corner_center, 0.5 * self.cylinder_height],
-                                    [corner_center + 4 * self.cylinder_size, -corner_center, 0.5 * self.cylinder_height],
-                                    [corner_center + 6 * self.cylinder_size, -corner_center, 0.5 * self.cylinder_height],
-                                ], device=self.device)
-                cylinders_pos_room3 = torch.tensor([
-                                    [-corner_center, corner_center, 0.5 * self.cylinder_height],
-                                    [-corner_center, corner_center + 2 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                    [-corner_center, corner_center + 4 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                    [-corner_center, corner_center + 6 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                    [-corner_center - 2 * self.cylinder_size, corner_center, 0.5 * self.cylinder_height],
-                                    [-corner_center - 4 * self.cylinder_size, corner_center, 0.5 * self.cylinder_height],
-                                    [-corner_center - 6 * self.cylinder_size, corner_center, 0.5 * self.cylinder_height],
-                                ], device=self.device)
-                cylinders_pos_room4 = torch.tensor([
-                                    [-corner_center, -corner_center, 0.5 * self.cylinder_height],
-                                    [-corner_center, -corner_center - 2 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                    [-corner_center, -corner_center - 4 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                    [-corner_center, -corner_center - 6 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                    [-corner_center - 2 * self.cylinder_size, -corner_center, 0.5 * self.cylinder_height],
-                                    [-corner_center - 4 * self.cylinder_size, -corner_center, 0.5 * self.cylinder_height],
-                                    [-corner_center - 6 * self.cylinder_size, -corner_center, 0.5 * self.cylinder_height],
-                                ], device=self.device)
-                cylinders_pos = torch.concat([
-                                cylinders_pos_room1, 
-                                cylinders_pos_room2,
-                                cylinders_pos_room3, 
-                                cylinders_pos_room4,
-                                ], dim=0)
 
         # init drone
         drone_model = MultirotorBase.REGISTRY[self.cfg.task.drone_model]
@@ -519,18 +570,6 @@ class HideAndSeek_square_partial(IsaacEnv):
                 height=self.cylinder_height,
                 mass=1000000.0
             )
-
-        # self.cylinders_prims = [None] * self.num_cylinders
-        # self.cylinders_size = []
-        # for idx in range(self.num_cylinders):
-        #     self.cylinders_size.append(self.cylinder_size)
-        #     attributes = {'axis': 'Z', 'radius': self.cylinder_size, 'height': self.cylinder_height}
-        #     self.cylinders_prims[idx] = create_obstacle(
-        #         "/World/envs/env_0/cylinder_{}".format(idx), 
-        #         prim_type="Cylinder",
-        #         translation=cylinders_pos[idx],
-        #         attributes=attributes
-        #     ) # Use 'self.cylinders_prims[0].GetAttribute('radius').Get()' to get attributes
 
         objects.DynamicCuboid(
             prim_path="/World/envs/env_0/wall0",
@@ -810,10 +849,7 @@ class HideAndSeek_square_partial(IsaacEnv):
         TP["TP_groundtruth"][..., 2] = TP["TP_groundtruth"][..., 2] / self.arena_size * 2.0 - 1.0
          
         target_rpos_predicted = (drone_pos.unsqueeze(2) - self.target_pos_predicted.unsqueeze(1)).view(self.num_envs, self.num_agents, -1)
-        # target_rpos_predicted = vmap(cpos)(drone_pos, self.target_pos_predicted.unsqueeze(1))
-        # if True, choose target_rpos_predicted, else target_rpos
-        # obs_target_rpos = torch.where(target_mask, target_rpos_predicted, target_rpos)
-        
+
         # compute one-step error
         self.stats["target_predicted_error"].add_(torch.norm(self.predicted_next - target_pos.squeeze(1), dim=-1).unsqueeze(-1))
         self.predicted_next = self.target_pos_predicted[:, 0].clone() # update
