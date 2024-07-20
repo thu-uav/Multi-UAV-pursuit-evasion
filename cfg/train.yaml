@@ -27,7 +27,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: catch0_5_TP_window1_2cylinders_TPinput_wogt
+  run_name: TP_window1_6cylinders
   # run_name: debug
   job_type: train
   entity: chenjy

@@ -421,13 +421,13 @@ class HideAndSeek_square_partial(IsaacEnv):
             target_pos = torch.concat([target_pos[0], target_pos_z], dim=-1)
         else:
             drone_pos = torch.tensor([
-                                [-0.7, -0.7, 0.5],
-                                [-0.4, -0.4, 0.5],
-                                [-0.7, -0.4, 0.5],
-                                [-0.4, -0.7, 0.5],
+                                [-0.8, -0.1, 0.5],
+                                [-0.8, 0.1, 0.5],
+                                [-1.2, -0.1, 0.5],
+                                [-1.2, 0.1, 0.5],
                             ], device=self.device)[:self.num_agents]
             target_pos = torch.tensor([
-                                [0.5, 0.5, 0.5],
+                                [1.0, 0.0, 0.5],
                             ], device=self.device)[:self.num_agents]
             if self.scenario_flag == '2cylinders':
                 cylinders_pos = torch.tensor([
