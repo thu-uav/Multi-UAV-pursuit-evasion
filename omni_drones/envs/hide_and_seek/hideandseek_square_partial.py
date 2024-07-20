@@ -409,25 +409,98 @@ class HideAndSeek_square_partial(IsaacEnv):
         self.cylinder_size = self.cfg.task.cylinder.size
         self.cylinder_height = self.max_height
         self.scenario_flag = self.cfg.task.scenario_flag
+        self.use_random_cylinder = self.cfg.task.use_random_cylinder
+
+        if self.use_random_cylinder:
+            cylinders_pos, drone_pos, target_pos = self.rejection_sampling_random_cylinder(torch.arange(1))
+            drone_pos_z = torch.ones(self.num_agents, 1, device=self.device) * 0.5
+            target_pos_z = torch.ones(1, 1, device=self.device) * 0.5
+            cylinder_pos_z = torch.ones(self.num_cylinders, 1, device=self.device) * 0.5 * self.cylinder_height
+            cylinders_pos = torch.concat([cylinders_pos[0], cylinder_pos_z], dim=-1)
+            drone_pos = torch.concat([drone_pos[0], drone_pos_z], dim=-1)
+            target_pos = torch.concat([target_pos[0], target_pos_z], dim=-1)
+        else:
+            drone_pos = torch.tensor([
+                                [-0.7, -0.7, 0.5],
+                                [-0.4, -0.4, 0.5],
+                                [-0.7, -0.4, 0.5],
+                                [-0.4, -0.7, 0.5],
+                            ], device=self.device)[:self.num_agents]
+            target_pos = torch.tensor([
+                                [0.5, 0.5, 0.5],
+                            ], device=self.device)[:self.num_agents]
+            if self.scenario_flag == '2cylinders':
+                cylinders_pos = torch.tensor([
+                                    [0.0, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [0.0, - 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                ], device=self.device)
+            elif self.scenario_flag == '6cylinders':
+                cylinders_pos = torch.tensor([
+                                    [0.0, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [0.0, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [0.0, 6 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [0.0, - 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [0.0, - 4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [0.0, - 6 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                ], device=self.device)
+            elif self.scenario_flag == '4rooms':
+                # 4 rooms
+                corner_center = 0.5
+                cylinders_pos_room1 = torch.tensor([
+                                    [corner_center, corner_center, 0.5 * self.cylinder_height],
+                                    [corner_center, corner_center + 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [corner_center, corner_center + 4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [corner_center, corner_center + 6 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [corner_center + 2 * self.cylinder_size, corner_center, 0.5 * self.cylinder_height],
+                                    [corner_center + 4 * self.cylinder_size, corner_center, 0.5 * self.cylinder_height],
+                                    [corner_center + 6 * self.cylinder_size, corner_center, 0.5 * self.cylinder_height],
+                                ], device=self.device)
+                cylinders_pos_room2 = torch.tensor([
+                                    [corner_center, -corner_center, 0.5 * self.cylinder_height],
+                                    [corner_center, -corner_center - 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [corner_center, -corner_center - 4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [corner_center, -corner_center - 6 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [corner_center + 2 * self.cylinder_size, -corner_center, 0.5 * self.cylinder_height],
+                                    [corner_center + 4 * self.cylinder_size, -corner_center, 0.5 * self.cylinder_height],
+                                    [corner_center + 6 * self.cylinder_size, -corner_center, 0.5 * self.cylinder_height],
+                                ], device=self.device)
+                cylinders_pos_room3 = torch.tensor([
+                                    [-corner_center, corner_center, 0.5 * self.cylinder_height],
+                                    [-corner_center, corner_center + 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-corner_center, corner_center + 4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-corner_center, corner_center + 6 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-corner_center - 2 * self.cylinder_size, corner_center, 0.5 * self.cylinder_height],
+                                    [-corner_center - 4 * self.cylinder_size, corner_center, 0.5 * self.cylinder_height],
+                                    [-corner_center - 6 * self.cylinder_size, corner_center, 0.5 * self.cylinder_height],
+                                ], device=self.device)
+                cylinders_pos_room4 = torch.tensor([
+                                    [-corner_center, -corner_center, 0.5 * self.cylinder_height],
+                                    [-corner_center, -corner_center - 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-corner_center, -corner_center - 4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-corner_center, -corner_center - 6 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-corner_center - 2 * self.cylinder_size, -corner_center, 0.5 * self.cylinder_height],
+                                    [-corner_center - 4 * self.cylinder_size, -corner_center, 0.5 * self.cylinder_height],
+                                    [-corner_center - 6 * self.cylinder_size, -corner_center, 0.5 * self.cylinder_height],
+                                ], device=self.device)
+                cylinders_pos = torch.concat([
+                                cylinders_pos_room1, 
+                                cylinders_pos_room2,
+                                cylinders_pos_room3, 
+                                cylinders_pos_room4,
+                                ], dim=0)
 
         # init drone
         drone_model = MultirotorBase.REGISTRY[self.cfg.task.drone_model]
         cfg = drone_model.cfg_cls(force_sensor=self.cfg.task.force_sensor)
         cfg.rigid_props.max_linear_velocity = self.cfg.task.v_drone
         self.drone: MultirotorBase = drone_model(cfg=cfg)
-        drone_pos = torch.tensor([
-                            [-0.7, -0.7, 0.5],
-                            [-0.4, -0.4, 0.5],
-                            [-0.7, -0.4, 0.5],
-                            [-0.4, -0.7, 0.5],
-                        ], device=self.device)[:self.num_agents]
         self.drone.spawn(drone_pos)
         
         # init prey
         objects.DynamicSphere(
             prim_path="/World/envs/env_0/target",
             name="target",
-            translation=(0.5, 0.5, 0.5),
+            translation=target_pos,
             radius=0.05,
             color=torch.tensor([1., 0., 0.]),
             mass=1.0
@@ -435,74 +508,6 @@ class HideAndSeek_square_partial(IsaacEnv):
 
         # cylinders with physcical properties
         self.cylinders_size = []
-        if self.scenario_flag == '2cylinders':
-            cylinders_pos = torch.tensor([
-                                [0.0, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [0.0, - 2 * self.cylinder_size, 0.5 * self.cylinder_height],
-                            ], device=self.device)
-        elif self.scenario_flag == '6cylinders':
-            cylinders_pos = torch.tensor([
-                                [0.0, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [0.0, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [0.0, 6 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [0.0, - 2 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [0.0, - 4 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [0.0, - 6 * self.cylinder_size, 0.5 * self.cylinder_height],
-                            ], device=self.device)
-        elif self.scenario_flag == '4rooms':
-            # 4 rooms
-            corner_center = 0.5
-            cylinders_pos_room1 = torch.tensor([
-                                [corner_center, corner_center, 0.5 * self.cylinder_height],
-                                [corner_center, corner_center + 2 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [corner_center, corner_center + 4 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [corner_center, corner_center + 6 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [corner_center + 2 * self.cylinder_size, corner_center, 0.5 * self.cylinder_height],
-                                [corner_center + 4 * self.cylinder_size, corner_center, 0.5 * self.cylinder_height],
-                                [corner_center + 6 * self.cylinder_size, corner_center, 0.5 * self.cylinder_height],
-                            ], device=self.device)
-            cylinders_pos_room2 = torch.tensor([
-                                [corner_center, -corner_center, 0.5 * self.cylinder_height],
-                                [corner_center, -corner_center - 2 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [corner_center, -corner_center - 4 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [corner_center, -corner_center - 6 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [corner_center + 2 * self.cylinder_size, -corner_center, 0.5 * self.cylinder_height],
-                                [corner_center + 4 * self.cylinder_size, -corner_center, 0.5 * self.cylinder_height],
-                                [corner_center + 6 * self.cylinder_size, -corner_center, 0.5 * self.cylinder_height],
-                            ], device=self.device)
-            cylinders_pos_room3 = torch.tensor([
-                                [-corner_center, corner_center, 0.5 * self.cylinder_height],
-                                [-corner_center, corner_center + 2 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [-corner_center, corner_center + 4 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [-corner_center, corner_center + 6 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [-corner_center - 2 * self.cylinder_size, corner_center, 0.5 * self.cylinder_height],
-                                [-corner_center - 4 * self.cylinder_size, corner_center, 0.5 * self.cylinder_height],
-                                [-corner_center - 6 * self.cylinder_size, corner_center, 0.5 * self.cylinder_height],
-                            ], device=self.device)
-            cylinders_pos_room4 = torch.tensor([
-                                [-corner_center, -corner_center, 0.5 * self.cylinder_height],
-                                [-corner_center, -corner_center - 2 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [-corner_center, -corner_center - 4 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [-corner_center, -corner_center - 6 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [-corner_center - 2 * self.cylinder_size, -corner_center, 0.5 * self.cylinder_height],
-                                [-corner_center - 4 * self.cylinder_size, -corner_center, 0.5 * self.cylinder_height],
-                                [-corner_center - 6 * self.cylinder_size, -corner_center, 0.5 * self.cylinder_height],
-                            ], device=self.device)
-            cylinders_pos = torch.concat([
-                            cylinders_pos_room1, 
-                            cylinders_pos_room2,
-                            cylinders_pos_room3, 
-                            cylinders_pos_room4,
-                            ], dim=0)
-        elif self.scenario_flag == 'debug':
-            cylinders_pos = torch.tensor([
-                                [0.0, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [0.0, - 2 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [0.0, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [0.0, - 4 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [2 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
-                                [- 2 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
-                            ], device=self.device)
         for idx in range(self.num_cylinders):
             # orientation = None
             self.cylinders_size.append(self.cylinder_size)
@@ -594,6 +599,26 @@ class HideAndSeek_square_partial(IsaacEnv):
         objects_grid = select_unoccupied_positions(grid_map, self.num_agents + 1)
         objects_pos = grid_to_continuous(objects_grid, boundary, grid_size, center_pos, center_grid)
         return objects_pos[:, :self.num_agents], objects_pos[:, self.num_agents:]
+
+    def rejection_sampling_random_cylinder(self, env_ids: torch.Tensor):
+        # init for drones and target
+        grid_size = 2 * self.cylinder_size
+        num_grid = int(self.arena_size / grid_size)
+        boundary = self.arena_size - 0.1
+        grid_map = torch.zeros((len(env_ids), num_grid, num_grid), device=self.device, dtype=torch.int)
+        # set the boundary = 1
+        grid_map[:, 0] = 1.0
+        grid_map[:, -1] = 1.0
+        grid_map[:, :, 0] = 1.0
+        grid_map[:, :, -1] = 1.0
+        center_pos = torch.zeros((len(env_ids), 1, 2), device=self.device)
+        center_grid = torch.ones((len(env_ids), 1, 2), device=self.device, dtype=torch.int) * int(num_grid / 2)
+        
+        objects_grid = select_unoccupied_positions(grid_map, self.num_cylinders + self.num_agents + 1)
+        objects_pos = grid_to_continuous(objects_grid, boundary, grid_size, center_pos, center_grid)
+        return objects_pos[:, :self.num_cylinders], \
+            objects_pos[:, self.num_cylinders:self.num_agents + self.num_cylinders], \
+            objects_pos[:, self.num_agents + self.num_cylinders:]
 
     def _reset_idx(self, env_ids: torch.Tensor):
         self.drone._reset_idx(env_ids)

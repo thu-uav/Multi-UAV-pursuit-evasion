@@ -45,6 +45,7 @@ drone_detect_radius: 100.0
 target_detect_radius: 100.0
 collision_radius: 0.1
 
+use_random_cylinder: 0
 cylinder:
   size: 0.1
   num: 2
