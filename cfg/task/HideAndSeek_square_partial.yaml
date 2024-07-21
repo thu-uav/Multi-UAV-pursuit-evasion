@@ -31,9 +31,8 @@ use_prediction_net: 1
 history_step: 10
 future_predcition_step: 5
 window_step: 1
-use_target_groundtruth: 0
 
-arena_size: 3.0
+arena_size: 2.2
 v_drone: 1.0
 v_prey: 1.3
 
