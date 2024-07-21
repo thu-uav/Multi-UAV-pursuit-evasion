@@ -682,6 +682,9 @@ class HideAndSeek_square_partial(IsaacEnv):
                                 [-0.7, -0.4, 0.5],
                                 [-0.4, -0.7, 0.5],
                             ], device=self.device)[:self.num_agents].unsqueeze(0).expand(self.num_envs, -1, -1)
+            # target_pos = torch.tensor([
+            #                     [-0.8, -0.8, 0.5],
+            #                 ], device=self.device)[:self.num_agents].unsqueeze(0).expand(self.num_envs, -1, -1)
             target_pos = torch.tensor([
                                 [0.8, 0.8, 0.5],
                             ], device=self.device)[:self.num_agents].unsqueeze(0).expand(self.num_envs, -1, -1)
@@ -719,7 +722,7 @@ class HideAndSeek_square_partial(IsaacEnv):
         target_rpos_masked = target_rpos.clone()
         target_rpos_masked.masked_fill_(target_pos_mask, self.mask_value)
         target_vel_masked = target_vel[..., :3].clone()
-        target_vel_mask = torch.any(detect, dim=1).unsqueeze(-1).expand_as(target_vel_masked)
+        target_vel_mask = ~torch.any(detect, dim=1).unsqueeze(-1).expand_as(target_vel_masked)
         target_vel_masked.masked_fill_(target_vel_mask, self.mask_value)
         for i in range(self.history_step):
             # target pos, target rpos flatten
@@ -817,7 +820,7 @@ class HideAndSeek_square_partial(IsaacEnv):
         target_rpos_masked = target_rpos.clone()
         target_rpos_masked.masked_fill_(target_pos_mask, self.mask_value)
         target_vel_masked = target_vel[..., :3].clone()
-        target_vel_mask = torch.any(detect, dim=1).unsqueeze(-1).expand_as(target_vel_masked)
+        target_vel_mask = ~torch.any(detect, dim=1).unsqueeze(-1).expand_as(target_vel_masked)
         target_vel_masked.masked_fill_(target_vel_mask, self.mask_value)        
         
         t = (self.progress_buf / self.max_episode_length).unsqueeze(-1).unsqueeze(-1)
@@ -843,6 +846,8 @@ class HideAndSeek_square_partial(IsaacEnv):
         self.target_pos_predicted = self.TP(TP["TP_input"]).reshape(self.num_envs, self.future_predcition_step, -1) # [num_envs, 3 * future_step]
         self.target_pos_predicted[..., :2] = self.target_pos_predicted[..., :2] * 0.5 * self.arena_size
         self.target_pos_predicted[..., 2] = (self.target_pos_predicted[..., 2] + 1.0) / 2.0 * self.arena_size
+        # if self.progress_buf[0] > 200:
+        #     breakpoint()
         # TP_groundtruth: clip to (-1.0, 1.0)
         TP["TP_groundtruth"] = target_pos.squeeze(1).clone()
         TP["TP_groundtruth"][..., :2] = TP["TP_groundtruth"][..., :2] / (0.5 * self.arena_size)
