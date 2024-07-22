@@ -1027,7 +1027,7 @@ class HideAndSeek_square_partial(IsaacEnv):
         if torch.any(done):
             if self.stats["success"].mean() > 0.95:
                 self.current_L = min(100, self.current_L + 1)
-                self.stats["distance_threshold_L"].set_(self.current_L * torch.ones_like(self.stats["distance_threshold_L"]))
+            self.stats["distance_threshold_L"].set_(self.current_L * torch.ones_like(self.stats["distance_threshold_L"]))
 
         ep_len = self.progress_buf.unsqueeze(-1)
         self.stats["collision"].div_(
