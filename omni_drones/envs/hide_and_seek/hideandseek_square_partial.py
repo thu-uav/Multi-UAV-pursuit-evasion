@@ -241,7 +241,7 @@ class HideAndSeek_square_partial(IsaacEnv):
         self.speed_coef = self.cfg.task.speed_coef
         self.dist_reward_coef = self.cfg.task.dist_reward_coef
         self.use_eval = self.cfg.task.use_eval
-        self.use_wall_blocked = self.cfg.task.use_wall_blocked
+        self.use_partial_obs = self.cfg.task.use_partial_obs
         self.capture = torch.zeros(self.num_envs, 3, device=self.device)
         
         self.central_env_pos = Float3(
@@ -284,7 +284,7 @@ class HideAndSeek_square_partial(IsaacEnv):
                 torch.tensor([0.0, 0.0, 0.0], device=self.device) * torch.pi
             )
 
-        self.mask_value = -1e9
+        self.mask_value = -5
         self.draw = _debug_draw.acquire_debug_draw_interface()
 
         # for deployment
@@ -694,10 +694,7 @@ class HideAndSeek_square_partial(IsaacEnv):
 
         target_rpos = vmap(cpos)(drone_pos, target_pos) # [num_envs, num_agents, 1, 3]
         # self.blocked use in the _compute_reward_and_done
-        if self.use_wall_blocked:
-            self.blocked = is_line_blocked_by_cylinder(drone_pos, target_pos, cylinders_pos, self.cylinder_size)
-        else:
-            self.blocked = torch.zeros(self.num_envs, self.num_agents, device = self.device).type(torch.bool)
+        self.blocked = is_line_blocked_by_cylinder(drone_pos, target_pos, cylinders_pos, self.cylinder_size)
         in_detection_range = (torch.norm(target_rpos, dim=-1) < self.drone_detect_radius)
         # detect: [num_envs, num_agents, 1]
         detect = in_detection_range * (~ self.blocked.unsqueeze(-1))
@@ -786,10 +783,7 @@ class HideAndSeek_square_partial(IsaacEnv):
         target_rpos = vmap(cpos)(drone_pos, target_pos) # [num_envs, num_agents, 1, 3]
         # self.blocked use in the _compute_reward_and_done
         # _get_dummy_policy_prey: recompute the blocked
-        if self.use_wall_blocked:
-            self.blocked = is_line_blocked_by_cylinder(drone_pos, target_pos, cylinders_pos, self.cylinder_size)
-        else:
-            self.blocked = torch.zeros(self.num_envs, self.num_agents, device = self.device).type(torch.bool)
+        self.blocked = is_line_blocked_by_cylinder(drone_pos, target_pos, cylinders_pos, self.cylinder_size)
         in_detection_range = (torch.norm(target_rpos, dim=-1) < self.drone_detect_radius)
         # detect: [num_envs, num_agents, 1]
         detect = in_detection_range * (~ self.blocked.unsqueeze(-1))
@@ -845,14 +839,24 @@ class HideAndSeek_square_partial(IsaacEnv):
                 ], dim=-1
             ).unsqueeze(2)
         else:
-            obs["state_self"] = torch.cat(
-                [
-                target_rpos_masked.reshape(self.num_envs, self.num_agents, -1),
-                self.drone_states[..., 3:10],
-                self.drone_states[..., 13:19],
-                t.expand(-1, self.num_agents, self.time_encoding_dim),
-                ], dim=-1
-            ).unsqueeze(2)
+            if self.use_partial_obs:
+                obs["state_self"] = torch.cat(
+                    [
+                    target_rpos_masked.reshape(self.num_envs, self.num_agents, -1),
+                    self.drone_states[..., 3:10],
+                    self.drone_states[..., 13:19],
+                    t.expand(-1, self.num_agents, self.time_encoding_dim),
+                    ], dim=-1
+                ).unsqueeze(2)
+            else:
+                obs["state_self"] = torch.cat(
+                    [
+                    target_rpos.reshape(self.num_envs, self.num_agents, -1),
+                    self.drone_states[..., 3:10],
+                    self.drone_states[..., 13:19],
+                    t.expand(-1, self.num_agents, self.time_encoding_dim),
+                    ], dim=-1
+                ).unsqueeze(2)
                          
         # state_others
         if self.drone.n > 1:
@@ -1042,10 +1046,7 @@ class HideAndSeek_square_partial(IsaacEnv):
 
         # pursuers
         dist_pos = torch.norm(target_rpos, dim=-1).squeeze(1).unsqueeze(-1)
-        if self.use_wall_blocked:
-            blocked = is_line_blocked_by_cylinder(drone_pos, target_pos, cylinders_pos, self.cylinder_size)
-        else:
-            blocked = torch.zeros(self.num_envs, self.num_agents, device = self.device).type(torch.bool)
+        blocked = is_line_blocked_by_cylinder(drone_pos, target_pos, cylinders_pos, self.cylinder_size)
         detect_drone = (dist_pos < self.target_detect_radius).squeeze(-1)
 
         # active_drone: if drone is in th detect range, get force from it
