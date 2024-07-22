@@ -108,6 +108,37 @@ def select_unoccupied_positions(occupancy_matrix, n):
         all_chosen_coords.append(chosen_coords)  
     return torch.stack(all_chosen_coords)   
 
+def select_unoccupied_positions_conditionedL(occupancy_matrix, n, L):
+    batch_size, height, width = occupancy_matrix.shape
+    all_chosen_coords = []
+    for i in range(batch_size):
+        available_coords = torch.nonzero(occupancy_matrix[i] == 0, as_tuple=False)
+
+        if available_coords.size(0) < n:
+            raise ValueError(f"Not enough available coordinates in batch {i} to choose from")
+
+        # select drones pos
+        choose_index = torch.randperm(available_coords.size(0))
+        chosen_coords = available_coords[choose_index[:n-1]]
+        remaining_coords = available_coords[choose_index[n-1:]]
+
+        # average pos of drones
+        avg_position = torch.mean(chosen_coords.float(), dim=0)
+
+        # select target，|dist_target - dist_avg| < L
+        # L ~ [1, max]
+        distances = torch.norm(remaining_coords.float() - avg_position, dim=1)
+        valid_indices = torch.nonzero(distances < L, as_tuple=False).squeeze()
+
+        if valid_indices.numel() == 0:
+            raise ValueError(f"No valid coordinates found within distance L in batch {i}")
+
+        last_coord = remaining_coords[valid_indices[torch.randint(0, valid_indices.size(0), (1,))]]
+        chosen_coords = torch.cat((chosen_coords, last_coord), dim=0)
+        all_chosen_coords.append(chosen_coords)
+
+    return torch.stack(all_chosen_coords)
+
 def grid_to_continuous(grid_coords, boundary, grid_size, center_pos, center_grid):
     """
     Convert grid coordinates to continuous coordinates.
@@ -243,6 +274,7 @@ class HideAndSeek_square_partial(IsaacEnv):
         self.use_eval = self.cfg.task.use_eval
         self.use_partial_obs = self.cfg.task.use_partial_obs
         self.capture = torch.zeros(self.num_envs, 3, device=self.device)
+        self.current_L = 3 # 3 ~ sqrt(2) * grid_map_length
         
         self.central_env_pos = Float3(
             *self.envs_positions[self.central_env_idx].tolist()
@@ -373,6 +405,7 @@ class HideAndSeek_square_partial(IsaacEnv):
             "action_error_order1_mean": UnboundedContinuousTensorSpec(1),
             "action_error_order1_max": UnboundedContinuousTensorSpec(1),
             "target_predicted_error": UnboundedContinuousTensorSpec(1),
+            "distance_threshold_L": UnboundedContinuousTensorSpec(1),
         }).expand(self.num_envs).to(self.device)
         info_spec = CompositeSpec({
             "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13), device=self.device),
@@ -620,7 +653,8 @@ class HideAndSeek_square_partial(IsaacEnv):
         flat_indices = cylinders_grid.view(len(env_ids), -1, 2).to(torch.long)
         # set occupied
         grid_map[batch_indices, flat_indices[:, :, 0], flat_indices[:, :, 1]] = 1
-        objects_grid = select_unoccupied_positions(grid_map, self.num_agents + 1)
+        # objects_grid = select_unoccupied_positions(grid_map, self.num_agents + 1)
+        objects_grid = select_unoccupied_positions_conditionedL(grid_map, self.num_agents + 1, self.current_L)
         objects_pos = grid_to_continuous(objects_grid, boundary, grid_size, center_pos, center_grid)
         return objects_pos[:, :self.num_agents], objects_pos[:, self.num_agents:]
 
@@ -989,6 +1023,11 @@ class HideAndSeek_square_partial(IsaacEnv):
         done  = (
             (self.progress_buf >= self.max_episode_length).unsqueeze(-1)
         )
+
+        if torch.any(done):
+            if self.stats["success"].mean() > 0.0:
+                self.current_L = min(100, self.current_L + 1)
+                self.stats["distance_threshold_L"].set_(self.current_L * torch.ones_like(self.stats["distance_threshold_L"]))
 
         ep_len = self.progress_buf.unsqueeze(-1)
         self.stats["collision"].div_(
