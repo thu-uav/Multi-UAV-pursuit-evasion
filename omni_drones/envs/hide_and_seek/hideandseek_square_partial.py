@@ -271,6 +271,7 @@ class HideAndSeek_square_partial(IsaacEnv):
         self.collision_coef = self.cfg.task.collision_coef
         self.speed_coef = self.cfg.task.speed_coef
         self.dist_reward_coef = self.cfg.task.dist_reward_coef
+        self.use_predicted_dist_reward = self.cfg.task.use_predicted_dist_reward
         self.use_eval = self.cfg.task.use_eval
         self.use_partial_obs = self.cfg.task.use_partial_obs
         self.capture = torch.zeros(self.num_envs, 3, device=self.device)
@@ -392,6 +393,7 @@ class HideAndSeek_square_partial(IsaacEnv):
             "success": UnboundedContinuousTensorSpec(1),
             "collision": UnboundedContinuousTensorSpec(1),
             "distance_reward": UnboundedContinuousTensorSpec(1),
+            "distance_predicted_reward": UnboundedContinuousTensorSpec(1),
             "speed_reward": UnboundedContinuousTensorSpec(1),
             "collision_reward": UnboundedContinuousTensorSpec(1),
             "collision_wall": UnboundedContinuousTensorSpec(1),
@@ -822,13 +824,13 @@ class HideAndSeek_square_partial(IsaacEnv):
         # detect: [num_envs, num_agents, 1]
         detect = in_detection_range * (~ self.blocked.unsqueeze(-1))
         # broadcast the detect info to all drones
-        broadcast_detect = torch.any(detect, dim=1)
-        target_rpos_mask = (~ broadcast_detect).unsqueeze(-1).unsqueeze(-1).expand_as(target_rpos) # [num_envs, num_agents, 1, 3]
+        self.broadcast_detect = torch.any(detect, dim=1)
+        target_rpos_mask = (~ self.broadcast_detect).unsqueeze(-1).unsqueeze(-1).expand_as(target_rpos) # [num_envs, num_agents, 1, 3]
         target_rpos_masked = target_rpos.clone()
         target_rpos_masked.masked_fill_(target_rpos_mask, self.mask_value)
         
         # TP input
-        target_mask = (~ broadcast_detect).unsqueeze(-1).expand_as(target_pos)
+        target_mask = (~ self.broadcast_detect).unsqueeze(-1).expand_as(target_pos)
         target_pos_masked = target_pos.clone()
         target_pos_masked.masked_fill_(target_mask, self.mask_value)   
         target_vel_masked = target_vel[..., :3].clone()
@@ -942,21 +944,25 @@ class HideAndSeek_square_partial(IsaacEnv):
         
         # [num_envs, num_agents]
         target_dist = torch.norm(target_pos - drone_pos, dim=-1)
+        predicted_target_dist = torch.norm(self.target_pos_predicted[:, 0].unsqueeze(1) - drone_pos, dim=-1)
 
-        # guidance, share distance reward
+        # guidance, individual distance reward
         min_dist = torch.min(target_dist, dim=-1).values.unsqueeze(-1).expand_as(target_dist)
         active_distance_reward = (min_dist > self.catch_radius).float()
-        # # share distance reward
-        # distance_reward = - self.dist_reward_coef * min_dist * active_distance_reward
-        # individual distance reward
-        distance_reward = - self.dist_reward_coef * target_dist * active_distance_reward
+        expanded_broadcast_detect = self.broadcast_detect.expand(-1, self.num_agents)
+        if self.use_predicted_dist_reward:
+            distance_reward = - self.dist_reward_coef * \
+                (target_dist * expanded_broadcast_detect.float() + \
+                predicted_target_dist * (~expanded_broadcast_detect).float()) * active_distance_reward
+        else:
+            distance_reward = - self.dist_reward_coef * target_dist * active_distance_reward
         self.stats['distance_reward'].add_(distance_reward.mean(-1).unsqueeze(-1))
         
+        # guidance, if detected, - dist_to_target
+        # else, - dist_to_predicted
+        
         # detect
-        detect = (target_dist < self.drone_detect_radius)
-        masked_detect = detect * (~ self.blocked).float()
-        broadcast_detect = torch.any(masked_detect, dim=-1).unsqueeze(-1).expand_as(masked_detect) # cooperative reward
-        detect_reward = self.detect_reward_coef * broadcast_detect
+        detect_reward = self.detect_reward_coef * self.broadcast_detect.expand(-1, self.num_agents)
         # if detect, current_capture_step = progress_buf
         # else, current_capture_step = max_episode_length
         detect_flag = torch.any(detect_reward, dim=1)
