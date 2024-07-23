@@ -27,8 +27,8 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: TP_6cylinders_add_predicted_dist_reward
-  # run_name: debug
+  # run_name: TP_6cylinders_add_predicted_dist_reward
+  run_name: cross_demo
   job_type: train
   entity: chenjy
   project: pursuit-evasion

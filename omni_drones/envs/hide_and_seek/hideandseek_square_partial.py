@@ -968,7 +968,7 @@ class HideAndSeek_square_partial(IsaacEnv):
         detect_reward = self.detect_reward_coef * self.broadcast_detect.expand(-1, self.num_agents)
         # if detect, current_capture_step = progress_buf
         # else, current_capture_step = max_episode_length
-        detect_flag = torch.any(detect_reward, dim=1)
+        detect_flag = torch.any(self.broadcast_detect.expand(-1, self.num_agents), dim=1)
         self.stats['sum_detect_step'] += 1.0 * detect_flag.unsqueeze(1)
         self.stats['detect_reward'].add_(detect_reward.mean(-1).unsqueeze(-1))
         
