@@ -26,6 +26,9 @@ scenario_flag: '6cylinders' # '2cylinders', '4rooms', '6cylinders', 'cross', ''
 num_agents: 3
 use_partial_obs: 1 # sanity check
 
+# naive cl
+use_naive_cl: 0
+
 # TP net param
 use_prediction_net: 1 # only used in use_partial_obs = 1
 history_step: 10

@@ -275,6 +275,7 @@ class HideAndSeek_square_partial(IsaacEnv):
         self.use_eval = self.cfg.task.use_eval
         self.use_partial_obs = self.cfg.task.use_partial_obs
         self.capture = torch.zeros(self.num_envs, 3, device=self.device)
+        self.use_naive_cl = self.cfg.task.use_naive_cl
         self.current_L = 3 # 3 ~ sqrt(2) * grid_map_length
         
         self.central_env_pos = Float3(
@@ -655,8 +656,10 @@ class HideAndSeek_square_partial(IsaacEnv):
         flat_indices = cylinders_grid.view(len(env_ids), -1, 2).to(torch.long)
         # set occupied
         grid_map[batch_indices, flat_indices[:, :, 0], flat_indices[:, :, 1]] = 1
-        # objects_grid = select_unoccupied_positions(grid_map, self.num_agents + 1)
-        objects_grid = select_unoccupied_positions_conditionedL(grid_map, self.num_agents + 1, self.current_L)
+        if self.use_naive_cl:
+            objects_grid = select_unoccupied_positions_conditionedL(grid_map, self.num_agents + 1, self.current_L)
+        else:
+            objects_grid = select_unoccupied_positions(grid_map, self.num_agents + 1)
         objects_pos = grid_to_continuous(objects_grid, boundary, grid_size, center_pos, center_grid)
         return objects_pos[:, :self.num_agents], objects_pos[:, self.num_agents:]
 
