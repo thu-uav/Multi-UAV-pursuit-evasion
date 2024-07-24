@@ -6,7 +6,7 @@ sim: ${task.sim}
 env: ${task.env}
 
 # model_dir: /home/jiayu/OmniDrones/scripts/outputs/catch0_5_TP_window1/07-19_12-00/wandb/run-20240719_120034-qehz35x7/files/checkpoint_629407744.pt
-# model_dir: /home/jiayu/OmniDrones/scripts/outputs/7cylinders_newreward/07-24_15-31/wandb/run-20240724_153115-5wdmi6it/files/checkpoint_943980544.pt
+# model_dir: /home/jiayu/OmniDrones/scripts/outputs/7cylinders/07-24_21-23/wandb/run-20240724_212324-uo9pzyim/files/checkpoint_209977344.pt
 model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
@@ -25,8 +25,8 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: narrow_arena3
-  # run_name: debug
+  run_name: narrow
+  # run_name: 1corner_eval
   job_type: train
   entity: chenjy
   project: pursuit-evasion

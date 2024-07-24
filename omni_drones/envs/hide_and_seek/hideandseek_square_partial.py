@@ -490,6 +490,7 @@ class HideAndSeek_square_partial(IsaacEnv):
     def _design_scene(self): # for render
         self.num_agents = self.cfg.task.num_agents
         self.num_cylinders = self.cfg.task.cylinder.num
+        self.max_cylinders = self.cfg.task.max_num
         self.drone_detect_radius = self.cfg.task.drone_detect_radius
         self.target_detect_radius = self.cfg.task.target_detect_radius
         self.catch_radius = self.cfg.task.catch_radius
@@ -554,20 +555,20 @@ class HideAndSeek_square_partial(IsaacEnv):
                                 ], device=self.device)
                 self.num_cylinders = 21
             elif self.scenario_flag == '1corner': # 5 cylinders, size = 3 
-                # cylinders_pos = torch.tensor([
-                #                     [2 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
-                #                     [2 * self.cylinder_size, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
-                #                     [2 * self.cylinder_size, 6 * self.cylinder_size, 0.5 * self.cylinder_height],
-                #                     [4 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
-                #                     [6 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
-                #                 ], device=self.device) # arena = 2.2
                 cylinders_pos = torch.tensor([
-                                    [4 * self.cylinder_size, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                    [4 * self.cylinder_size, 6 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                    [4 * self.cylinder_size, 8 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                    [6 * self.cylinder_size, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                    [8 * self.cylinder_size, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                ], device=self.device) # arena = 3.0
+                                    [2 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [2 * self.cylinder_size, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [2 * self.cylinder_size, 6 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [4 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [6 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                ], device=self.device) # arena = 2.2
+                # cylinders_pos = torch.tensor([
+                #                     [4 * self.cylinder_size, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                #                     [4 * self.cylinder_size, 6 * self.cylinder_size, 0.5 * self.cylinder_height],
+                #                     [4 * self.cylinder_size, 8 * self.cylinder_size, 0.5 * self.cylinder_height],
+                #                     [6 * self.cylinder_size, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                #                     [8 * self.cylinder_size, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                #                 ], device=self.device) # arena = 3.0
                 self.num_cylinders = 5
                 drone_pos = torch.tensor([
                                     [-0.8, -0.1, 0.5],
@@ -612,12 +613,12 @@ class HideAndSeek_square_partial(IsaacEnv):
                                     [0.0, -6 * self.cylinder_size, 0.5 * self.cylinder_height],
                                     [0.0, -8 * self.cylinder_size, 0.5 * self.cylinder_height],
                                     [0.0, -10 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                    [0.0, 12 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                    [0.0, -12 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                    [0.0, 14 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                    [0.0, -14 * self.cylinder_size, 0.5 * self.cylinder_height], # size = 3.0
+                                    # [0.0, 12 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    # [0.0, -12 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    # [0.0, 14 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    # [0.0, -14 * self.cylinder_size, 0.5 * self.cylinder_height], # size = 3.0
                                 ], device=self.device)
-                self.num_cylinders = 13
+                self.num_cylinders = 9
             elif self.scenario_flag == 'maze': # 37 cylinders, size = 3
                 cylinders_pos = torch.tensor([
                                     [2 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
@@ -658,6 +659,17 @@ class HideAndSeek_square_partial(IsaacEnv):
                                     [-6 * self.cylinder_size, 8 * self.cylinder_size, 0.5 * self.cylinder_height],
                                     [-8 * self.cylinder_size, 8 * self.cylinder_size, 0.5 * self.cylinder_height],
                                 ], device=self.device)          
+            elif self.scenario_flag == '7cylinders':
+                cylinders_pos = torch.tensor([
+                                    [0.0, 0.0, 0.5 * self.cylinder_height],
+                                    [0.0, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [0.0, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [0.0, 6 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [0.0, - 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [0.0, - 4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [0.0, - 6 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                ], device=self.device)
+                self.num_cylinders = 7
             elif self.scenario_flag == '9cylinders':
                 cylinders_pos = torch.tensor([
                                     [0.0, 0.0, 0.5 * self.cylinder_height],
@@ -812,15 +824,22 @@ class HideAndSeek_square_partial(IsaacEnv):
     def _reset_idx(self, env_ids: torch.Tensor):
         self.drone._reset_idx(env_ids)
         
-        # init cylinder
-        cylinders_pos, _ = self.get_env_poses(self.cylinders.get_world_poses())
-        
-        drone_pos_xy, target_pos_xy = self.rejection_sampling_for_init(cylinders_pos, env_ids)
-        drone_pos_z = self.init_drone_pos_dist_z.sample((*env_ids.shape, self.num_agents))
-        target_pos_z = self.init_target_pos_dist_z.sample((*env_ids.shape, 1))
-        drone_pos = torch.concat([drone_pos_xy, drone_pos_z], dim=-1)
-        target_pos = torch.concat([target_pos_xy, target_pos_z], dim=-1)
-        self.min_dist[env_ids] = float(torch.inf) # reset min distance
+        if self.use_random_cylinder:
+            cylinders_pos, drone_pos, target_pos = self.rejection_sampling_random_cylinder(env_ids)
+            drone_pos_z = self.init_drone_pos_dist_z.sample((*env_ids.shape, self.num_agents))
+            target_pos_z = self.init_target_pos_dist_z.sample((*env_ids.shape, 1))
+            cylinder_pos_z = torch.ones(len(env_ids), self.num_cylinders, 1, device=self.device) * 0.5 * self.cylinder_height
+            cylinders_pos = torch.concat([cylinders_pos, cylinder_pos_z], dim=-1)
+            drone_pos = torch.concat([drone_pos_xy, drone_pos_z], dim=-1)
+            target_pos = torch.concat([target_pos_xy, target_pos_z], dim=-1)
+        else:
+            cylinders_pos, _ = self.get_env_poses(self.cylinders.get_world_poses())
+            drone_pos_xy, target_pos_xy = self.rejection_sampling_for_init(cylinders_pos, env_ids)
+            drone_pos_z = self.init_drone_pos_dist_z.sample((*env_ids.shape, self.num_agents))
+            target_pos_z = self.init_target_pos_dist_z.sample((*env_ids.shape, 1))
+            drone_pos = torch.concat([drone_pos_xy, drone_pos_z], dim=-1)
+            target_pos = torch.concat([target_pos_xy, target_pos_z], dim=-1)
+            self.min_dist[env_ids] = float(torch.inf) # reset min distance
         
         # # # TODO: debug
         # drone_pos = drone_pos[53].unsqueeze(0).expand_as(drone_pos)
