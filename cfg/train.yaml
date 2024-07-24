@@ -18,16 +18,14 @@ seed: 0
 viewer:
   resolution: [960, 720]
   # # front
-  # eye: [0., -0.005, 6.]
-  # lookat: [0., 0., 1.]
-  eye: [-1.0, 0.0, 8.]
-  lookat: [0., 0.0, 1.]
-  # eye: [0., -5.0, 10.]
-  # lookat: [0., 4.0, 1.]
+  eye: [-0.005, 0.0, 8.]
+  lookat: [0., 0., 1.]
+  # eye: [-1.0, 0.0, 8.]
+  # lookat: [0., 0.0, 1.]
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: 7cylinders
+  run_name: narrow_arena3
   # run_name: debug
   job_type: train
   entity: chenjy
