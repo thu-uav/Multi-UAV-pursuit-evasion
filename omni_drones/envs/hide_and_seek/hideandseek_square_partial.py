@@ -490,7 +490,7 @@ class HideAndSeek_square_partial(IsaacEnv):
     def _design_scene(self): # for render
         self.num_agents = self.cfg.task.num_agents
         self.num_cylinders = self.cfg.task.cylinder.num
-        self.max_cylinders = self.cfg.task.max_num
+        self.max_cylinders = self.cfg.task.cylinder.max_num
         self.drone_detect_radius = self.cfg.task.drone_detect_radius
         self.target_detect_radius = self.cfg.task.target_detect_radius
         self.catch_radius = self.cfg.task.catch_radius
