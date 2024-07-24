@@ -41,9 +41,8 @@ import time
 import collections
 from omni_drones.learning import TP_net
 
-# drones on land by default
-# only cubes are available as walls
 
+# blocked
 def is_perpendicular_line_intersecting_segment(a, b, c):
     # a: drones, b: target, c: cylinders
     
@@ -455,7 +454,7 @@ class HideAndSeek_square_partial(IsaacEnv):
                                     [0.0, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
                                     [0.0, - 2 * self.cylinder_size, 0.5 * self.cylinder_height],
                                 ], device=self.device)
-            elif self.scenario_flag == 'cross': # 17 cylinders, size = 3
+            elif self.scenario_flag == 'cross': # 13 cylinders, size = 3
                 cylinders_pos = torch.tensor([
                                     [0.0, 0.0, 0.5 * self.cylinder_height],
                                     [0.0, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
@@ -466,16 +465,20 @@ class HideAndSeek_square_partial(IsaacEnv):
                                     [4 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
                                     [- 2 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
                                     [- 4 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
-                                    [10.0 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
-                                    [12.0 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
-                                    [-10.0 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
-                                    [-12.0 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
-                                    [0.0, 10.0 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                    [0.0, 12.0 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                    [0.0, - 10.0 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                    [0.0, - 12.0 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [6.0 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
+                                    [-6.0 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
+                                    [0.0, 6.0 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [0.0, - 6.0 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    # [10.0 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
+                                    # [-10.0 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
+                                    # [0.0, 10.0 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    # [0.0, - 10.0 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    # [12.0 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
+                                    # [-12.0 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
+                                    # [0.0, 12.0 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    # [0.0, - 12.0 * self.cylinder_size, 0.5 * self.cylinder_height],
                                 ], device=self.device)
-            elif self.scenario_flag == '1corner': # 20 cylinders, size = 3 
+            elif self.scenario_flag == '1corner': # 5 cylinders, size = 3 
                 cylinders_pos = torch.tensor([
                                     [2 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
                                     [2 * self.cylinder_size, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
@@ -483,6 +486,15 @@ class HideAndSeek_square_partial(IsaacEnv):
                                     [4 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
                                     [6 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
                                 ], device=self.device)
+                drone_pos = torch.tensor([
+                                    [-0.8, -0.1, 0.5],
+                                    [-0.8, 0.1, 0.5],
+                                    [-1.2, -0.1, 0.5],
+                                    [-1.2, 0.1, 0.5],
+                                ], device=self.device)[:self.num_agents]
+                target_pos = torch.tensor([
+                                    [0.8, 0.8, 0.5],
+                                ], device=self.device)[:self.num_agents]
             elif self.scenario_flag == 'corner': # 20 cylinders, size = 3 
                 cylinders_pos = torch.tensor([
                                     [4 * self.cylinder_size, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
@@ -506,7 +518,7 @@ class HideAndSeek_square_partial(IsaacEnv):
                                     [-6 * self.cylinder_size, -4 * self.cylinder_size, 0.5 * self.cylinder_height],
                                     [-8 * self.cylinder_size, -4 * self.cylinder_size, 0.5 * self.cylinder_height],
                                 ], device=self.device)
-            elif self.scenario_flag == 'narrow':
+            elif self.scenario_flag == 'narrow': # 9 cylinders
                 cylinders_pos = torch.tensor([
                                     [0.0, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
                                     [0.0, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
@@ -695,10 +707,10 @@ class HideAndSeek_square_partial(IsaacEnv):
         boundary = self.arena_size - 0.1
         grid_map = torch.zeros((len(env_ids), num_grid, num_grid), device=self.device, dtype=torch.int)
         # set the boundary = 1
-        grid_map[:, 0] = 1.0
-        grid_map[:, -1] = 1.0
-        grid_map[:, :, 0] = 1.0
-        grid_map[:, :, -1] = 1.0
+        # grid_map[:, 0] = 1.0
+        # grid_map[:, -1] = 1.0
+        # grid_map[:, :, 0] = 1.0
+        # grid_map[:, :, -1] = 1.0
         center_pos = torch.zeros((len(env_ids), 1, 2), device=self.device)
         center_grid = torch.ones((len(env_ids), 1, 2), device=self.device, dtype=torch.int) * int(num_grid / 2)
         
@@ -720,7 +732,7 @@ class HideAndSeek_square_partial(IsaacEnv):
         target_pos_z = self.init_target_pos_dist_z.sample((*env_ids.shape, 1))
         drone_pos = torch.concat([drone_pos_xy, drone_pos_z], dim=-1)
         target_pos = torch.concat([target_pos_xy, target_pos_z], dim=-1)
-    
+            
         # drone_pos = self.init_drone_pos_dist.sample((*env_ids.shape, self.num_agents))
         rpy = self.init_rpy_dist.sample((*env_ids.shape, self.num_agents))
         rot = euler_to_quaternion(rpy)

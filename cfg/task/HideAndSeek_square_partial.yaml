@@ -6,7 +6,7 @@ defaults:
   - /base/sim_base@_here_
 
 env:
-  num_envs: 4096
+  num_envs: 10
   max_episode_length: 800
 
 drone_model: Crazyflie
@@ -18,7 +18,7 @@ action_transform: PIDrate
 # # evalution scenario
 # evaluation_flag: null # '3_cylineder_line', '5_cylineder_line', '8_cylineder_ring', '7_cylineder_ring'
 
-scenario_flag: 'narrow' # '2cylinders', 'narrow', '7cylinders', '1corner', 'corner', 'cross'
+scenario_flag: 'cross' # '2cylinders', 'narrow', '7cylinders', '1corner', 'corner', 'cross'
 
 # exp
 num_agents: 3
@@ -40,8 +40,8 @@ arena_size: 2.2
 v_drone: 1.0
 v_prey: 1.3
 
-dist_reward_coef: 5.0
-catch_reward_coef: 10.0
+dist_reward_coef: 50.0
+catch_reward_coef: 50.0
 detect_reward_coef: 0.0
 collision_coef: 100.0
 speed_coef: 50.0
@@ -52,7 +52,7 @@ collision_radius: 0.1
 
 cylinder:
   size: 0.1
-  num: 9
+  num: 13
   obs_max_cylinder: 5
   # max_active: 3
   # min_active: 0

@@ -6,7 +6,7 @@ sim: ${task.sim}
 env: ${task.env}
 
 # model_dir: /home/jiayu/OmniDrones/scripts/outputs/catch0_5_TP_window1/07-19_12-00/wandb/run-20240719_120034-qehz35x7/files/checkpoint_629407744.pt
-# model_dir: /home/jiayu/OmniDrones/scripts/outputs/TP_6cylinders_exploration/07-22_22-07/wandb/run-20240722_220743-hjyuxnk0/files/checkpoint_2910060544.pt
+# model_dir: /home/jiayu/OmniDrones/scripts/outputs/narrow_TP/07-23_21-58/wandb/run-20240723_215807-5ad5krst/files/checkpoint_2621702144.pt
 model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
@@ -27,8 +27,8 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: TP_6cylinders_add_predicted_dist_reward
-  run_name: narrow_TP
+  # run_name: 7cylinders_newreward
+  run_name: cross
   job_type: train
   entity: chenjy
   project: pursuit-evasion
