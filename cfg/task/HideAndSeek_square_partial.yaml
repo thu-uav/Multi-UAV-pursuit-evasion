@@ -18,14 +18,14 @@ action_transform: PIDrate
 # # evalution scenario
 # evaluation_flag: null # '3_cylineder_line', '5_cylineder_line', '8_cylineder_ring', '7_cylineder_ring'
 
-scenario_flag: 'cross' # '2cylinders', 'narrow', '7cylinders', '1corner', 'corner', 'cross'
+scenario_flag: 'narrow' # '2cylinders', 'narrow', '7cylinders', '1corner', 'corner', 'cross'
 
 # exp
 num_agents: 3
 
 # flag
 use_eval: 0
-use_naive_cl: 0 # use naive cl
+use_teacher: 0
 use_partial_obs: 1
 use_prediction_net: 1 # only used in use_partial_obs = 1
 use_predicted_dist_reward: 0
@@ -52,7 +52,7 @@ collision_radius: 0.1
 
 cylinder:
   size: 0.1
-  num: 13
+  num: 9
   obs_max_cylinder: 5
   # max_active: 3
   # min_active: 0

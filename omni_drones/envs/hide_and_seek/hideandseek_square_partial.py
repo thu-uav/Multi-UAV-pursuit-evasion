@@ -184,6 +184,71 @@ def continuous_to_grid(continuous_coords, num_grid, grid_size, center_pos, cente
     
     return grid_coords
 
+class Teacher(object):
+    def __init__(self, cfg) -> None:
+        self.num_agents = 3
+        self.num_target = 1
+        self._state_buffer = np.zeros((0, 1), dtype=np.float32)
+        self._weight_buffer = np.zeros((0, 1), dtype=np.float32)
+        self._temp_state_buffer = []
+        self.prop_p = 0.7
+        self.buffer_size = 5000
+        self.R_min = cfg.task.catch_radius
+        self.R_max = cfg.task.catch_radius * 1.5
+    
+    def insert(self, states):
+        """
+        input:
+            states: list of np.array(size=(state_dim, ))
+        """
+        self._temp_state_buffer = copy.deepcopy(states)
+
+    def update_curriculum(self, all_weights):
+        mask = (all_weights > self.R_min) & (all_weights < self.R_max)
+        filter_indices = torch.nonzero(mask, as_tuple=True)[0]
+          
+        # concatenate to get all states and all weights
+        all_states = self._temp_state_buffer[filter_indices]
+        all_values = all_weights[filter_indices]
+
+        # random replace
+        if all_states.shape[0] > 0:
+            if self._state_buffer.shape[0] != 0:  # state buffer is not empty
+                num_replace = len(all_states) + len(self._state_buffer) - self.buffer_size
+                if num_replace > 0:
+                    num_left = len(self._state_buffer) - num_replace
+                    random_idx = torch.randperm(self._state_buffer.shape[0])
+                    self._state_buffer = torch.concat([self._state_buffer[random_idx][:num_left], all_states], dim=0)
+                    self._weight_buffer = torch.concat([self._weight_buffer[random_idx][:num_left], all_values], dim=0)
+                else:
+                    self._state_buffer = torch.concat([self._state_buffer, all_states], dim=0)
+                    self._weight_buffer = torch.concat([self._weight_buffer, all_values], dim=0)
+            else:
+                self._state_buffer = copy.deepcopy(all_states)
+                self._weight_buffer = copy.deepcopy(all_values)
+        
+        # reset temp state
+        self._temp_state_buffer = []
+        
+    def empty(self):
+        self._state_buffer = np.zeros((0, 1), dtype=np.float32)
+        self._weight_buffer = np.zeros((0, 1), dtype=np.float32)
+        self._temp_state_buffer = []
+
+    def sample(self, num_samples):
+        """
+        return list of np.array
+        """
+        weights = self._weight_buffer / np.mean(self._weight_buffer)
+        probs = weights / np.sum(weights)
+        sample_idx = np.random.choice(self._state_buffer.shape[0], num_samples, replace=True, p=probs)
+        initial_states = [self._state_buffer[idx] for idx in sample_idx]
+        return initial_states
+    
+    def save_task(self, model_dir, episode):
+        np.save('{}/tasks_{}.npy'.format(model_dir,episode), self._state_buffer)
+        np.save('{}/weights_{}.npy'.format(model_dir,episode), self._weight_buffer)
+
 class HideAndSeek_square_partial(IsaacEnv): 
     """
     HideAndSeek environment designed for curriculum learning.
@@ -273,9 +338,9 @@ class HideAndSeek_square_partial(IsaacEnv):
         self.use_predicted_dist_reward = self.cfg.task.use_predicted_dist_reward
         self.use_eval = self.cfg.task.use_eval
         self.use_partial_obs = self.cfg.task.use_partial_obs
+        self.use_teacher = self.cfg.task.use_teacher
         self.capture = torch.zeros(self.num_envs, 3, device=self.device)
-        self.use_naive_cl = self.cfg.task.use_naive_cl
-        self.current_L = 3 # 3 ~ sqrt(2) * grid_map_length
+        self.min_dist = torch.ones(self.num_envs, 1, device=self.device) * float(torch.inf) # for teacher evaluation
         
         self.central_env_pos = Float3(
             *self.envs_positions[self.central_env_idx].tolist()
@@ -329,6 +394,10 @@ class HideAndSeek_square_partial(IsaacEnv):
         self.history_step = self.cfg.task.history_step
         self.history_data = collections.deque(maxlen=self.history_step)
         self.predicted_next = torch.zeros(self.num_envs, 3, device=self.device) # only one step
+
+        # teacher
+        if self.use_teacher:
+            self.teacher = Teacher(cfg)
 
     def _set_specs(self):        
         drone_state_dim = self.drone.state_spec.shape.numel()
@@ -454,6 +523,7 @@ class HideAndSeek_square_partial(IsaacEnv):
                                     [0.0, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
                                     [0.0, - 2 * self.cylinder_size, 0.5 * self.cylinder_height],
                                 ], device=self.device)
+                self.num_cylinders = 2
             elif self.scenario_flag == 'cross': # 13 cylinders, size = 3
                 cylinders_pos = torch.tensor([
                                     [0.0, 0.0, 0.5 * self.cylinder_height],
@@ -478,6 +548,7 @@ class HideAndSeek_square_partial(IsaacEnv):
                                     # [0.0, 12.0 * self.cylinder_size, 0.5 * self.cylinder_height],
                                     # [0.0, - 12.0 * self.cylinder_size, 0.5 * self.cylinder_height],
                                 ], device=self.device)
+                self.num_cylinders = 13
             elif self.scenario_flag == '1corner': # 5 cylinders, size = 3 
                 cylinders_pos = torch.tensor([
                                     [2 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
@@ -486,6 +557,7 @@ class HideAndSeek_square_partial(IsaacEnv):
                                     [4 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
                                     [6 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
                                 ], device=self.device)
+                self.num_cylinders = 5
                 drone_pos = torch.tensor([
                                     [-0.8, -0.1, 0.5],
                                     [-0.8, 0.1, 0.5],
@@ -534,6 +606,7 @@ class HideAndSeek_square_partial(IsaacEnv):
                                     # [0.0, 14 * self.cylinder_size, 0.5 * self.cylinder_height],
                                     # [0.0, -14 * self.cylinder_size, 0.5 * self.cylinder_height],
                                 ], device=self.device)
+                self.num_cylinders = 9
             elif self.scenario_flag == 'maze': # 37 cylinders, size = 3
                 cylinders_pos = torch.tensor([
                                     [2 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
@@ -584,6 +657,7 @@ class HideAndSeek_square_partial(IsaacEnv):
                                     [0.0, - 4 * self.cylinder_size, 0.5 * self.cylinder_height],
                                     [0.0, - 6 * self.cylinder_size, 0.5 * self.cylinder_height],
                                 ], device=self.device)
+                self.num_cylinders = 7
 
         # init drone
         drone_model = MultirotorBase.REGISTRY[self.cfg.task.drone_model]
@@ -693,10 +767,7 @@ class HideAndSeek_square_partial(IsaacEnv):
         flat_indices = cylinders_grid.view(len(env_ids), -1, 2).to(torch.long)
         # set occupied
         grid_map[batch_indices, flat_indices[:, :, 0], flat_indices[:, :, 1]] = 1
-        if self.use_naive_cl:
-            objects_grid = select_unoccupied_positions_conditionedL(grid_map, self.num_agents + 1, self.current_L)
-        else:
-            objects_grid = select_unoccupied_positions(grid_map, self.num_agents + 1)
+        objects_grid = select_unoccupied_positions(grid_map, self.num_agents + 1)
         objects_pos = grid_to_continuous(objects_grid, boundary, grid_size, center_pos, center_grid)
         return objects_pos[:, :self.num_agents], objects_pos[:, self.num_agents:]
 
@@ -723,7 +794,6 @@ class HideAndSeek_square_partial(IsaacEnv):
     def _reset_idx(self, env_ids: torch.Tensor):
         self.drone._reset_idx(env_ids)
         
-        # TODO, RL output 
         # init cylinder
         cylinders_pos, _ = self.get_env_poses(self.cylinders.get_world_poses())
         
@@ -732,6 +802,20 @@ class HideAndSeek_square_partial(IsaacEnv):
         target_pos_z = self.init_target_pos_dist_z.sample((*env_ids.shape, 1))
         drone_pos = torch.concat([drone_pos_xy, drone_pos_z], dim=-1)
         target_pos = torch.concat([target_pos_xy, target_pos_z], dim=-1)
+        self.min_dist[env_ids] = float(torch.inf) # reset min distance
+        
+        if self.use_teacher:
+            if self.teacher._state_buffer.shape[0] > 1000:
+                num_exploration = len(env_ids) * self.teacher.prop_p
+                num_random = len(env_ids) - num_exploration
+                exploration_tasks = self.teacher.sample(num_exploration)
+                exploration_drone_pos = exploration_tasks[:, :self.num_agents]
+                exploration_target_pos = exploration_tasks[:, self.num_agents:]
+                drone_pos = torch.concat([drone_pos[:num_random], exploration_drone_pos], dim=0)
+                target_pos = torch.concat([target_pos[:num_random], exploration_target_pos], dim=0)
+            # insert
+            current_tasks = torch.concat([drone_pos.reshape(len(env_ids), -1), target_pos.reshape(len(env_ids), -1)], dim=-1)
+            self.teacher.insert(current_tasks)
             
         # drone_pos = self.init_drone_pos_dist.sample((*env_ids.shape, self.num_agents))
         rpy = self.init_rpy_dist.sample((*env_ids.shape, self.num_agents))
@@ -987,8 +1071,11 @@ class HideAndSeek_square_partial(IsaacEnv):
         predicted_target_dist = torch.norm(self.target_pos_predicted[:, 0].unsqueeze(1) - drone_pos, dim=-1)
 
         # guidance, individual distance reward
-        min_dist = torch.min(target_dist, dim=-1).values.unsqueeze(-1).expand_as(target_dist)
-        active_distance_reward = (min_dist > self.catch_radius).float()
+        min_dist = torch.min(target_dist, dim=-1).values.unsqueeze(-1)
+        active_distance_reward = (min_dist.expand_as(target_dist) > self.catch_radius).float()
+        if self.use_teacher:
+            # teacher evaluation
+            self.min_dist = torch.min(torch.concat([self.min_dist, min_dist], dim=-1), dim=-1).values.unsqueeze(-1)
         expanded_broadcast_detect = self.broadcast_detect.expand(-1, self.num_agents)
         if self.use_predicted_dist_reward:
             distance_reward = - self.dist_reward_coef * \
@@ -1071,9 +1158,14 @@ class HideAndSeek_square_partial(IsaacEnv):
         )
 
         if torch.any(done):
-            if self.stats["success"].mean() > 0.95:
-                self.current_L = min(100, self.current_L + 1)
-            self.stats["distance_threshold_L"].set_(self.current_L * torch.ones_like(self.stats["distance_threshold_L"]))
+            # get done index
+            if self.use_teacher:
+                self.teacher.update_curriculum(self.min_dist)
+
+        # if torch.any(done):
+        #     if self.stats["success"].mean() > 0.95:
+        #         self.current_L = min(100, self.current_L + 1)
+        #     self.stats["distance_threshold_L"].set_(self.current_L * torch.ones_like(self.stats["distance_threshold_L"]))
 
         ep_len = self.progress_buf.unsqueeze(-1)
         self.stats["collision"].div_(
