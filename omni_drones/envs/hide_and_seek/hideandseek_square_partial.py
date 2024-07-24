@@ -804,6 +804,10 @@ class HideAndSeek_square_partial(IsaacEnv):
         target_pos = torch.concat([target_pos_xy, target_pos_z], dim=-1)
         self.min_dist[env_ids] = float(torch.inf) # reset min distance
         
+        # # TODO: debug
+        drone_pos = drone_pos[53].unsqueeze(0).expand_as(drone_pos)
+        target_pos = target_pos[53].unsqueeze(0).expand_as(target_pos)
+        
         if self.use_teacher:
             if self.teacher._state_buffer.shape[0] > 1000:
                 num_exploration = len(env_ids) * self.teacher.prop_p
