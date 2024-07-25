@@ -42,7 +42,7 @@ import collections
 from omni_drones.learning import TP_net
 
 
-# blocked
+# *********check whether the capture is blocked***************
 def is_perpendicular_line_intersecting_segment(a, b, c):
     # a: drones, b: target, c: cylinders
     
@@ -93,10 +93,12 @@ def is_line_blocked_by_cylinder(drone_pos, target_pos, cylinder_pos, cylinder_si
 
     return blocked.any(dim=(-1))
 
-# grid initialization
-def select_unoccupied_positions(occupancy_matrix, n):
+# *************grid initialization****************
+def select_unoccupied_positions(occupancy_matrix, num_obstacles, num_drones, num_target):
     batch_size, height, width = occupancy_matrix.shape
+    cylinder_occupancy_matrix = occupancy_matrix.clone()
     all_chosen_coords = []
+    n = num_obstacles + num_drones + num_target
     for i in range(batch_size):
         available_coords = torch.nonzero(occupancy_matrix[i] == 0, as_tuple=False)
 
@@ -104,8 +106,14 @@ def select_unoccupied_positions(occupancy_matrix, n):
             raise ValueError(f"Not enough available coordinates in batch {i} to choose from")
 
         chosen_coords = available_coords[torch.randperm(available_coords.size(0))[:n]]
-        all_chosen_coords.append(chosen_coords)  
-    return torch.stack(all_chosen_coords)   
+        
+        # cylinders
+        cylinder_chosen_coords = chosen_coords[:num_obstacles]
+        cylinder_occupancy_matrix[i][cylinder_chosen_coords[:,0], cylinder_chosen_coords[:,1]] = 1.0
+        
+        all_chosen_coords.append(chosen_coords)
+        
+    return torch.stack(all_chosen_coords), cylinder_occupancy_matrix 
 
 def select_unoccupied_positions_conditionedL(occupancy_matrix, n, L):
     batch_size, height, width = occupancy_matrix.shape
@@ -183,6 +191,40 @@ def continuous_to_grid(continuous_coords, num_grid, grid_size, center_pos, cente
     grid_coords = torch.clamp(grid_coords, 0, num_grid - 1)
     
     return grid_coords
+
+# ****************DFS*****************
+def is_valid_move(matrix, row, col, visited):
+    rows, cols = len(matrix), len(matrix[0])
+    return 0 <= row < rows and 0 <= col < cols and matrix[row][col] == 0 and (row, col) not in visited
+
+def dfs(matrix, start, target, visited):
+    row, col = start
+    if start == target:
+        return True
+
+    visited.add((row, col))
+
+    # up, down, left, right
+    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+
+    for dr, dc in directions:
+        new_row, new_col = row + dr, col + dc
+        if is_valid_move(matrix, new_row, new_col, visited):
+            if dfs(matrix, (new_row, new_col), target, visited):
+                return True
+
+    return False
+
+def has_feasible_path(matrix, start_points, target):
+    reached_targets = 0
+    num_threshold = 3 # num_agents
+    for start_point in start_points:
+        visited = set()
+        if dfs(matrix, start_point, target, visited):
+            reached_targets += 1
+            if reached_targets >= num_threshold:
+                return True
+    return False
 
 class Teacher(object):
     def __init__(self, cfg) -> None:
@@ -335,6 +377,7 @@ class HideAndSeek_square_partial(IsaacEnv):
         self.collision_coef = self.cfg.task.collision_coef
         self.speed_coef = self.cfg.task.speed_coef
         self.dist_reward_coef = self.cfg.task.dist_reward_coef
+        self.smoothness_coef = self.cfg.task.smoothness_coef
         self.use_predicted_dist_reward = self.cfg.task.use_predicted_dist_reward
         self.use_eval = self.cfg.task.use_eval
         self.use_partial_obs = self.cfg.task.use_partial_obs
@@ -470,6 +513,9 @@ class HideAndSeek_square_partial(IsaacEnv):
             "collision_drone": UnboundedContinuousTensorSpec(1),
             "detect_reward": UnboundedContinuousTensorSpec(1),
             "catch_reward": UnboundedContinuousTensorSpec(1),
+            "smoothness_reward": UnboundedContinuousTensorSpec(1),
+            "smoothness_mean": UnboundedContinuousTensorSpec(1),
+            "smoothness_max": UnboundedContinuousTensorSpec(1),
             "first_capture_step": UnboundedContinuousTensorSpec(1),
             "sum_detect_step": UnboundedContinuousTensorSpec(1),
             "return": UnboundedContinuousTensorSpec(1),
@@ -489,7 +535,7 @@ class HideAndSeek_square_partial(IsaacEnv):
         
     def _design_scene(self): # for render
         self.num_agents = self.cfg.task.num_agents
-        self.num_cylinders = self.cfg.task.cylinder.num
+        # self.num_cylinders = self.cfg.task.cylinder.num
         self.max_cylinders = self.cfg.task.cylinder.max_num
         self.drone_detect_radius = self.cfg.task.drone_detect_radius
         self.target_detect_radius = self.cfg.task.target_detect_radius
@@ -500,12 +546,14 @@ class HideAndSeek_square_partial(IsaacEnv):
         self.cylinder_height = self.max_height
         self.scenario_flag = self.cfg.task.scenario_flag
         self.use_random_cylinder = self.cfg.task.use_random_cylinder
+        self.use_DFS_validation = self.cfg.task.use_DFS_validation
 
         if self.use_random_cylinder:
+            self.num_cylinders = self.max_cylinders
             cylinders_pos, drone_pos, target_pos = self.rejection_sampling_random_cylinder(torch.arange(1))
             drone_pos_z = torch.ones(self.num_agents, 1, device=self.device) * 0.5
             target_pos_z = torch.ones(1, 1, device=self.device) * 0.5
-            cylinder_pos_z = torch.ones(self.num_cylinders, 1, device=self.device) * 0.5 * self.cylinder_height
+            cylinder_pos_z = torch.ones(self.max_cylinders, 1, device=self.device) * 0.5 * self.cylinder_height
             cylinders_pos = torch.concat([cylinders_pos[0], cylinder_pos_z], dim=-1)
             drone_pos = torch.concat([drone_pos[0], drone_pos_z], dim=-1)
             target_pos = torch.concat([target_pos[0], target_pos_z], dim=-1)
@@ -524,7 +572,7 @@ class HideAndSeek_square_partial(IsaacEnv):
                                     [0.0, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
                                     [0.0, - 2 * self.cylinder_size, 0.5 * self.cylinder_height],
                                 ], device=self.device)
-                self.num_cylinders = 2
+                num_fixed_cylinders = 2
             elif self.scenario_flag == 'cross': # 13 cylinders, size = 3
                 cylinders_pos = torch.tensor([
                                     [0.0, 0.0, 0.5 * self.cylinder_height],
@@ -553,7 +601,7 @@ class HideAndSeek_square_partial(IsaacEnv):
                                     [0.0, 14.0 * self.cylinder_size, 0.5 * self.cylinder_height],
                                     [0.0, - 14.0 * self.cylinder_size, 0.5 * self.cylinder_height],
                                 ], device=self.device)
-                self.num_cylinders = 21
+                num_fixed_cylinders = 21
             elif self.scenario_flag == '1corner': # 5 cylinders, size = 3 
                 cylinders_pos = torch.tensor([
                                     [2 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
@@ -569,7 +617,7 @@ class HideAndSeek_square_partial(IsaacEnv):
                 #                     [6 * self.cylinder_size, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
                 #                     [8 * self.cylinder_size, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
                 #                 ], device=self.device) # arena = 3.0
-                self.num_cylinders = 5
+                num_fixed_cylinders = 5
                 drone_pos = torch.tensor([
                                     [-0.8, -0.1, 0.5],
                                     [-0.8, 0.1, 0.5],
@@ -618,7 +666,7 @@ class HideAndSeek_square_partial(IsaacEnv):
                                     # [0.0, 14 * self.cylinder_size, 0.5 * self.cylinder_height],
                                     # [0.0, -14 * self.cylinder_size, 0.5 * self.cylinder_height], # size = 3.0
                                 ], device=self.device)
-                self.num_cylinders = 9
+                num_fixed_cylinders = 9
             elif self.scenario_flag == 'maze': # 37 cylinders, size = 3
                 cylinders_pos = torch.tensor([
                                     [2 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
@@ -669,7 +717,7 @@ class HideAndSeek_square_partial(IsaacEnv):
                                     [0.0, - 4 * self.cylinder_size, 0.5 * self.cylinder_height],
                                     [0.0, - 6 * self.cylinder_size, 0.5 * self.cylinder_height],
                                 ], device=self.device)
-                self.num_cylinders = 7
+                num_fixed_cylinders = 7
             elif self.scenario_flag == '9cylinders':
                 cylinders_pos = torch.tensor([
                                     [0.0, 0.0, 0.5 * self.cylinder_height],
@@ -682,7 +730,7 @@ class HideAndSeek_square_partial(IsaacEnv):
                                     [0.0, 8 * self.cylinder_size, 0.5 * self.cylinder_height],
                                     [0.0, -8 * self.cylinder_size, 0.5 * self.cylinder_height],
                                 ], device=self.device)
-                self.num_cylinders = 9
+                num_fixed_cylinders = 9
 
         # init drone
         drone_model = MultirotorBase.REGISTRY[self.cfg.task.drone_model]
@@ -701,6 +749,7 @@ class HideAndSeek_square_partial(IsaacEnv):
             mass=1.0
         )
 
+        self.num_cylinders = self.max_cylinders if self.use_random_cylinder else num_fixed_cylinders
         for idx in range(self.num_cylinders):
             attributes = {'axis': 'Z', 'radius': self.cylinder_size, 'height': self.cylinder_height}
             create_obstacle(
@@ -797,7 +846,7 @@ class HideAndSeek_square_partial(IsaacEnv):
         flat_indices = cylinders_grid.view(len(env_ids), -1, 2).to(torch.long)
         # set occupied
         grid_map[batch_indices, flat_indices[:, :, 0], flat_indices[:, :, 1]] = 1
-        objects_grid = select_unoccupied_positions(grid_map, self.num_agents + 1)
+        objects_grid, _ = select_unoccupied_positions(grid_map, num_obstacles=0, num_drones=self.num_agents, num_target=1)
         objects_pos = grid_to_continuous(objects_grid, boundary, grid_size, center_pos, center_grid)
         return objects_pos[:, :self.num_agents], objects_pos[:, self.num_agents:]
 
@@ -815,7 +864,19 @@ class HideAndSeek_square_partial(IsaacEnv):
         center_pos = torch.zeros((len(env_ids), 1, 2), device=self.device)
         center_grid = torch.ones((len(env_ids), 1, 2), device=self.device, dtype=torch.int) * int(num_grid / 2)
         
-        objects_grid = select_unoccupied_positions(grid_map, self.num_cylinders + self.num_agents + 1)
+        if self.use_DFS_validation:
+            objects_grid = []
+            while len(objects_grid) < len(env_ids):
+                tmp_objects_grid, cylinder_occupancy_matrix = select_unoccupied_positions(grid_map, self.num_cylinders, self.num_agents, 1)
+                for idx in range(tmp_objects_grid.shape[0]):
+                    tmp_drones_grid = tmp_objects_grid[idx, self.num_cylinders:self.num_agents + self.num_cylinders]
+                    tmp_target_grid = tmp_objects_grid[idx, self.num_agents + self.num_cylinders:][0]
+                    if has_feasible_path(cylinder_occupancy_matrix[idx], tmp_drones_grid.to('cpu').numpy().tolist(), tmp_target_grid.to('cpu').numpy().tolist()):
+                        objects_grid.append(tmp_objects_grid[idx])
+            objects_grid = torch.stack(objects_grid)[:len(env_ids)]
+        else:
+            objects_grid, _ = select_unoccupied_positions(grid_map, self.num_cylinders, self.num_agents, 1)
+        
         objects_pos = grid_to_continuous(objects_grid, boundary, grid_size, center_pos, center_grid)
         return objects_pos[:, :self.num_cylinders], \
             objects_pos[:, self.num_cylinders:self.num_agents + self.num_cylinders], \
@@ -825,11 +886,11 @@ class HideAndSeek_square_partial(IsaacEnv):
         self.drone._reset_idx(env_ids)
         
         if self.use_random_cylinder:
-            cylinders_pos, drone_pos, target_pos = self.rejection_sampling_random_cylinder(env_ids)
+            cylinders_pos_xy, drone_pos_xy, target_pos_xy = self.rejection_sampling_random_cylinder(env_ids)
             drone_pos_z = self.init_drone_pos_dist_z.sample((*env_ids.shape, self.num_agents))
             target_pos_z = self.init_target_pos_dist_z.sample((*env_ids.shape, 1))
             cylinder_pos_z = torch.ones(len(env_ids), self.num_cylinders, 1, device=self.device) * 0.5 * self.cylinder_height
-            cylinders_pos = torch.concat([cylinders_pos, cylinder_pos_z], dim=-1)
+            cylinders_pos = torch.concat([cylinders_pos_xy, cylinder_pos_z], dim=-1)
             drone_pos = torch.concat([drone_pos_xy, drone_pos_z], dim=-1)
             target_pos = torch.concat([target_pos_xy, target_pos_z], dim=-1)
         else:
@@ -840,11 +901,7 @@ class HideAndSeek_square_partial(IsaacEnv):
             drone_pos = torch.concat([drone_pos_xy, drone_pos_z], dim=-1)
             target_pos = torch.concat([target_pos_xy, target_pos_z], dim=-1)
             self.min_dist[env_ids] = float(torch.inf) # reset min distance
-        
-        # # # TODO: debug
-        # drone_pos = drone_pos[53].unsqueeze(0).expand_as(drone_pos)
-        # target_pos = target_pos[53].unsqueeze(0).expand_as(target_pos)
-        
+              
         if self.use_teacher:
             if self.teacher._state_buffer.shape[0] > 1000:
                 num_exploration = len(env_ids) * self.teacher.prop_p
@@ -868,9 +925,6 @@ class HideAndSeek_square_partial(IsaacEnv):
                                 [-0.7, -0.4, 0.5],
                                 [-0.4, -0.7, 0.5],
                             ], device=self.device)[:self.num_agents].unsqueeze(0).expand(self.num_envs, -1, -1)
-            # target_pos = torch.tensor([
-            #                     [-0.8, -0.8, 0.5],
-            #                 ], device=self.device)[:self.num_agents].unsqueeze(0).expand(self.num_envs, -1, -1)
             target_pos = torch.tensor([
                                 [0.8, 0.8, 0.5],
                             ], device=self.device)[:self.num_agents].unsqueeze(0).expand(self.num_envs, -1, -1)
@@ -1180,12 +1234,18 @@ class HideAndSeek_square_partial(IsaacEnv):
         self.stats['collision_wall'].add_(collision_wall.mean(-1).unsqueeze(-1))
         self.stats['collision_reward'].add_(collision_reward.mean(-1).unsqueeze(-1))
         
+        # smoothness
+        smoothness_reward = self.smoothness_coef * torch.exp(-self.action_error_order1)
+        self.stats["smoothness_mean"].add_(self.drone.throttle_difference.mean(-1).unsqueeze(-1))
+        self.stats["smoothness_max"].set_(torch.max(self.drone.throttle_difference.max(-1).values.unsqueeze(-1), self.stats["smoothness_max"]))
+        
         reward = (
             distance_reward
             + detect_reward
             + catch_reward
             + collision_reward
             + speed_reward
+            + smoothness_reward
         )
 
         done  = (
@@ -1210,6 +1270,9 @@ class HideAndSeek_square_partial(IsaacEnv):
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
         self.stats["target_predicted_error"].div_(
+            torch.where(done, ep_len, torch.ones_like(ep_len))
+        )
+        self.stats['smoothness_mean'].div_(
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
         self.stats["distance_reward"].div_(

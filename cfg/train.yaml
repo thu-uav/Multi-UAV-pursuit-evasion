@@ -18,20 +18,20 @@ seed: 0
 viewer:
   resolution: [960, 720]
   # up
-  # eye: [-0.005, 0.0, 5.]
-  # lookat: [0., 0., 1.]
-  eye: [-0.7, 0.0, 2.]
-  lookat: [0., 0.0, 1.]
+  eye: [-0.005, 0.0, 5.]
+  lookat: [0., 0., 1.]
+  # eye: [-0.7, 0.0, 2.]
+  # lookat: [0., 0.0, 1.]
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: debug
-  run_name: narrow
+  run_name: debug
+  # run_name: narrow
   job_type: train
   entity: chenjy
   project: pursuit-evasion
-  # mode: disabled
-  mode: online # set to 'disabled' when debugging locally, online
+  mode: disabled
+  # mode: online # set to 'disabled' when debugging locally, online
   run_id: 
   monitor_gym: True
   tags: 

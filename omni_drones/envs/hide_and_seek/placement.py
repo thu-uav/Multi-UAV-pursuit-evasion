@@ -70,10 +70,6 @@ def dfs(matrix, start, target, visited):
 
     return False
 
-def has_path(matrix, start, target):
-    visited = set()
-    return dfs(matrix, start, target, visited)
-
 def has_feasible_path(matrix, start_points, target):
     reached_targets = 0
     num_threshold = 4
