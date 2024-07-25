@@ -592,16 +592,16 @@ class HideAndSeek_square_partial(IsaacEnv):
                                     # [-10.0 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
                                     # [0.0, 10.0 * self.cylinder_size, 0.5 * self.cylinder_height],
                                     # [0.0, - 10.0 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                    [12.0 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
-                                    [-12.0 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
-                                    [0.0, 12.0 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                    [0.0, - 12.0 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                    [14.0 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
-                                    [-14.0 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
-                                    [0.0, 14.0 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                    [0.0, - 14.0 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    # [12.0 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
+                                    # [-12.0 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
+                                    # [0.0, 12.0 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    # [0.0, - 12.0 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    # [14.0 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
+                                    # [-14.0 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
+                                    # [0.0, 14.0 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    # [0.0, - 14.0 * self.cylinder_size, 0.5 * self.cylinder_height],
                                 ], device=self.device)
-                num_fixed_cylinders = 21
+                num_fixed_cylinders = 13
             elif self.scenario_flag == '1corner': # 5 cylinders, size = 3 
                 cylinders_pos = torch.tensor([
                                     [2 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],

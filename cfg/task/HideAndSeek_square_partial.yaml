@@ -6,7 +6,7 @@ defaults:
   - /base/sim_base@_here_
 
 env:
-  num_envs: 10
+  num_envs: 4096
   max_episode_length: 800
 
 drone_model: Crazyflie
@@ -18,7 +18,7 @@ action_transform: PIDrate
 # # evalution scenario
 # evaluation_flag: null # '3_cylineder_line', '5_cylineder_line', '8_cylineder_ring', '7_cylineder_ring'
 
-scenario_flag: 'narrow' # 'narrow', '7cylinders', '1corner'
+scenario_flag: '2cylinders' # 'narrow', '7cylinders', '1corner'
 # arena3: '9cylinders', 'cross', 'corner'
 
 # exp
@@ -30,7 +30,7 @@ use_teacher: 0
 use_partial_obs: 1
 use_prediction_net: 1 # only used in use_partial_obs = 1
 use_predicted_dist_reward: 0
-use_random_cylinder: 1 # fixed task config
+use_random_cylinder: 0 # fixed task config
 use_DFS_validation: 0 # only use_random_cylinder = 1
 
 # TP net param
