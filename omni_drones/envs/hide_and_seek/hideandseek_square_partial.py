@@ -1085,10 +1085,7 @@ class HideAndSeek_square_partial(IsaacEnv):
 
         # draw drone trajectory and detection range
         if self._should_render(0) and self.use_eval:
-            # self._draw_traj()
             self._draw_catch()
-            # if self.drone_detect_radius > 0.0:
-            #     self._draw_detection()   
 
         return TensorDict(
             {
@@ -1157,9 +1154,6 @@ class HideAndSeek_square_partial(IsaacEnv):
         self.stats['speed_reward'].add_(speed_reward.mean(-1).unsqueeze(-1))
 
         # collison with cylinders, drones and walls
-        # for cylinders, only consider the nearest cylinder in x-y plane
-        # TODO: consider the z-axis
-        # nearest_cylinder_state = self.cylinders_state.gather(2, self.min_distance_idx_expanded)
         # self.k_nearest_cylinders: [num_envs, num_agents, k, 5]
         cylinder_pos_dist = torch.norm(self.k_nearest_cylinders[..., :2], dim= -1).squeeze(-1)
         collision_cylinder = (cylinder_pos_dist - self.cylinder_size < self.collision_radius).float().sum(-1)
