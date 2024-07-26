@@ -28,7 +28,7 @@ num_agents: 3
 use_eval: 0
 use_teacher: 0
 use_partial_obs: 1
-use_prediction_net: 1 # only used in use_partial_obs = 1
+use_prediction_net: 0 # only used in use_partial_obs = 1
 use_predicted_dist_reward: 0
 use_random_cylinder: 0 # fixed task config
 use_DFS_validation: 0 # only use_random_cylinder = 1

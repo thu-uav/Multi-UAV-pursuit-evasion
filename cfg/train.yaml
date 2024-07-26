@@ -25,7 +25,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: 2cylinders_wosmooth
+  run_name: 2cylinders_woTP_wosmooth_newreward
   # run_name: narrow
   job_type: train
   entity: chenjy
