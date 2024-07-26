@@ -407,8 +407,8 @@ class HideAndSeek_square_partial(IsaacEnv):
             torch.tensor([0.5 * self.arena_size - 0.1, 0.5 * self.arena_size - 0.1, self.max_height - 0.5], device=self.device)
         )
         self.init_rpy_dist = D.Uniform(
-            torch.tensor([0.0, 0.0, 0.0], device=self.device) * torch.pi,
-            torch.tensor([0.0, 0.0, 0.0], device=self.device) * torch.pi
+            torch.tensor([-0.2, -0.2, 0.0], device=self.device) * torch.pi,
+            torch.tensor([0.2, 0.2, 0.2], device=self.device) * torch.pi
         )
 
         if self.use_eval:
@@ -1236,6 +1236,7 @@ class HideAndSeek_square_partial(IsaacEnv):
         
         # smoothness
         smoothness_reward = self.smoothness_coef * torch.exp(-self.action_error_order1)
+        self.stats['smoothness_reward'].add_(smoothness_reward.mean(-1).unsqueeze(-1))
         self.stats["smoothness_mean"].add_(self.drone.throttle_difference.mean(-1).unsqueeze(-1))
         self.stats["smoothness_max"].set_(torch.max(self.drone.throttle_difference.max(-1).values.unsqueeze(-1), self.stats["smoothness_max"]))
         
@@ -1273,6 +1274,9 @@ class HideAndSeek_square_partial(IsaacEnv):
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
         self.stats['smoothness_mean'].div_(
+            torch.where(done, ep_len, torch.ones_like(ep_len))
+        )
+        self.stats['smoothness_reward'].div_(
             torch.where(done, ep_len, torch.ones_like(ep_len))
         )
         self.stats["distance_reward"].div_(
