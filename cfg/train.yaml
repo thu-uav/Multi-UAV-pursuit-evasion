@@ -25,8 +25,8 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: 2cylinders_woTP_wosmooth_newreward
-  # run_name: narrow
+  # run_name: 2cylinders_woTP_wosmooth_newreward
+  run_name: ring
   job_type: train
   entity: chenjy
   project: pursuit-evasion

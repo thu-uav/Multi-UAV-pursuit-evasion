@@ -707,6 +707,30 @@ class HideAndSeek_square_partial(IsaacEnv):
                                     [-6 * self.cylinder_size, 8 * self.cylinder_size, 0.5 * self.cylinder_height],
                                     [-8 * self.cylinder_size, 8 * self.cylinder_size, 0.5 * self.cylinder_height],
                                 ], device=self.device)          
+            elif self.scenario_flag == 'ring':
+                cylinders_pos = torch.tensor([
+                                    [0.0, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [0.0, - 4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [4 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
+                                    [- 4 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
+                                    [2 * self.cylinder_size, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-2 * self.cylinder_size, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [4 * self.cylinder_size, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-4 * self.cylinder_size, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [2 * self.cylinder_size, -4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-2 * self.cylinder_size, -4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [4 * self.cylinder_size, -4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-4 * self.cylinder_size, -4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [4 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [4 * self.cylinder_size, -2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [4 * self.cylinder_size, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [4 * self.cylinder_size, -4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-4 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-4 * self.cylinder_size, -2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-4 * self.cylinder_size, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-4 * self.cylinder_size, -4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                ], device=self.device)
+                num_fixed_cylinders = 20
             elif self.scenario_flag == '7cylinders':
                 cylinders_pos = torch.tensor([
                                     [0.0, 0.0, 0.5 * self.cylinder_height],
