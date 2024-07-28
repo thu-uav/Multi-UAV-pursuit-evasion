@@ -25,19 +25,20 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: random2_woTP_wosmooth
-  # run_name: ring
+  # run_name: random2_woTP_wosmooth
+  run_name: debug
   job_type: train
   entity: chenjy
-  project: pursuit-evasion
-  # mode: disabled
-  mode: online # set to 'disabled' when debugging locally, online
+  project: RAL
+  mode: disabled
+  # mode: online # set to 'disabled' when debugging locally, online
   run_id: 
   monitor_gym: True
   tags: 
 
 defaults:
-  - task: HideAndSeek_square_partial
+  # - task: HideAndSeek_square_partial
+  - task: HideAndSeek_circle_fully
   # - task: Track
   - algo: mappo
   - _self_

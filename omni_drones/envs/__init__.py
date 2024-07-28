@@ -32,7 +32,8 @@ from .multi_catch import MultiCatch
 from .payload import PayloadTrack, PayloadFlyThrough
 # from .dragon import DragonHover
 from .predatorprey import PredatorPrey
-from .hide_and_seek import HideAndSeek, HideAndSeek_circle_static_UED, HideAndSeek_circle_static_UED_large_cylinder, HideAndSeek_circle_static_UED_large_cylinder_cl, HideAndSeek_circle_static_UED_large_cylinder_cl_v2, HideAndSeek_circle_static_UED_addeasy, HideAndSeek_circle_static_UED_cl, HideAndSeek_circle_static_UED_cl_v2, HideAndSeek_circle, HideAndSeek_multiprey, HideAndSeek_circle_eval, HideAndSeek_circle_eval_large
+from .hide_and_seek import HideAndSeek, HideAndSeek_circle_static_UED, HideAndSeek_circle_static_UED_large_cylinder, HideAndSeek_circle_static_UED_large_cylinder_cl, HideAndSeek_circle_static_UED_addeasy, HideAndSeek_circle_static_UED_cl, HideAndSeek_circle_static_UED_cl_v2, HideAndSeek_circle, HideAndSeek_multiprey, HideAndSeek_circle_eval, HideAndSeek_circle_eval_large
+from .hide_and_seek import HideAndSeek_circle_fully
 from .hide_and_seek import HideAndSeek_square_partial
 # from .hideandseek import HideAndSeek
 # from .multi_gate import MultiGate

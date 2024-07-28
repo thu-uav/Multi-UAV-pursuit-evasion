@@ -244,7 +244,7 @@ def refresh_cylinder_pos_height(max_cylinder_height, origin_cylinder_pos, device
     origin_height = origin_height + ~low_cylinder_mask * 0.5 * max_cylinder_height
     return origin_cylinder_pos, origin_height
 
-class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv): 
+class HideAndSeek_circle_fully(IsaacEnv): 
     """
     HideAndSeek environment designed for curriculum learning.
 
@@ -303,7 +303,8 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
 
         self.target = RigidPrimView(
             "/World/envs/env_*/target", 
-            reset_xform_properties=False
+            reset_xform_properties=False,
+            shape=[self.num_envs, -1],
         )
         self.target.initialize()
 
@@ -325,12 +326,20 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         self.collision_radius = self.cfg.task.collision_radius
         self.init_poses = self.drone.get_world_poses(clone=True)
         self.v_prey = self.cfg.task.v_drone * self.cfg.task.v_prey
+        self.dist_reward_coef = self.cfg.task.dist_reward_coef
+        self.catch_reward_coef = self.cfg.task.catch_reward_coef
+        self.collision_coef = self.cfg.task.collision_coef
+        self.speed_coef = self.cfg.task.speed_coef
+        self.smoothness_coef = self.cfg.task.smoothness_coef
         
         self.central_env_pos = Float3(
             *self.envs_positions[self.central_env_idx].tolist()
         )
 
-        self.mask_value = -1.0
+        # for deployment
+        self.prev_actions = torch.zeros(self.num_envs, self.num_agents, 4, device=self.device)
+
+        self.mask_value = -5.0
         
         # inner CL
         self.use_inner_cl = self.cfg.task.use_inner_cl
@@ -359,14 +368,12 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
             frame_state_dim += self.time_encoding_dim        
 
         observation_spec = CompositeSpec({
-            "state_self": UnboundedContinuousTensorSpec((1, 3 + 6 + drone_state_dim)),
+            "state_self": UnboundedContinuousTensorSpec((1, 3 + self.time_encoding_dim + 13)),
             "state_others": UnboundedContinuousTensorSpec((self.drone.n-1, 3)), # pos
-            "state_frame": UnboundedContinuousTensorSpec((1, frame_state_dim)),
             "cylinders": UnboundedContinuousTensorSpec((self.num_cylinders, 5)), # pos + radius + height
         }).to(self.device)
         state_spec = CompositeSpec({
-            "state_drones": UnboundedContinuousTensorSpec((self.drone.n, 3 + 6 + drone_state_dim)),
-            "state_frame": UnboundedContinuousTensorSpec((1, frame_state_dim)),
+            "state_drones": UnboundedContinuousTensorSpec((self.drone.n, 3 + self.time_encoding_dim + 13)),
             "cylinders": UnboundedContinuousTensorSpec((self.num_cylinders, 5)), # pos + radius + height
         }).to(self.device)
         
@@ -397,22 +404,26 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
 
         # stats and infos
         stats_spec = CompositeSpec({
-            "capture": UnboundedContinuousTensorSpec(1),
+            "success": UnboundedContinuousTensorSpec(1),
             "collision": UnboundedContinuousTensorSpec(1),
-            "capture_episode": UnboundedContinuousTensorSpec(1),
-            "collision_episode": UnboundedContinuousTensorSpec(1),
-            "capture_per_step": UnboundedContinuousTensorSpec(1),
+            "distance_reward": UnboundedContinuousTensorSpec(1),
+            "distance_predicted_reward": UnboundedContinuousTensorSpec(1),
+            "speed_reward": UnboundedContinuousTensorSpec(1),
+            "collision_reward": UnboundedContinuousTensorSpec(1),
+            "collision_wall": UnboundedContinuousTensorSpec(1),
+            "collision_cylinder": UnboundedContinuousTensorSpec(1),
+            "collision_drone": UnboundedContinuousTensorSpec(1),
+            "detect_reward": UnboundedContinuousTensorSpec(1),
+            "catch_reward": UnboundedContinuousTensorSpec(1),
+            "smoothness_reward": UnboundedContinuousTensorSpec(1),
+            "smoothness_mean": UnboundedContinuousTensorSpec(1),
+            "smoothness_max": UnboundedContinuousTensorSpec(1),
             "first_capture_step": UnboundedContinuousTensorSpec(1),
-            # "cover_rate": UnboundedContinuousTensorSpec(1),
             "catch_radius": UnboundedContinuousTensorSpec(1),
             "v_prey": UnboundedContinuousTensorSpec(1),
             "return": UnboundedContinuousTensorSpec(1),
-            "drone1_speed_per_step": UnboundedContinuousTensorSpec(1),
-            "drone2_speed_per_step": UnboundedContinuousTensorSpec(1),
-            "drone3_speed_per_step": UnboundedContinuousTensorSpec(1),
-            "drone1_max_speed": UnboundedContinuousTensorSpec(1),
-            "drone2_max_speed": UnboundedContinuousTensorSpec(1),
-            "drone3_max_speed": UnboundedContinuousTensorSpec(1),
+            "drone_mean_speed": UnboundedContinuousTensorSpec(1),
+            "drone_max_speed": UnboundedContinuousTensorSpec(1),
             "prey_speed": UnboundedContinuousTensorSpec(1),
             'inner_cl_eval_capture': UnboundedContinuousTensorSpec(1),
             'capture_0': UnboundedContinuousTensorSpec(1),
@@ -422,10 +433,6 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
             'capture_4': UnboundedContinuousTensorSpec(1),
             'capture_5': UnboundedContinuousTensorSpec(1),
             'min_distance': UnboundedContinuousTensorSpec(1),
-            'collision_return': UnboundedContinuousTensorSpec(1),
-            'speed_return': UnboundedContinuousTensorSpec(1),
-            'distance_return': UnboundedContinuousTensorSpec(1),
-            'capture_return': UnboundedContinuousTensorSpec(1),
             'cl_bound': UnboundedContinuousTensorSpec(1),
             'height_bound': UnboundedContinuousTensorSpec(1),
             'num_buffer_0': UnboundedContinuousTensorSpec(1),
@@ -434,13 +441,8 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
             'num_buffer_3': UnboundedContinuousTensorSpec(1),
         }).expand(self.num_envs).to(self.device)
         info_spec = CompositeSpec({
-            "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13)),
-            'capture_0': UnboundedContinuousTensorSpec(1),
-            'capture_1': UnboundedContinuousTensorSpec(1),
-            'capture_2': UnboundedContinuousTensorSpec(1),
-            'capture_3': UnboundedContinuousTensorSpec(1),
-            'capture_4': UnboundedContinuousTensorSpec(1),
-            'capture_5': UnboundedContinuousTensorSpec(1),
+            "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13), device=self.device),
+            "prev_action": torch.stack([self.drone.action_spec] * self.drone.n, 0).to(self.device),
         }).expand(self.num_envs).to(self.device)
         self.observation_spec["stats"] = stats_spec
         self.observation_spec["info"] = info_spec
@@ -454,7 +456,6 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         self.min_active_cylinders = self.cfg.task.cylinder.min_active
         self.random_active = self.cfg.task.cylinder.random_active
         self.cylinder_size = self.cfg.task.cylinder.size
-        self.detect_range = self.cfg.task.detect_range
         self.arena_size = self.cfg.task.arena_size
         self.max_height = self.cfg.task.max_height
         self.cylinder_height = self.max_height
@@ -656,9 +657,6 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
                 
             # if idx == self.central_env_idx and self._should_render(0):
             #     self._draw_court_circle(self.arena_size)
-
-        # end_time = time.time()
-        # print('reset time', end_time - start_time)
                 
         drone_pos = torch.stack(drone_pos, dim=0).type(torch.float32)
         target_pos = torch.stack(target_pos, dim=0).type(torch.float32)
@@ -693,11 +691,16 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         self.stats['v_prey'].set_(torch.ones_like(self.stats['v_prey'], device=self.device) * self.v_prey)
         self.stats['first_capture_step'].set_(torch.ones_like(self.stats['first_capture_step']) * self.max_episode_length)
 
+        cmd_init = 2.0 * (self.drone.throttle[env_ids]) ** 2 - 1.0
+        max_thrust_ratio = self.drone.params['max_thrust_ratio']
+        self.info['prev_action'][env_ids, :, 3] = (0.5 * (max_thrust_ratio + cmd_init)).mean(dim=-1)
+        self.prev_actions[env_ids] = self.info['prev_action'][env_ids]
+
         # reset info
         self.stats['min_distance'].set_(torch.Tensor(self.num_envs, 1).fill_(float('inf')).to(self.device))
 
-        for substep in range(1):
-            self.sim.step(self._should_render(substep))
+        # for substep in range(1):
+        #     self.sim.step(self._should_render(substep))
 
     def update_base_cl(self, capture_dict):
         if self.random_active:
@@ -722,7 +725,14 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
     def _pre_sim_step(self, tensordict: TensorDictBase):   
         self.step_spec += 1
         actions = tensordict[("agents", "action")]
-        
+
+        # for deployment
+        self.info["prev_action"] = tensordict[("info", "prev_action")]
+        self.prev_actions = self.info["prev_action"].clone()
+        self.action_error_order1 = tensordict[("stats", "action_error_order1")].clone()
+        self.stats["action_error_order1_mean"].add_(self.action_error_order1.mean(dim=-1).unsqueeze(-1))
+        self.stats["action_error_order1_max"].set_(torch.max(self.stats["action_error_order1_max"], self.action_error_order1.mean(dim=-1).unsqueeze(-1)))
+
         self.effort = self.drone.apply_action(actions)
         
         target_vel = self.target.get_velocities()
@@ -736,17 +746,11 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
     def _compute_state_and_obs(self):
         self.drone_states = self.drone.get_state()
         self.info["drone_state"][:] = self.drone_states[..., :13]
-        drone_pos = self.drone_states[..., :3]
+        drone_pos, _ = self.get_env_poses(self.drone.get_world_poses())
         drone_vel = self.drone.get_velocities()
         self.drone_rpos = vmap(cpos)(drone_pos, drone_pos)
         self.drone_rpos = vmap(off_diag)(self.drone_rpos)
-        
-        # # draw drone trajectory and detection range
-        # if self._should_render(0):
-        #     self._draw_traj()
-        #     if self.detect_range > 0.0:
-        #         self._draw_detection()       
-
+             
         drone_speed_norm = torch.norm(drone_vel[..., :3], dim=-1)
         self.drone_sum_speed += drone_speed_norm
         self.drone_max_speed = torch.max(torch.stack([self.drone_max_speed, drone_speed_norm], dim=-1), dim=-1).values
@@ -769,12 +773,7 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         # get masked target relative position and velocity
         target_rpos = target_pos - drone_pos # [N, n, 3]
         target_rvel = target_vel - drone_vel # [N, n, 6]
-        if self.detect_range < 0.0:
-            target_mask = torch.zeros_like(target_rpos[...,0], dtype=bool)
-        else:
-            target_mask = torch.norm(target_rpos, dim=-1) > self.detect_range # [N, n]
-            target_mask = target_mask.all(1).unsqueeze(1).expand_as(target_mask) # [N, n]
-
+        target_mask = torch.zeros_like(target_rpos[...,0], dtype=bool)
         target_pmask = target_mask.unsqueeze(-1).expand_as(target_rpos) # [N, n, 3]
         target_vmask = target_mask.unsqueeze(-1).expand_as(target_rvel) # [N, n, 6]
         target_rpos_masked = target_rpos.clone()
@@ -783,34 +782,23 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         target_rvel_masked.masked_fill_(target_vmask, self.mask_value)
 
         # get full target state
-        if self.time_encoding:
-            t = (self.progress_buf / self.max_episode_length).unsqueeze(-1)
-            target_state = torch.cat([
-                target_pos,
-                target_vel,
-                t.expand(-1, self.time_encoding_dim).unsqueeze(1)
-            ], dim=-1) # [num_envs, 1, 9+time_encoding_dim]
-        else:
-            target_state = torch.cat([
-                target_pos,
-                target_vel
-            ], dim=-1) # [num_envs, 1, 9]
-
-        # identity = torch.eye(self.drone.n, device=self.device).expand(self.num_envs, -1, -1)
+        t = (self.progress_buf / self.max_episode_length).unsqueeze(-1)
+        target_state = torch.cat([
+            target_pos,
+            target_vel,
+            t.expand(-1, self.time_encoding_dim).unsqueeze(1)
+        ], dim=-1) # [num_envs, 1, 9+time_encoding_dim]
 
         obs = TensorDict({}, [self.num_envs, self.drone.n])
-        obs["state_self"] = torch.cat(
-            [-target_rpos_masked,
-             -target_rvel_masked,
-             self.drone_states, 
-            #  identity
+        obs["state_self"] = torch.cat([
+            target_rpos,
+            target_rvel,
+            self.drone_states[..., 3:10],
+            self.drone_states[..., 13:19],
              ], dim=-1
         ).unsqueeze(2)
 
         obs["state_others"] = self.drone_rpos
-
-        frame_state = target_state.unsqueeze(1).expand(-1, self.drone.n, -1, -1)
-        obs["state_frame"] = frame_state
 
         # get masked cylinder relative position
         cylinders_pos, _ = self.get_env_poses(self.cylinders.get_world_poses())
@@ -842,33 +830,20 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
             cylinders_radius
         ], dim=-1)
         
-        cylinders_mdist_z = torch.abs(cylinders_rpos[..., 2]) - cylinders_height.squeeze(-1) / 2
-        cylinders_mdist_xy = torch.norm(cylinders_rpos[..., :2], dim=-1) - cylinders_radius.squeeze(-1)
-        cylinders_mdist = torch.stack([torch.max(cylinders_mdist_xy, torch.zeros_like(cylinders_mdist_xy)), 
-                                       torch.max(cylinders_mdist_z, torch.zeros_like(cylinders_mdist_z))
-                                       ], dim=-1)
-        if self.detect_range < 0.0:
-            cylinders_mask = torch.zeros_like(cylinders_mdist[...,0], dtype=bool)
-        else:
-            cylinders_mask = torch.norm(cylinders_mdist, dim=-1) > self.detect_range
-            cylinders_mask = cylinders_mask.all(1).unsqueeze(1).expand_as(cylinders_mask)
         # add physical mask, for inactive cylinders
         cylinders_inactive_mask = ~ self.cylinders_mask.unsqueeze(1).expand(-1, self.num_agents, -1).type(torch.bool)
-        cylinders_mask = cylinders_mask + cylinders_inactive_mask
-        cylinders_smask = cylinders_mask.unsqueeze(-1).expand(-1, -1, -1, 5)
+        cylinders_smask = cylinders_inactive_mask.unsqueeze(-1).expand(-1, -1, -1, 5)
         cylinders_state_masked = cylinders_state.clone()
         cylinders_state_masked.masked_fill_(cylinders_smask, self.mask_value)
         obs["cylinders"] = cylinders_state_masked
 
         state = TensorDict({}, [self.num_envs])
         state["state_drones"] = torch.cat(
-            [-target_rpos,
-             -target_rvel,
+            [target_rpos,
+             target_rvel,
              self.drone_states, 
-            #  identity
              ], dim=-1
         )   # [num_envs, drone.n, drone_state_dim]
-        state["state_frame"] = target_state                # [num_envs, 1, target_rpos_dim]
         state["cylinders"] = cylinders_state
         return TensorDict(
             {
@@ -883,52 +858,55 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
         )
 
     def _compute_reward_and_done(self):
-        drone_pos, _ = self.drone.get_world_poses()
-        target_pos, _ = self.target.get_world_poses()
-        target_pos = target_pos.unsqueeze(1)
+        drone_pos, _ = self.get_env_poses(self.drone.get_world_poses())
+        target_pos, _ = self.get_env_poses(self.target.get_world_poses())
+        cylinders_pos, _ = self.get_env_poses(self.cylinders.get_world_poses())
 
         target_dist = torch.norm(target_pos - drone_pos, dim=-1)
-
-        capture_flag = (target_dist < self.catch_radius)
-        self.stats['capture_episode'].add_(torch.sum(capture_flag, dim=1).unsqueeze(-1))
-        self.stats['capture'].set_(torch.from_numpy(self.stats['capture_episode'].to('cpu').numpy() > 0.0).type(torch.float32).to(self.device))
+        # guidance, individual distance reward
+        min_dist = torch.min(target_dist, dim=-1).values.unsqueeze(-1)
+        active_distance_reward = (min_dist.expand_as(target_dist) > self.catch_radius).float()
+        distance_reward = - self.dist_reward_coef * target_dist * active_distance_reward
+        self.stats['distance_reward'].add_(distance_reward.mean(-1).unsqueeze(-1))
         
-        self.stats['capture_0'].set_(torch.ones_like(self.stats['capture'], device=self.device) * self.stats['capture'][(self.cylinders_mask.sum(-1) == 0)].mean())
-        for idx in range(self.max_active_cylinders):
-            self.stats['capture_{}'.format(idx + 1)].set_(torch.ones_like(self.stats['capture'], device=self.device) * self.stats['capture'][(self.cylinders_mask.sum(-1) == idx + 1)].mean())
-        if not self.set_train:
-            self.info['capture_0'].set_(torch.ones_like(self.stats['capture'], device=self.device) * self.stats['capture'][(self.cylinders_mask.sum(-1) == 0)].mean())
-            for idx in range(self.max_active_cylinders):
-                self.info['capture_{}'.format(idx + 1)].set_(torch.ones_like(self.stats['capture'], device=self.device) * self.stats['capture'][(self.cylinders_mask.sum(-1) == idx + 1)].mean())
+        # self.stats['capture_0'].set_(torch.ones_like(self.stats['capture'], device=self.device) * self.stats['capture'][(self.cylinders_mask.sum(-1) == 0)].mean())
+        # for idx in range(self.max_active_cylinders):
+        #     self.stats['capture_{}'.format(idx + 1)].set_(torch.ones_like(self.stats['capture'], device=self.device) * self.stats['capture'][(self.cylinders_mask.sum(-1) == idx + 1)].mean())
+        # if not self.set_train:
+        #     self.info['capture_0'].set_(torch.ones_like(self.stats['capture'], device=self.device) * self.stats['capture'][(self.cylinders_mask.sum(-1) == 0)].mean())
+        #     for idx in range(self.max_active_cylinders):
+        #         self.info['capture_{}'.format(idx + 1)].set_(torch.ones_like(self.stats['capture'], device=self.device) * self.stats['capture'][(self.cylinders_mask.sum(-1) == idx + 1)].mean())
         
-        self.stats['capture_per_step'].set_(self.stats['capture_episode'] / self.step_spec)
-        # catch_reward = 10 * capture_flag.type(torch.float32) # selfish
-        catch_reward = 10 * torch.any(capture_flag, dim=-1).unsqueeze(-1).expand_as(capture_flag) # cooperative
-        catch_flag = torch.any(catch_reward, dim=1).unsqueeze(-1)
-        self.stats['first_capture_step'][catch_flag * (self.stats['first_capture_step'] >= self.step_spec)] = self.step_spec
+        # capture
+        self.capture = (target_dist < self.catch_radius)
+        broadcast_capture = torch.any(self.capture, dim=-1).unsqueeze(-1).expand(-1, self.num_agents) # cooperative reward
+        catch_reward = self.catch_reward_coef * broadcast_capture
+        # if capture, current_capture_step = progress_buf
+        # else, current_capture_step = max_episode_length
+        capture_flag = torch.any(catch_reward, dim=1)
+        self.stats["success"] = torch.logical_or(capture_flag.unsqueeze(1), self.stats["success"]).float()
+        current_capture_step = capture_flag.float() * self.progress_buf + (~capture_flag).float() * self.max_episode_length
+        self.stats['first_capture_step'] = torch.min(self.stats['first_capture_step'], current_capture_step.unsqueeze(1))
+        self.stats['catch_reward'].add_(catch_reward.mean(-1).unsqueeze(-1))
 
         # speed penalty
-        if self.cfg.task.use_speed_penalty:
-            drone_vel = self.drone.get_velocities()
-            drone_speed_norm = torch.norm(drone_vel[..., :3], dim=-1)
-            speed_reward = - 100 * (drone_speed_norm > self.cfg.task.v_drone)
-        else:
-            speed_reward = 0.0
+        drone_vel = self.drone.get_velocities()
+        drone_speed_norm = torch.norm(drone_vel[..., :3], dim=-1)
+        speed_reward = - self.speed_coef * (drone_speed_norm > self.cfg.task.v_drone)
+        self.stats['speed_reward'].add_(speed_reward.mean(-1).unsqueeze(-1))
 
-        # speed penalty
-        if self.cfg.task.use_inside_penalty:
-            drone_env_pos = self.drone.get_state()[..., :3]
-            inside_reward = - 100 * ((drone_env_pos[..., -1] > self.max_height).type(torch.float32) + ((drone_env_pos[..., 0]**2 + drone_env_pos[..., 1]**2) > self.arena_size**2).type(torch.float32))
-        else:
-            inside_reward = 0.0
-
-        # collison with cylinders
-        coll_reward = torch.zeros(self.num_envs, self.num_agents, device=self.device)
-        
-        cylinders_pos, _ = self.cylinders.get_world_poses()
-        
+        # collision
+        # for wall
+        collision_reward = - self.collision_coef * ((drone_pos[..., -1] > self.max_height).type(torch.float32) + ((drone_pos[..., 0]**2 + drone_pos[..., 1]**2) > self.arena_size**2).type(torch.float32))
+        # for drones
+        drone_pos_dist = torch.norm(self.drone_rpos, dim=-1)
+        collision_drone = (drone_pos_dist < 2.0 * self.collision_radius).float().sum(-1)
+        collision_reward += - self.collision_coef * collision_drone
+        self.stats['collision_drone'].add_(collision_drone.mean(-1).unsqueeze(-1))
+        # TODO: for cylinders        
         cylinders_pos, cylinders_height = refresh_cylinder_pos_height(max_cylinder_height=self.cylinder_height,
                                                                           origin_cylinder_pos=cylinders_pos,                                                               device=self.device)
+        breakpoint()
         for i in range(self.num_cylinders):
             relative_pos = drone_pos[..., :2] - cylinders_pos[:, i, :2].unsqueeze(-2)
             norm_r = torch.norm(relative_pos, dim=-1)
@@ -936,40 +914,38 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
             if_coll = ((drone_pos[..., 2] - cylinders_height[:, i].unsqueeze(-1) - self.collision_radius) < 0) \
                             * (norm_r < (self.collision_radius + self.cylinders_size[i])).type(torch.float32)
             tmp_cylinder_mask = self.cylinders_mask[:, i].unsqueeze(-1).expand(-1, self.num_agents)
-            coll_reward -= if_coll * tmp_cylinder_mask # sparse
+            collision_reward -= if_coll * tmp_cylinder_mask # sparse
 
         self.stats['collision_episode'].add_((torch.sum(coll_reward, dim=1) < 0.0).unsqueeze(-1))
         self.stats['collision'].set_(torch.from_numpy(self.stats['collision_episode'].to('cpu').numpy() > 0.0).type(torch.float32).to(self.device))
 
-        # distance reward
-        # min_dist = target_dist
-        min_dist = (torch.min(target_dist, dim=-1)[0].unsqueeze(-1).expand_as(target_dist))
-        current_min_dist = torch.min(target_dist, dim=-1).values.unsqueeze(-1)
+        # min_dist = (torch.min(target_dist, dim=-1)[0].unsqueeze(-1).expand_as(target_dist))
+        # current_min_dist = torch.min(target_dist, dim=-1).values.unsqueeze(-1)
         
-        # update min_distance_task
-        for idx, flag in enumerate((current_min_dist < self.stats['min_distance'])):
-            if flag:
-                self.min_distance_task[idx] = copy.deepcopy(self.current_cl_tasks[idx])
+        # # update min_distance_task
+        # for idx, flag in enumerate((current_min_dist < self.stats['min_distance'])):
+        #     if flag:
+        #         self.min_distance_task[idx] = copy.deepcopy(self.current_cl_tasks[idx])
         
-        self.stats['min_distance'].set_(torch.min(current_min_dist, self.stats['min_distance']))
+        # self.stats['min_distance'].set_(torch.min(current_min_dist, self.stats['min_distance']))
         
-        dist_reward_mask = (min_dist > self.catch_radius)
-        distance_reward = - 1.0 * min_dist * dist_reward_mask
+        # smoothness
+        smoothness_reward = self.smoothness_coef * torch.exp(-self.action_error_order1)
+        self.stats['smoothness_reward'].add_(smoothness_reward.mean(-1).unsqueeze(-1))
+        self.stats["smoothness_mean"].add_(self.drone.throttle_difference.mean(-1).unsqueeze(-1))
+        self.stats["smoothness_max"].set_(torch.max(self.drone.throttle_difference.max(-1).values.unsqueeze(-1), self.stats["smoothness_max"]))
         
-        if self.cfg.task.use_distance_reward:
-            reward = speed_reward + inside_reward + 1.0 * catch_reward + 1.0 * distance_reward + self.cfg.task.collision_coef * coll_reward
-        else:
-            reward = speed_reward + inside_reward + 1.0 * catch_reward + self.cfg.task.collision_coef * coll_reward
-        
+        reward = (
+            distance_reward
+            + catch_reward
+            + collision_reward
+            + speed_reward
+            + smoothness_reward
+        )
+
         self._tensordict["return"] += reward.unsqueeze(-1)
         self.returns = self._tensordict["return"].sum(1)
         self.stats["return"].set_(self.returns)
-
-        # other reward
-        self.stats['collision_return'].add_(5 * coll_reward.sum(1).unsqueeze(-1))
-        self.stats['speed_return'].add_(speed_reward.sum(1).unsqueeze(-1))
-        self.stats['distance_return'].add_(distance_reward.sum(1).unsqueeze(-1))
-        self.stats['capture_return'].add_(catch_reward.sum(1).unsqueeze(-1))
 
         done  = (
             (self.progress_buf >= self.max_episode_length).unsqueeze(-1)
@@ -1127,7 +1103,7 @@ class HideAndSeek_circle_static_UED_large_cylinder_cl_v2(IsaacEnv):
             xaxis=drone_xaxis[self.central_env_idx, 0, :],
             yaxis=drone_yaxis[self.central_env_idx, 0, :],
             zaxis=drone_zaxis[self.central_env_idx, 0, :],
-            drange=self.detect_range,
+            drange=self.catch_radius,
         )
         point_list = [
             _carb_float3_add(p, self.central_env_pos) for p in point_list

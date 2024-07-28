@@ -1,4 +1,4 @@
-name: HideAndSeek_circle_static_UED_large_cylinder_cl_v2
+name: HideAndSeek_circle_fully
 
 defaults:
   # see https://hydra.cc/docs/advanced/overriding_packages/
@@ -6,22 +6,21 @@ defaults:
   - /base/sim_base@_here_
 
 env:
-  num_envs: 2048
+  num_envs: 10
   max_episode_length: 800
 
 drone_model: Crazyflie
 force_sensor: false
 time_encoding: true
 
-# action_transform: multidiscrete:4
-action_transform: rate
+action_transform: PIDrate
 
 # inner cl
 use_inner_cl: 0
 capture_threshold: 0.98
 
 # outer cl
-use_outer_cl: 1
+use_outer_cl: 0
 threshold_min: 1.0
 threshold_max: 100.0
 prob_random: 0.3
@@ -39,21 +38,21 @@ evaluation_flag: null # '3_cylineder_line', '5_cylineder_line', '8_cylineder_rin
 
 # exp
 num_agents: 4
-detect_range: -1.0 # -1.0 means fully-observable
 
 arena_size: 0.9
 max_height: 1.2 # 2 * arena_size
 v_drone: 1.0
 v_prey: 2.4
 
-use_collision: 1
-collision_coef: 1.0
-use_speed_penalty: 1
-use_inside_penalty: 1
-use_distance_reward: 0
 catch_radius: 0.12
-collision_radius: 0.05
-use_dynamic: False
+collision_radius: 0.07
+
+# reward param
+dist_reward_coef: 10.0
+catch_reward_coef: 5.0
+collision_coef: 100.0
+speed_coef: 10.0
+smoothness_coef: 0.0
 
 cylinder:
   size: 0.3
