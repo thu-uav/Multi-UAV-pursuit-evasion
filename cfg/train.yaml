@@ -6,7 +6,7 @@ sim: ${task.sim}
 env: ${task.env}
 
 # model_dir: /home/jiayu/OmniDrones/scripts/outputs/catch0_5_TP_window1/07-19_12-00/wandb/run-20240719_120034-qehz35x7/files/checkpoint_629407744.pt
-# model_dir: /home/jiayu/OmniDrones/scripts/outputs/1corner.pt
+# model_dir: /home/jiayu/OmniDrones/scripts/outputs/2cylinders_woTP_wosmooth_newreward/07-26_18-25/wandb/run-20240726_182548-uxm270hm/files/checkpoint_2988703744.pt
 model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
@@ -25,8 +25,8 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: 2cylinders_woTP_wosmooth_newreward
-  run_name: ring
+  run_name: random2_woTP_wosmooth
+  # run_name: ring
   job_type: train
   entity: chenjy
   project: pursuit-evasion
