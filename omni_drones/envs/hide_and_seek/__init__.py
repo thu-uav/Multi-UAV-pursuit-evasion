@@ -1,5 +1,5 @@
 from .hideandseek import HideAndSeek
-from .hideandseek_circle import HideAndSeek_circle
+from .hideandseek_circle_partial import HideAndSeek_circle_partial
 from .hideandseek_circle_static_ued import HideAndSeek_circle_static_UED
 from .hideandseek_circle_static_ued_large_cylinder import HideAndSeek_circle_static_UED_large_cylinder
 from .hideandseek_circle_static_ued_large_cylinder_cl import HideAndSeek_circle_static_UED_large_cylinder_cl

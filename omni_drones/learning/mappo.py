@@ -53,7 +53,7 @@ from torchrl.modules import TanhNormal, IndependentNormal
 
 class MAPPOPolicy(object):
     def __init__(
-        self, cfg, TP_net, agent_spec: AgentSpec, device="cuda"
+        self, cfg, agent_spec: AgentSpec, device="cuda"
     ) -> None:
         super().__init__()
 
@@ -66,7 +66,6 @@ class MAPPOPolicy(object):
 
         self.clip_param = cfg.clip_param
         self.ppo_epoch = int(cfg.ppo_epochs)
-        self.TP_epoch = int(cfg.TP_epochs)
         self.num_minibatches = int(cfg.num_minibatches)
         self.normalize_advantages = cfg.normalize_advantages
 
@@ -89,9 +88,6 @@ class MAPPOPolicy(object):
 
         self.make_actor()
         self.make_critic()
-        self.TP_net = TP_net
-        self.TP_optimizer = torch.optim.Adam(self.TP_net.parameters(), lr=0.0001)
-        self.TP_criterion = nn.MSELoss()
 
         self.train_in_keys = list(
             set(
@@ -248,27 +244,6 @@ class MAPPOPolicy(object):
         tensordict.update(self.value_op(tensordict))
         return tensordict
 
-    def update_TP(self, batch: TensorDict) -> Dict[str, Any]:
-        future_step = batch['TP_groundtruth'].shape[1]
-        pos_dim = batch['TP_groundtruth'].shape[2]
-        batch_size = batch['TP_groundtruth'].shape[0]
-        TP_input = batch['TP_input']
-        TP_groundtruth = batch['TP_groundtruth'] # range: (-1, 1)
-        
-        # TP_output = self.TP_net(TP_input).reshape(-1, future_step, pos_dim) # range: (-1, 1)
-        # loss = torch.mean(torch.norm(TP_output - TP_groundtruth, dim=-1).mean(1), dim=0)
-        
-        TP_output = self.TP_net(TP_input)
-        loss = self.TP_criterion(TP_output, TP_groundtruth.reshape(batch_size, -1))
-        
-        self.TP_optimizer.zero_grad()
-        loss.backward()
-        self.TP_optimizer.step()
-        
-        return {
-            "TP_loss": loss.item()
-        }
-
     def update_actor(self, batch: TensorDict) -> Dict[str, Any]:
         advantages = batch["advantages"]
         actor_input = batch.select(*self.actor_in_keys)
@@ -402,41 +377,7 @@ class MAPPOPolicy(object):
                 tensordict["returns"]
             )
 
-        train_info = []
-        TP_info = []
-        
-        # expand TP_groundtruth
-        TP_groundtruth = tensordict['next']['agents']['TP']['TP_groundtruth']
-        TP_input = tensordict['next']['agents']['TP']['TP_input']
-        window_size = self.TP_net.future_predcition_step
-        window_step = self.TP_net.window_step
-        # use the future groundtruth
-        windows = TP_groundtruth.unfold(dimension=1, size=window_size + 1, step=window_step).transpose(2, 3)[:,:, 1:]
-        TP_tensordict = TensorDict(
-            {
-                "TP_input": TP_input[:, :windows.shape[1]],
-                "TP_groundtruth": windows,
-            },
-            windows.shape[:2], # [num_envs, time_step - window_size + 1]
-        )
-        
-        for _ in range(self.TP_epoch):
-            dataset = make_dataset_naive(
-                TP_tensordict,
-                # tensordict,
-                int(self.cfg.num_minibatches),
-                self.minibatch_seq_len if hasattr(self, "minibatch_seq_len") else 1,
-            )
-            for minibatch in dataset:
-                TP_info.append(
-                    TensorDict(
-                        {
-                            **self.update_TP(minibatch),
-                        },
-                        batch_size=[],
-                    )
-                )
-        
+        train_info = []        
         # RL_update
         for ppo_epoch in range(self.ppo_epoch):
             dataset = make_dataset_naive(
@@ -455,9 +396,7 @@ class MAPPOPolicy(object):
                     )
                 )
         
-        TP_info = {k: v.mean().item() for k, v in torch.stack(TP_info).items()}
         train_info = {k: v.mean().item() for k, v in torch.stack(train_info).items()}
-        train_info.update(TP_info)
         train_info["advantages_mean"] = advantages_mean.item()
         train_info["advantages_std"] = advantages_std.item()
         if isinstance(self.agent_spec.action_spec, (BoundedTensorSpec, UnboundedTensorSpec)):
@@ -470,7 +409,6 @@ class MAPPOPolicy(object):
 
     def state_dict(self):
         state_dict = {
-            "TP": self.TP_net.state_dict(),
             "critic": self.critic.state_dict(),
             "actor_params": self.actor_params,
             "value_normalizer": self.value_normalizer.state_dict()
@@ -478,7 +416,6 @@ class MAPPOPolicy(object):
         return state_dict
     
     def load_state_dict(self, state_dict):
-        self.TP_net.load_state_dict(state_dict["TP"])
         self.actor_params = TensorDictParams(state_dict["actor_params"].to_tensordict())
         self.actor_opt = torch.optim.Adam(self.actor_params.parameters(), lr=self.cfg.actor.lr)
         self.critic.load_state_dict(state_dict["critic"])
