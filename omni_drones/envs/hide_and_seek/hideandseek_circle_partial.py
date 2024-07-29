@@ -821,9 +821,9 @@ class HideAndSeek_circle_partial(IsaacEnv):
         self.min_distance_idx_expanded = min_k_indices.unsqueeze(-1).expand(-1, -1, -1, self.cylinders_state.shape[-1])
         self.k_nearest_cylinders = self.cylinders_state.gather(2, self.min_distance_idx_expanded)
         # mask invalid cylinders
-        k_nearest_cylinders_mask = cylinders_mask.gather(2, min_k_indices)
+        self.k_nearest_cylinders_mask = cylinders_mask.gather(2, min_k_indices)
         self.k_nearest_cylinders_masked = self.k_nearest_cylinders.clone()
-        self.k_nearest_cylinders_masked.masked_fill_(k_nearest_cylinders_mask.unsqueeze(-1).expand_as(self.k_nearest_cylinders_masked), self.mask_value)
+        self.k_nearest_cylinders_masked.masked_fill_(self.k_nearest_cylinders_mask.unsqueeze(-1).expand_as(self.k_nearest_cylinders_masked), self.mask_value)
         obs["cylinders"] = self.k_nearest_cylinders_masked
 
         # state_self
@@ -936,8 +936,13 @@ class HideAndSeek_circle_partial(IsaacEnv):
 
         # collison with cylinders, drones and walls
         # self.k_nearest_cylinders: [num_envs, num_agents, k, 5]
+        # self.k_nearest_cylinders_mask: : [num_envs, num_agents, k]
         cylinder_pos_dist = torch.norm(self.k_nearest_cylinders[..., :2], dim= -1).squeeze(-1)
-        collision_cylinder = (cylinder_pos_dist - self.cylinder_size < self.collision_radius).float().sum(-1)
+        collision_cylinder = (cylinder_pos_dist - self.cylinder_size < self.collision_radius).float() # [num_envs, num_agents, k]
+        # mask inactive cylinders
+        collision_cylinder.masked_fill_(self.k_nearest_cylinders_mask, 0.0)
+        # sum all cylinders
+        collision_cylinder = collision_cylinder.sum(-1)
         collision_reward = - self.collision_coef * collision_cylinder
         self.stats['collision_cylinder'].add_(collision_cylinder.mean(-1).unsqueeze(-1))
         # for drones
