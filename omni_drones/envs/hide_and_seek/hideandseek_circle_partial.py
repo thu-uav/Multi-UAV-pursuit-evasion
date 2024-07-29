@@ -64,6 +64,7 @@ def is_perpendicular_line_intersecting_segment(a, b, c):
 
 def is_line_blocked_by_cylinder(drone_pos, target_pos, cylinder_pos, cylinder_size):
     '''
+        # only consider cylinders on the ground
         # 1. compute_reward: for catch reward, not blocked
         # 2. compute_obs: for drones' state, mask the target state in the shadow
         # 3. dummy_prey_policy: if not blocked, the target gets force from the drone
@@ -805,7 +806,7 @@ class HideAndSeek_circle_partial(IsaacEnv):
         # get masked cylinder relative position
         cylinders_pos, _ = self.get_env_poses(self.cylinders.get_world_poses())
         # mask inactive cylinders(underground)
-        cylinders_mask = (cylinders_pos[..., 2] < 0.0).unsqueeze(1).expand(-1, self.num_agents, -1) # [num_envs, num_agents, self.num_cylinders]
+        self.cylinders_mask = (cylinders_pos[..., 2] < 0.0) # [num_envs, self.num_cylinders]
         cylinders_rpos = vmap(cpos)(drone_pos, cylinders_pos) # [num_envs, num_agents, num_cylinders, 3]
         self.cylinders_state = torch.concat([
             cylinders_rpos,
@@ -813,15 +814,15 @@ class HideAndSeek_circle_partial(IsaacEnv):
             self.cylinder_size * torch.ones(self.num_envs, self.num_agents, self.num_cylinders, 1, device=self.device),
         ], dim=-1)
         # cylinders_mdist_z = torch.abs(cylinders_rpos[..., 2]) - 0.5 * self.cylinder_height
-        cylinders_mdist_xy = torch.norm(cylinders_rpos[..., :2], dim=-1) - self.cylinder_size
+        cylinders_mdist = torch.norm(cylinders_rpos, dim=-1) - self.cylinder_size
 
         # use the kth nearest cylinders
-        _, sorted_indices = torch.sort(cylinders_mdist_xy, dim=-1)
+        _, sorted_indices = torch.sort(cylinders_mdist, dim=-1)
         min_k_indices = sorted_indices[..., :self.obs_max_cylinder]
         self.min_distance_idx_expanded = min_k_indices.unsqueeze(-1).expand(-1, -1, -1, self.cylinders_state.shape[-1])
         self.k_nearest_cylinders = self.cylinders_state.gather(2, self.min_distance_idx_expanded)
         # mask invalid cylinders
-        self.k_nearest_cylinders_mask = cylinders_mask.gather(2, min_k_indices)
+        self.k_nearest_cylinders_mask = self.cylinders_mask.unsqueeze(1).expand(-1, self.num_agents, -1).gather(2, min_k_indices)
         self.k_nearest_cylinders_masked = self.k_nearest_cylinders.clone()
         self.k_nearest_cylinders_masked.masked_fill_(self.k_nearest_cylinders_mask.unsqueeze(-1).expand_as(self.k_nearest_cylinders_masked), self.mask_value)
         obs["cylinders"] = self.k_nearest_cylinders_masked
@@ -1068,19 +1069,17 @@ class HideAndSeek_circle_partial(IsaacEnv):
         
         # only get force from the nearest cylinder to the target
         # get the nearest cylinder to the target
-        target_cylinders_mdist_z = torch.abs(target_cylinders_rpos[..., 2]) - 0.5 * self.cylinder_height
-        target_cylinders_mdist_xy = torch.norm(target_cylinders_rpos[..., :2], dim=-1) - self.cylinder_size
-        target_cylinders_mdist = torch.stack([torch.max(target_cylinders_mdist_xy, torch.zeros_like(target_cylinders_mdist_xy)), 
-                                       torch.max(target_cylinders_mdist_z, torch.zeros_like(target_cylinders_mdist_z))
-                                       ], dim=-1)
-        target_min_distance_idx = torch.argmin(torch.norm(target_cylinders_mdist, dim=-1), dim=-1)
+        target_cylinders_mdist = torch.norm(target_cylinders_rpos, dim=-1) - self.cylinder_size
+        target_min_distance_idx = torch.argmin(target_cylinders_mdist, dim=-1)
+        # inactive mask
+        target_min_distance_mask = self.cylinders_mask.gather(1, target_min_distance_idx)
         target_min_distance_idx_expanded = target_min_distance_idx.unsqueeze(-1).unsqueeze(-1).expand(-1, -1, 1, target_cylinders_rpos.shape[-1])
         nearest_cylinder_to_target = target_cylinders_rpos.gather(2, target_min_distance_idx_expanded)
         
         force_c = torch.zeros_like(force)
         dist_target_cylinder = torch.norm(nearest_cylinder_to_target[..., :2], dim=-1)
         detect_cylinder = (dist_target_cylinder < self.target_detect_radius)
-        force_c[..., :2] = detect_cylinder * nearest_cylinder_to_target[..., :2].squeeze(2) / (dist_target_cylinder**2 + 1e-5)
+        force_c[..., :2] = ~target_min_distance_mask.unsqueeze(-1) * detect_cylinder * nearest_cylinder_to_target[..., :2].squeeze(2) / (dist_target_cylinder**2 + 1e-5)
         force += force_c
 
         return force.type(torch.float32)
