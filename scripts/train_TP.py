@@ -191,7 +191,7 @@ def main(cfg):
 
     agent_spec: AgentSpec = env.agent_spec["drone"]
     # add base_env.TP to MAPPOPolicy
-    policy = algos[cfg.algo.name.lower()](cfg.algo, base_env.TP, agent_spec=agent_spec, device="cuda")
+    policy = algos[cfg.algo.name.lower()](cfg.algo, agent_spec=agent_spec, device="cuda", TP_net=base_env.TP)
 
     frames_per_batch = env.num_envs * int(cfg.algo.train_every)
     total_frames = cfg.get("total_frames", -1) // frames_per_batch * frames_per_batch

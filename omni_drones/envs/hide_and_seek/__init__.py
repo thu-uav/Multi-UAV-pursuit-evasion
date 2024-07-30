@@ -1,5 +1,4 @@
 from .hideandseek import HideAndSeek
-from .hideandseek_circle_partial import HideAndSeek_circle_partial
 from .hideandseek_circle_static_ued import HideAndSeek_circle_static_UED
 from .hideandseek_circle_static_ued_large_cylinder import HideAndSeek_circle_static_UED_large_cylinder
 from .hideandseek_circle_static_ued_large_cylinder_cl import HideAndSeek_circle_static_UED_large_cylinder_cl
@@ -10,4 +9,5 @@ from .hideandseek_circle_static_ued_cl_v2 import HideAndSeek_circle_static_UED_c
 from .hideandseek_circle_eval import HideAndSeek_circle_eval
 from .hideandseek_circle_eval_large import HideAndSeek_circle_eval_large
 from .hideandseek_multiprey import HideAndSeek_multiprey
-from .hideandseek_square_partial import HideAndSeek_square_partial
+from .hideandseek_circle_partial_TP import HideAndSeek_circle_partial_TP
+from .hideandseek_circle_partial_woTP import HideAndSeek_circle_partial_woTP
