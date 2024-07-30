@@ -6,7 +6,7 @@ sim: ${task.sim}
 env: ${task.env}
 
 # model_dir: /home/jiayu/OmniDrones/scripts/outputs/catch0_5_TP_window1/07-19_12-00/wandb/run-20240719_120034-qehz35x7/files/checkpoint_629407744.pt
-# model_dir: /home/chenjy/OmniDrones/scripts/outputs/empty_catch0_5_v1_3_TP/07-30_14-06/wandb/run-20240730_140701-27ffpthh/files/checkpoint_288620544.pt
+# model_dir: /home/chenjy/OmniDrones/scripts/outputs/empty_catch0_5_v1_3_TP/07-30_17-15/wandb/run-20240730_171509-5p5bpb5g/files/checkpoint_236191744.pt
 model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000

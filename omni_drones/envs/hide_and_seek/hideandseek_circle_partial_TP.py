@@ -473,7 +473,6 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         self.TP = TP_net(input_dim = 1 + 3 + 3 + 3 * self.num_agents, output_dim = 3 * self.future_predcition_step, future_predcition_step = self.future_predcition_step, window_step=self.window_step).to(self.device)
         self.history_step = self.cfg.task.history_step
         self.history_data = collections.deque(maxlen=self.history_step)
-        self.predicted_next = torch.zeros(self.num_envs, 3, device=self.device) # only one step
 
         # for deployment
         self.prev_actions = torch.zeros(self.num_envs, self.num_agents, 4, device=self.device)
@@ -500,7 +499,9 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         # TP network
         TP_spec = CompositeSpec({
             "TP_input": UnboundedContinuousTensorSpec((self.history_step, 1 + 3 + 3 + self.num_agents * 3)),
+            # "TP_output": UnboundedContinuousTensorSpec((self.future_predcition_step, 3)),
             "TP_groundtruth": UnboundedContinuousTensorSpec((1, 3)),
+            "TP_done": UnboundedContinuousTensorSpec((1, 3)),
         }).to(self.device)
         self.observation_spec = CompositeSpec({
             "agents": CompositeSpec({
@@ -787,29 +788,6 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         self.info['prev_action'][env_ids, :, 3] = (0.5 * (max_thrust_ratio + cmd_init)).mean(dim=-1)
         self.prev_actions[env_ids] = self.info['prev_action'][env_ids]
 
-        target_rpos = vmap(cpos)(drone_pos, target_pos) # [num_envs, num_agents, 1, 3]
-        # self.blocked use in the _compute_reward_and_done
-        self.blocked = is_line_blocked_by_cylinder(drone_pos, target_pos, cylinders_pos, self.cylinder_size)
-        in_detection_range = (torch.norm(target_rpos, dim=-1) < self.drone_detect_radius)
-        # detect: [num_envs, num_agents, 1]
-        detect = in_detection_range * (~ self.blocked.unsqueeze(-1))
-        # broadcast the detect info to all drones
-        broadcast_detect = torch.any(detect, dim=1)
-        target_mask = (~ broadcast_detect).unsqueeze(-1).expand_as(target_pos) # [num_envs, 1, 3]
-        target_pos_masked = target_pos.clone()
-        target_pos_masked.masked_fill_(target_mask, self.mask_value)
-        target_vel_masked = target_vel[..., :3].clone()
-        target_vel_masked.masked_fill_(target_mask, self.mask_value)
-        for i in range(self.history_step):
-            # t, target pos, target vel, drone_pos
-            frame_state = torch.concat([
-                torch.zeros(self.num_envs, 1, device=self.device),
-                target_pos_masked.reshape(self.num_envs, -1),
-                target_vel_masked.squeeze(1),
-                drone_pos.reshape(self.num_envs, -1)
-            ], dim=-1)
-            self.history_data.append(frame_state)
-
         if self.use_eval and self._should_render(0):
             self._draw_court_circle()
 
@@ -900,23 +878,27 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
             target_vel_masked.squeeze(1),
             drone_pos.reshape(self.num_envs, -1)
         ], dim=-1)
-        self.history_data.append(frame_state)
-        TP["TP_input"] = torch.stack(list(self.history_data), dim=1).to(self.device)
+        if len(self.history_data) < self.history_step:
+            # init history data
+            for i in range(self.history_step):
+                self.history_data.append(frame_state)
+        else:
+            self.history_data.append(frame_state)
+        TP['TP_input'] = torch.stack(list(self.history_data), dim=1).to(self.device)
         # target_pos_predicted, x, y -> [-0.5 * self.arena_size, 0.5 * self.arena_size]
         # z -> [0, self.max_height]
-        self.target_pos_predicted = self.TP(TP["TP_input"]).reshape(self.num_envs, self.future_predcition_step, -1) # [num_envs, 3 * future_step]
+        self.target_pos_predicted = self.TP(TP['TP_input']).reshape(self.num_envs, self.future_predcition_step, -1) # [num_envs, 3 * future_step]
         self.target_pos_predicted[..., :2] = self.target_pos_predicted[..., :2] * 0.5 * self.arena_size
         self.target_pos_predicted[..., 2] = (self.target_pos_predicted[..., 2] + 1.0) / 2.0 * self.max_height
-        # TP_groundtruth: clip to (-1.0, 1.0)
+        # TP["TP_output"] = self.target_pos_predicted
         TP["TP_groundtruth"] = target_pos.squeeze(1).clone()
-        TP["TP_groundtruth"][..., :2] = TP["TP_groundtruth"][..., :2] / (0.5 * self.arena_size)
-        TP["TP_groundtruth"][..., 2] = TP["TP_groundtruth"][..., 2] / self.max_height * 2.0 - 1.0     
+        TP["TP_done"] = (self.progress_buf <= (self.max_episode_length - self.future_predcition_step)).unsqueeze(-1)
+        # # TP_groundtruth: clip to (-1.0, 1.0)
+        # TP["TP_groundtruth"] = target_pos.squeeze(1).clone()
+        # TP["TP_groundtruth"][..., :2] = TP["TP_groundtruth"][..., :2] / (0.5 * self.arena_size)
+        # TP["TP_groundtruth"][..., 2] = TP["TP_groundtruth"][..., 2] / self.max_height * 2.0 - 1.0     
 
         target_rpos_predicted = (drone_pos.unsqueeze(2) - self.target_pos_predicted.unsqueeze(1)).view(self.num_envs, self.num_agents, -1)
-
-        # compute one-step error
-        self.stats["target_predicted_error"].add_(torch.norm(self.predicted_next - target_pos.squeeze(1), dim=-1).unsqueeze(-1))
-        self.predicted_next = self.target_pos_predicted[:, 0].clone() # update
 
         obs["state_self"] = torch.cat(
             [
@@ -1046,7 +1028,6 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
             (self.progress_buf >= self.max_episode_length).unsqueeze(-1)
         )
 
-        # if torch.any(done):
         #     if self.stats["success"].mean() > 0.95:
         #         self.current_L = min(100, self.current_L + 1)
         #     self.stats["distance_threshold_L"].set_(self.current_L * torch.ones_like(self.stats["distance_threshold_L"]))

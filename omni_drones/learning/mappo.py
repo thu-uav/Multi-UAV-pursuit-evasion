@@ -250,8 +250,6 @@ class MAPPOPolicy(object):
         return tensordict
 
     def update_TP(self, batch: TensorDict) -> Dict[str, Any]:
-        future_step = batch['TP_groundtruth'].shape[1]
-        pos_dim = batch['TP_groundtruth'].shape[2]
         batch_size = batch['TP_groundtruth'].shape[0]
         TP_input = batch['TP_input']
         TP_groundtruth = batch['TP_groundtruth'] # range: (-1, 1)
@@ -259,8 +257,8 @@ class MAPPOPolicy(object):
         # TP_output = self.TP_net(TP_input).reshape(-1, future_step, pos_dim) # range: (-1, 1)
         # loss = torch.mean(torch.norm(TP_output - TP_groundtruth, dim=-1).mean(1), dim=0)
         
-        TP_output = self.TP_net(TP_input)
-        loss = self.TP_criterion(TP_output, TP_groundtruth.reshape(batch_size, -1))
+        TP_outsput = self.TP_net(TP_input)
+        loss = self.TP_criterion(TP_outsput, TP_groundtruth.reshape(batch_size, -1))
         
         self.TP_optimizer.zero_grad()
         loss.backward()
@@ -409,19 +407,24 @@ class MAPPOPolicy(object):
         if self.TP_net is not None:
             # expand TP_groundtruth
             TP_groundtruth = tensordict['next']['agents']['TP']['TP_groundtruth']
+            # TP_output = tensordict['next']['agents']['TP']['TP_output']
             TP_input = tensordict['next']['agents']['TP']['TP_input']
+            TP_done = tensordict['next']['agents']['TP']['TP_done']
             window_size = self.TP_net.future_predcition_step
             window_step = self.TP_net.window_step
             # use the future groundtruth
-            windows = TP_groundtruth.unfold(dimension=1, size=window_size + 1, step=window_step).transpose(2, 3)[:,:, 1:]
+            windows = TP_groundtruth.unfold(dimension=1, size=window_size + 1, step=window_step).transpose(2, 3)[:, :, 1:]
+            batch, seq_len, future_step, pos_dim = windows.shape
+            mask = TP_done[:, :windows.shape[1]].squeeze(-1).unsqueeze(-1).unsqueeze(-1).expand_as(windows).bool()
+            selected_windows = torch.masked_select(windows, mask).view(batch, -1, future_step, pos_dim)
+            select_seq_len = selected_windows.shape[1]
             TP_tensordict = TensorDict(
                 {
-                    "TP_input": TP_input[:, :windows.shape[1]],
-                    "TP_groundtruth": windows,
+                    "TP_input": TP_input[:, :select_seq_len],
+                    "TP_groundtruth": selected_windows,
                 },
-                windows.shape[:2], # [num_envs, time_step - window_size + 1]
+                selected_windows.shape[:2], # [num_envs, time_step - window_size + 1]
             )
-            
             for _ in range(self.TP_epoch):
                 dataset = make_dataset_naive(
                     TP_tensordict,
