@@ -903,14 +903,14 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         self.history_data.append(frame_state)
         TP["TP_input"] = torch.stack(list(self.history_data), dim=1).to(self.device)
         # target_pos_predicted, x, y -> [-0.5 * self.arena_size, 0.5 * self.arena_size]
-        # z -> [0, self.arena_size]
+        # z -> [0, self.max_height]
         self.target_pos_predicted = self.TP(TP["TP_input"]).reshape(self.num_envs, self.future_predcition_step, -1) # [num_envs, 3 * future_step]
         self.target_pos_predicted[..., :2] = self.target_pos_predicted[..., :2] * 0.5 * self.arena_size
-        self.target_pos_predicted[..., 2] = (self.target_pos_predicted[..., 2] + 1.0) / 2.0 * self.arena_size
+        self.target_pos_predicted[..., 2] = (self.target_pos_predicted[..., 2] + 1.0) / 2.0 * self.max_height
         # TP_groundtruth: clip to (-1.0, 1.0)
         TP["TP_groundtruth"] = target_pos.squeeze(1).clone()
         TP["TP_groundtruth"][..., :2] = TP["TP_groundtruth"][..., :2] / (0.5 * self.arena_size)
-        TP["TP_groundtruth"][..., 2] = TP["TP_groundtruth"][..., 2] / self.arena_size * 2.0 - 1.0     
+        TP["TP_groundtruth"][..., 2] = TP["TP_groundtruth"][..., 2] / self.max_height * 2.0 - 1.0     
 
         target_rpos_predicted = (drone_pos.unsqueeze(2) - self.target_pos_predicted.unsqueeze(1)).view(self.num_envs, self.num_agents, -1)
 
