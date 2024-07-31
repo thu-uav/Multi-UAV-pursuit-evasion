@@ -17,15 +17,15 @@ seed: 0
 
 viewer:
   resolution: [960, 720]
-  # # up
-  eye: [-0.005, 0.0, 5.]
+  # up
+  eye: [-0.005, 0.0, 15.]
   lookat: [0., 0., 1.]
   # eye: [-2.0, 0.0, 5.]
   # lookat: [0., 0.0, 1.0]
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: empty_catch0_5_v1_3_TP
+  run_name: random5_catch0_5_v1_3_woTP
   # run_name: debug
   job_type: train
   entity: chenjy
@@ -38,7 +38,7 @@ wandb:
 
 defaults:
   # - task: HideAndSeek_square_partial
-  # - task: HideAndSeek_circle_partial_woTP
-  - task: HideAndSeek_circle_partial_TP
+  - task: HideAndSeek_circle_partial_woTP
+  # - task: HideAndSeek_circle_partial_TP
   - algo: mappo
   - _self_

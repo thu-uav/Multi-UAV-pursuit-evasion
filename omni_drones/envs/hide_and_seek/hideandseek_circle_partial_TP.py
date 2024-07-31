@@ -585,6 +585,7 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         all_cylinders_pos[:, 1] = 0.0
         all_cylinders_pos[:, 2] = self.invalid_z
 
+        # init for evaluation
         drone_pos = torch.tensor([
                             [-0.8, -0.1, 0.5],
                             [-0.8, 0.1, 0.5],
@@ -594,63 +595,72 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         target_pos = torch.tensor([
                             [1.0, 0.0, 0.5],
                         ], device=self.device)[:self.num_agents]
-        if self.scenario_flag == 'empty':
-            num_fixed_cylinders = 0
-        elif self.scenario_flag == '2cylinders':
-            num_fixed_cylinders = 2
-            all_cylinders_pos[:num_fixed_cylinders] = torch.tensor([
-                                [0.0, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [0.0, - 2 * self.cylinder_size, 0.5 * self.cylinder_height],
-                            ], device=self.device)
-        elif self.scenario_flag == 'center':
-            num_fixed_cylinders = 9
-            all_cylinders_pos[:num_fixed_cylinders] = torch.tensor([
-                                [0.0, 0.0, 0.5 * self.cylinder_height],
-                                [0.0, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [0.0, - 2 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [2 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
-                                [- 2 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
-                                [2 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [- 2 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [2 * self.cylinder_size, -2 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [- 2 * self.cylinder_size, -2 * self.cylinder_size, 0.5 * self.cylinder_height],
-                            ], device=self.device)
-        elif self.scenario_flag == 'corner':
-            num_fixed_cylinders = 5
-            all_cylinders_pos[:num_fixed_cylinders] = torch.tensor([
-                                [2 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [2 * self.cylinder_size, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [2 * self.cylinder_size, 6 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [4 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [6 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
-                            ], device=self.device)
-        elif self.scenario_flag == 'wall':
-            num_fixed_cylinders = 5
-            all_cylinders_pos[:num_fixed_cylinders] = torch.tensor([
-                                [0.0, 0.0, 0.5 * self.cylinder_height],
-                                [0.0, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [0.0, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [0.0, 8 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [0.0, 10 * self.cylinder_size, 0.5 * self.cylinder_height],
-                            ], device=self.device)
-        elif self.scenario_flag == 'box':
-            num_fixed_cylinders = 12
-            all_cylinders_pos[:num_fixed_cylinders] = torch.tensor([
-                                [4 * self.cylinder_size, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [-4 * self.cylinder_size, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [-4 * self.cylinder_size, -4 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [4 * self.cylinder_size, -4 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [4 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [2 * self.cylinder_size, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [-2 * self.cylinder_size, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [-4 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [-2 * self.cylinder_size, -4 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [-4 * self.cylinder_size, -2 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [2 * self.cylinder_size, -4 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                [4 * self.cylinder_size, -2 * self.cylinder_size, 0.5 * self.cylinder_height],
-                            ], device=self.device)
+        
+        if self.use_random_cylinder:
+            cylinders_pos_xy, _, _ = self.rejection_sampling_random_cylinder(torch.arange(1))
+            cylinder_pos_z = torch.ones(1, self.num_cylinders, 1, device=self.device) * 0.5 * self.cylinder_height
+            # set inactive cylinders under the ground
+            cylinder_pos_z[self.inactive_mask] = self.invalid_z
+            all_cylinders_pos = torch.concat([cylinders_pos_xy, cylinder_pos_z], dim=-1).squeeze(0)
+        else:
+            if self.scenario_flag == 'empty':
+                num_fixed_cylinders = 0
+            elif self.scenario_flag == '2cylinders':
+                num_fixed_cylinders = 2
+                all_cylinders_pos[:num_fixed_cylinders] = torch.tensor([
+                                    [0.0, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [0.0, - 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                ], device=self.device)
+            elif self.scenario_flag == 'center':
+                num_fixed_cylinders = 9
+                all_cylinders_pos[:num_fixed_cylinders] = torch.tensor([
+                                    [0.0, 0.0, 0.5 * self.cylinder_height],
+                                    [0.0, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [0.0, - 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [2 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
+                                    [- 2 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
+                                    [2 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [- 2 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [2 * self.cylinder_size, -2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [- 2 * self.cylinder_size, -2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                ], device=self.device)
+            elif self.scenario_flag == 'corner':
+                num_fixed_cylinders = 5
+                all_cylinders_pos[:num_fixed_cylinders] = torch.tensor([
+                                    [2 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [2 * self.cylinder_size, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [2 * self.cylinder_size, 6 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [4 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [6 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                ], device=self.device)
+            elif self.scenario_flag == 'wall':
+                num_fixed_cylinders = 5
+                all_cylinders_pos[:num_fixed_cylinders] = torch.tensor([
+                                    [0.0, 0.0, 0.5 * self.cylinder_height],
+                                    [0.0, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [0.0, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [0.0, 8 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [0.0, 10 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                ], device=self.device)
+            elif self.scenario_flag == 'box':
+                num_fixed_cylinders = 12
+                all_cylinders_pos[:num_fixed_cylinders] = torch.tensor([
+                                    [4 * self.cylinder_size, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-4 * self.cylinder_size, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-4 * self.cylinder_size, -4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [4 * self.cylinder_size, -4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [4 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [2 * self.cylinder_size, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-2 * self.cylinder_size, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-4 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-2 * self.cylinder_size, -4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-4 * self.cylinder_size, -2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [2 * self.cylinder_size, -4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [4 * self.cylinder_size, -2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                ], device=self.device)
 
-        self.active_cylinders = torch.ones(self.num_envs, 1, device=self.device) * num_fixed_cylinders
+        if not self.use_random_cylinder:
+            self.active_cylinders = torch.ones(self.num_envs, 1, device=self.device) * num_fixed_cylinders
 
         # init drone
         drone_model = MultirotorBase.REGISTRY[self.cfg.task.drone_model]
