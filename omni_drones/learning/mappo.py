@@ -414,7 +414,7 @@ class MAPPOPolicy(object):
             window_step = self.TP_net.window_step
             # use the future groundtruth
             windows = TP_groundtruth.unfold(dimension=1, size=window_size + 1, step=window_step).transpose(2, 3)[:, :, 1:]
-            batch, seq_len, future_step, pos_dim = windows.shape
+            batch, _, future_step, pos_dim = windows.shape
             mask = TP_done[:, :windows.shape[1]].squeeze(-1).unsqueeze(-1).unsqueeze(-1).expand_as(windows).bool()
             selected_windows = torch.masked_select(windows, mask).view(batch, -1, future_step, pos_dim)
             select_seq_len = selected_windows.shape[1]

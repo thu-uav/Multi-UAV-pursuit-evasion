@@ -473,6 +473,7 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         self.TP = TP_net(input_dim = 1 + 3 + 3 + 3 * self.num_agents, output_dim = 3 * self.future_predcition_step, future_predcition_step = self.future_predcition_step, window_step=self.window_step).to(self.device)
         self.history_step = self.cfg.task.history_step
         self.history_data = collections.deque(maxlen=self.history_step)
+        # self.debug_list = []
 
         # for deployment
         self.prev_actions = torch.zeros(self.num_envs, self.num_agents, 4, device=self.device)
@@ -891,12 +892,11 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         self.target_pos_predicted[..., :2] = self.target_pos_predicted[..., :2] * 0.5 * self.arena_size
         self.target_pos_predicted[..., 2] = (self.target_pos_predicted[..., 2] + 1.0) / 2.0 * self.max_height
         # TP["TP_output"] = self.target_pos_predicted
-        TP["TP_groundtruth"] = target_pos.squeeze(1).clone()
         TP["TP_done"] = (self.progress_buf <= (self.max_episode_length - self.future_predcition_step)).unsqueeze(-1)
-        # # TP_groundtruth: clip to (-1.0, 1.0)
-        # TP["TP_groundtruth"] = target_pos.squeeze(1).clone()
-        # TP["TP_groundtruth"][..., :2] = TP["TP_groundtruth"][..., :2] / (0.5 * self.arena_size)
-        # TP["TP_groundtruth"][..., 2] = TP["TP_groundtruth"][..., 2] / self.max_height * 2.0 - 1.0     
+        # TP_groundtruth: clip to (-1.0, 1.0)
+        TP["TP_groundtruth"] = target_pos.squeeze(1).clone()
+        TP["TP_groundtruth"][..., :2] = TP["TP_groundtruth"][..., :2] / (0.5 * self.arena_size)
+        TP["TP_groundtruth"][..., 2] = TP["TP_groundtruth"][..., 2] / self.max_height * 2.0 - 1.0     
 
         target_rpos_predicted = (drone_pos.unsqueeze(2) - self.target_pos_predicted.unsqueeze(1)).view(self.num_envs, self.num_agents, -1)
 
@@ -1028,6 +1028,8 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
             (self.progress_buf >= self.max_episode_length).unsqueeze(-1)
         )
 
+        # if torch.any(done):
+        #     breakpoint()
         #     if self.stats["success"].mean() > 0.95:
         #         self.current_L = min(100, self.current_L + 1)
         #     self.stats["distance_threshold_L"].set_(self.current_L * torch.ones_like(self.stats["distance_threshold_L"]))
