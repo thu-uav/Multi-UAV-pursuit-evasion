@@ -11,3 +11,4 @@ from .hideandseek_circle_eval_large import HideAndSeek_circle_eval_large
 from .hideandseek_multiprey import HideAndSeek_multiprey
 from .hideandseek_circle_partial_TP import HideAndSeek_circle_partial_TP
 from .hideandseek_circle_partial_woTP import HideAndSeek_circle_partial_woTP
+from .hideandseek_circle_partial_TP_GAN import HideAndSeek_circle_partial_TP_GAN
