@@ -579,6 +579,7 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         self.fixed_num = self.cfg.task.cylinder.fixed_num
         self.use_fixed_num = (self.fixed_num is not None)
         self.invalid_z = -20.0 # for invalid cylinders_z, far enough
+        self.boundary = self.arena_size - 0.1
         
         # set all_cylinders under the ground
         all_cylinders_x = torch.arange(self.num_cylinders) * 2 * self.cylinder_size
