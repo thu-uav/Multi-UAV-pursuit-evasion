@@ -28,6 +28,7 @@ use_eval: 0
 use_partial_obs: 1
 use_random_cylinder: 1 # fixed task config
 use_DFS_validation: 0 # only use_random_cylinder = 1
+use_GAN: 1
 
 # TP net param
 history_step: 10
@@ -54,7 +55,7 @@ collision_radius: 0.07
 
 cylinder:
   size: 0.1
-  max_num: 5
+  max_num: 7
   obs_max_cylinder: 5
   # max_active: 3
   # min_active: 0
