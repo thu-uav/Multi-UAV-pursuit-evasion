@@ -805,7 +805,7 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
         center_pos = torch.zeros((len(env_ids), 1, 2), device=self.device)
         center_grid = torch.ones((len(env_ids), 1, 2), device=self.device, dtype=torch.int) * int(self.num_grid / 2)
         
-        self.candidate_cylinders_pos = torch.tensor(self.candidate_cylinders_pos, device=self.device).float().reshape(len(env_ids), -1, 2)
+        self.candidate_cylinders_pos = torch.from_numpy(self.candidate_cylinders_pos).to(self.device).reshape(len(env_ids), -1, 2)
         # allow cylinders in the same grid
         candidate_cylinders_grid = continuous_to_grid(self.candidate_cylinders_pos, self.num_grid, self.grid_size, center_pos, center_grid)
         objects_grid, self.active_cylinders = select_unoccupied_positions_GAN(grid_map, candidate_cylinders_grid, num_drones=self.num_agents, num_target=1)
@@ -1089,7 +1089,7 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
         # collison with cylinders, drones and walls
         # self.k_nearest_cylinders: [num_envs, num_agents, k, 5]
         # self.k_nearest_cylinders_mask: : [num_envs, num_agents, k]
-        cylinder_pos_dist = torch.norm(self.k_nearest_cylinders[..., :2], dim= -1).squeeze(-1)
+        cylinder_pos_dist = torch.norm(self.k_nearest_cylinders[..., :2], dim= -1)
         collision_cylinder = (cylinder_pos_dist - self.cylinder_size < self.collision_radius).float() # [num_envs, num_agents, k]
         # mask inactive cylinders
         collision_cylinder.masked_fill_(self.k_nearest_cylinders_mask, 0.0)

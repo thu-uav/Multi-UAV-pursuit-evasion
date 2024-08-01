@@ -1002,7 +1002,7 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         # collison with cylinders, drones and walls
         # self.k_nearest_cylinders: [num_envs, num_agents, k, 5]
         # self.k_nearest_cylinders_mask: : [num_envs, num_agents, k]
-        cylinder_pos_dist = torch.norm(self.k_nearest_cylinders[..., :2], dim= -1).squeeze(-1)
+        cylinder_pos_dist = torch.norm(self.k_nearest_cylinders[..., :2], dim= -1)
         collision_cylinder = (cylinder_pos_dist - self.cylinder_size < self.collision_radius).float() # [num_envs, num_agents, k]
         # mask inactive cylinders
         collision_cylinder.masked_fill_(self.k_nearest_cylinders_mask, 0.0)
