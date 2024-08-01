@@ -26,7 +26,7 @@ num_agents: 4
 # flag
 use_eval: 0
 use_partial_obs: 1
-use_random_cylinder: 1 # fixed task config
+use_random_cylinder: 1
 use_DFS_validation: 0 # only use_random_cylinder = 1
 
 # TP net param
@@ -54,7 +54,8 @@ collision_radius: 0.07
 
 cylinder:
   size: 0.1
-  max_num: 2
+  fixed_num: 0 # None: random num and pos, else only fixed num, random pos
+  max_num: 15
   obs_max_cylinder: 5
   # max_active: 3
   # min_active: 0

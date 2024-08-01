@@ -576,6 +576,8 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         self.scenario_flag = self.cfg.task.scenario_flag
         self.use_random_cylinder = self.cfg.task.use_random_cylinder
         self.num_cylinders = self.max_cylinders
+        self.fixed_num = self.cfg.task.cylinder.fixed_num
+        self.use_fixed_num = (self.fixed_num is not None)
         self.invalid_z = -20.0 # for invalid cylinders_z, far enough
         
         # set all_cylinders under the ground
@@ -727,7 +729,10 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         center_grid = torch.ones((len(env_ids), 1, 2), device=self.device, dtype=torch.int) * int(num_grid / 2)
         grid_map = set_outside_circle_to_one(grid_map)
         # randomize number of activate cylinders, use it later
-        self.active_cylinders = torch.randint(low=0, high=self.num_cylinders + 1, size=(len(env_ids), 1), device=self.device)
+        if self.use_fixed_num:
+            self.active_cylinders = torch.ones(len(env_ids), 1, device=self.device) * self.fixed_num
+        else:
+            self.active_cylinders = torch.randint(low=0, high=self.num_cylinders + 1, size=(len(env_ids), 1), device=self.device)
         self.inactive_mask = torch.arange(self.num_cylinders, device=self.device).unsqueeze(0).expand(len(env_ids), -1)
         # inactive = True, [envs, self.num_cylinders]
         self.inactive_mask = self.inactive_mask >= self.active_cylinders
@@ -763,7 +768,7 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
             drone_pos = torch.concat([drone_pos_xy, drone_pos_z], dim=-1)
             target_pos = torch.concat([target_pos_xy, target_pos_z], dim=-1)
             self.min_dist[env_ids] = float(torch.inf) # reset min distance
-                          
+                     
         # drone_pos = self.init_drone_pos_dist.sample((*env_ids.shape, self.num_agents))
         rpy = self.init_rpy_dist.sample((*env_ids.shape, self.num_agents))
         rot = euler_to_quaternion(rpy)
@@ -801,6 +806,9 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
 
         if self.use_eval and self._should_render(0):
             self._draw_court_circle()
+        
+        for substep in range(1):
+            self.sim.step(self._should_render(substep))
 
     def _pre_sim_step(self, tensordict: TensorDictBase):   
         actions = tensordict[("agents", "action")]

@@ -952,6 +952,9 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
         if self.use_eval and self._should_render(0):
             self._draw_court_circle()
 
+        for substep in range(1):
+            self.sim.step(self._should_render(substep))
+
     def _pre_sim_step(self, tensordict: TensorDictBase):   
         actions = tensordict[("agents", "action")]
         
