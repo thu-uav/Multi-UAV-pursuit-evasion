@@ -278,71 +278,6 @@ def set_outside_circle_to_one(grid_map):
     
     return grid_map
 
-class Teacher(object):
-    def __init__(self, cfg) -> None:
-        self.num_agents = 3
-        self.num_target = 1
-        self._state_buffer = np.zeros((0, 1), dtype=np.float32)
-        self._weight_buffer = np.zeros((0, 1), dtype=np.float32)
-        self._temp_state_buffer = []
-        self.prop_p = 0.7
-        self.buffer_size = 5000
-        self.R_min = cfg.task.catch_radius
-        self.R_max = cfg.task.catch_radius * 1.5
-    
-    def insert(self, states):
-        """
-        input:
-            states: list of np.array(size=(state_dim, ))
-        """
-        self._temp_state_buffer = copy.deepcopy(states)
-
-    def update_curriculum(self, all_weights):
-        mask = (all_weights > self.R_min) & (all_weights < self.R_max)
-        filter_indices = torch.nonzero(mask, as_tuple=True)[0]
-          
-        # concatenate to get all states and all weights
-        all_states = self._temp_state_buffer[filter_indices]
-        all_values = all_weights[filter_indices]
-
-        # random replace
-        if all_states.shape[0] > 0:
-            if self._state_buffer.shape[0] != 0:  # state buffer is not empty
-                num_replace = len(all_states) + len(self._state_buffer) - self.buffer_size
-                if num_replace > 0:
-                    num_left = len(self._state_buffer) - num_replace
-                    random_idx = torch.randperm(self._state_buffer.shape[0])
-                    self._state_buffer = torch.concat([self._state_buffer[random_idx][:num_left], all_states], dim=0)
-                    self._weight_buffer = torch.concat([self._weight_buffer[random_idx][:num_left], all_values], dim=0)
-                else:
-                    self._state_buffer = torch.concat([self._state_buffer, all_states], dim=0)
-                    self._weight_buffer = torch.concat([self._weight_buffer, all_values], dim=0)
-            else:
-                self._state_buffer = copy.deepcopy(all_states)
-                self._weight_buffer = copy.deepcopy(all_values)
-        
-        # reset temp state
-        self._temp_state_buffer = []
-        
-    def empty(self):
-        self._state_buffer = np.zeros((0, 1), dtype=np.float32)
-        self._weight_buffer = np.zeros((0, 1), dtype=np.float32)
-        self._temp_state_buffer = []
-
-    def sample(self, num_samples):
-        """
-        return list of np.array
-        """
-        weights = self._weight_buffer / np.mean(self._weight_buffer)
-        probs = weights / np.sum(weights)
-        sample_idx = np.random.choice(self._state_buffer.shape[0], num_samples, replace=True, p=probs)
-        initial_states = [self._state_buffer[idx] for idx in sample_idx]
-        return initial_states
-    
-    def save_task(self, model_dir, episode):
-        np.save('{}/tasks_{}.npy'.format(model_dir,episode), self._state_buffer)
-        np.save('{}/weights_{}.npy'.format(model_dir,episode), self._weight_buffer)
-
 class StateGenerator(object):
     """A base class for state generation."""
 
@@ -429,32 +364,27 @@ class GANBuffer(object):
     def __init__(self):
         self._state_buffer = np.zeros((0, 1), dtype=np.float32)
         self._weight_buffer = np.zeros((0, 1), dtype=np.float32)
-        self._share_obs_buffer = np.zeros((0, 1), dtype=np.float32)
+        self.buffer_length = 2000
         self._temp_state_buffer = []
-        self._temp_share_obs_buffer = []
+        self._temp_weight_buffer = []
     
-    def insert(self, states, share_obs):
+    def insert(self, states):
         """
         input:
             states: list of np.array(size=(state_dim, ))
-            weight: list of np.array(size=(1, ))
         """
         self._temp_state_buffer.extend(copy.deepcopy(states))
-        self._temp_share_obs_buffer.extend(copy.deepcopy(share_obs))
 
-    def update_states(self):
+    def insert_weights(self, weights):
+        self._temp_weight_buffer.append(weights.to('cpu').numpy())
+
+    def update(self):
         self._state_buffer = np.array(self._temp_state_buffer)
-        self._share_obs_buffer = np.array(self._temp_share_obs_buffer)
+        self._weight_buffer = np.stack(self._temp_weight_buffer, axis=-1).mean(-1)
 
         # reset temp state and weight buffer
         self._temp_state_buffer = []
-        self._temp_share_obs_buffer = []
-
-        return self._share_obs_buffer.copy()
-
-    # normalize
-    def update_weights(self, weights):
-        self._weight_buffer = (weights - np.min(weights)) / (np.max(weights) - np.min(weights))
+        self._temp_weight_buffer = []
 
 class HideAndSeek_circle_partial_TP_GAN(IsaacEnv): 
     """
@@ -595,6 +525,8 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
         # GAN proposer
         self.gan_buffer = GANBuffer()
         self.create_goalproposal_gan()
+        self.update_iter = 0 # multiple initialization for agents and target
+        self.eval_iter = 5
 
     def _set_specs(self):        
         drone_state_dim = self.drone.state_spec.shape.numel()
@@ -671,7 +603,13 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
             "action_error_order1_max": UnboundedContinuousTensorSpec(1),
             "target_predicted_error": UnboundedContinuousTensorSpec(1),
             "distance_threshold_L": UnboundedContinuousTensorSpec(1),
-        }).expand(self.num_envs).to(self.device)
+        })
+        # }).expand(self.num_envs).to(self.device)
+        # add success and number for all cylinders
+        for i in range(self.num_cylinders + 1):
+            stats_spec['ratio_cylinders_{}'.format(i)] = UnboundedContinuousTensorSpec(1)
+            stats_spec['success_cylinders_{}'.format(i)] = UnboundedContinuousTensorSpec(1)
+        stats_spec = stats_spec.expand(self.num_envs).to(self.device)
         info_spec = CompositeSpec({
             "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13), device=self.device),
             "prev_action": torch.stack([self.drone.action_spec] * self.drone.n, 0).to(self.device),
@@ -696,6 +634,10 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
         self.use_GAN = self.cfg.task.use_GAN
         self.num_cylinders = self.max_cylinders
         self.invalid_z = -20.0 # for invalid cylinders_z, far enough
+        # init grid map
+        self.grid_size = 2 * self.cylinder_size
+        self.num_grid = int(self.arena_size * 2 / self.grid_size)
+        self.boundary = self.arena_size - 0.1
         
         # set all_cylinders under the ground
         all_cylinders_x = torch.arange(self.num_cylinders) * 2 * self.cylinder_size
@@ -825,7 +767,6 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
         # init for drones and target
         grid_size = 2 * self.cylinder_size
         num_grid = int(self.arena_size * 2 / grid_size)
-        self.boundary = self.arena_size * 2 - 0.1
         grid_map = torch.zeros((len(env_ids), num_grid, num_grid), device=self.device, dtype=torch.int)
         # set out of circle = 1
         grid_map = set_outside_circle_to_one(grid_map)
@@ -840,7 +781,6 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
         # init for drones and target
         grid_size = 2 * self.cylinder_size
         num_grid = int(self.arena_size * 2 / grid_size)
-        self.boundary = self.arena_size * 2 - 0.1
         grid_map = torch.zeros((len(env_ids), num_grid, num_grid), device=self.device, dtype=torch.int)
         center_pos = torch.zeros((len(env_ids), 1, 2), device=self.device)
         center_grid = torch.ones((len(env_ids), 1, 2), device=self.device, dtype=torch.int) * int(num_grid / 2)
@@ -857,30 +797,25 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
         return objects_pos[:, :self.num_cylinders], \
             objects_pos[:, self.num_cylinders:self.num_agents + self.num_cylinders], \
             objects_pos[:, self.num_agents + self.num_cylinders:]
-
-    def rejection_sampling_GAN(self, env_ids: torch.Tensor):
-        # init for drones and target
-        grid_size = 2 * self.cylinder_size
-        num_grid = int(self.arena_size * 2 / grid_size)
-        self.boundary = self.arena_size * 2 - 0.1
-        grid_map = torch.zeros((len(env_ids), num_grid, num_grid), device=self.device, dtype=torch.int)
-        center_pos = torch.zeros((len(env_ids), 1, 2), device=self.device)
-        center_grid = torch.ones((len(env_ids), 1, 2), device=self.device, dtype=torch.int) * int(num_grid / 2)
+    
+    # multiple times for randomizing agents and target, for GAN
+    def rejection_sampling_others(self, env_ids: torch.Tensor):
+        grid_map = torch.zeros((len(env_ids), self.num_grid, self.num_grid), device=self.device, dtype=torch.int)
         grid_map = set_outside_circle_to_one(grid_map)
+        center_pos = torch.zeros((len(env_ids), 1, 2), device=self.device)
+        center_grid = torch.ones((len(env_ids), 1, 2), device=self.device, dtype=torch.int) * int(self.num_grid / 2)
         
-        # objects_grid, _ = select_unoccupied_positions(grid_map, self.num_cylinders, self.num_agents, 1)s
-        candidate_cylinders_pos, _ = self.gan.sample_states_with_noise(len(env_ids))
-        candidate_cylinders_pos = torch.tensor(candidate_cylinders_pos, device=self.device).float().reshape(len(env_ids), -1, 2)
+        self.candidate_cylinders_pos = torch.tensor(self.candidate_cylinders_pos, device=self.device).float().reshape(len(env_ids), -1, 2)
         # allow cylinders in the same grid
-        candidate_cylinders_grid = continuous_to_grid(candidate_cylinders_pos, num_grid, grid_size, center_pos, center_grid)
+        candidate_cylinders_grid = continuous_to_grid(self.candidate_cylinders_pos, self.num_grid, self.grid_size, center_pos, center_grid)
         objects_grid, self.active_cylinders = select_unoccupied_positions_GAN(grid_map, candidate_cylinders_grid, num_drones=self.num_agents, num_target=1)
-        self.active_cylinders = self.active_cylinders.to(self.device)
+        self.active_cylinders = self.active_cylinders.unsqueeze(-1).to(self.device)
         # objects_grid: cylinders, agents, target
         
         self.inactive_mask = torch.arange(self.num_cylinders, device=self.device).unsqueeze(0).expand(len(env_ids), -1)
         # inactive = True, [envs, self.num_cylinders]
         self.inactive_mask = self.inactive_mask >= self.active_cylinders
-        objects_pos = grid_to_continuous(objects_grid, self.boundary, grid_size, center_pos, center_grid)
+        objects_pos = grid_to_continuous(objects_grid, self.boundary, self.grid_size, center_pos, center_grid)
         
         return objects_pos[:, :self.num_cylinders], \
             objects_pos[:, self.num_cylinders:self.num_agents + self.num_cylinders], \
@@ -891,7 +826,12 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
         
         if self.use_random_cylinder:
             if self.use_GAN:
-                cylinders_pos_xy, drone_pos_xy, target_pos_xy = self.rejection_sampling_GAN(env_ids)
+                if self.update_iter == 0:
+                    # TODO: sample tasks from old goals
+                    # sample tasks by GAN
+                    self.candidate_cylinders_pos, _ = self.gan.sample_states_with_noise(len(env_ids))
+                    self.gan_buffer.insert(self.candidate_cylinders_pos)
+                cylinders_pos_xy, drone_pos_xy, target_pos_xy = self.rejection_sampling_others(env_ids)
             else:
                 cylinders_pos_xy, drone_pos_xy, target_pos_xy = self.rejection_sampling_random_cylinder(env_ids)
             drone_pos_z = self.init_drone_pos_dist_z.sample((*env_ids.shape, self.num_agents))
@@ -1191,11 +1131,24 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
             (self.progress_buf >= self.max_episode_length).unsqueeze(-1)
         )
 
-        # if torch.any(done):
-        #     breakpoint()
-        #     if self.stats["success"].mean() > 0.95:
-        #         self.current_L = min(100, self.current_L + 1)
-        #     self.stats["distance_threshold_L"].set_(self.current_L * torch.ones_like(self.stats["distance_threshold_L"]))
+        if torch.any(done):
+            # update weights
+            self.gan_buffer.insert_weights(self.stats["success"])
+            # update buffer, insert latest tasks
+            self.update_iter += 1
+            if self.update_iter >= self.eval_iter:
+                self.update_iter = 0
+                self.gan_buffer.update()
+                # update info
+                for i in range(self.num_cylinders + 1):
+                    self.stats['ratio_cylinders_{}'.format(i)] = (self.active_cylinders == i) / self.active_cylinders.shape[0]
+                    success_i = self.gan_buffer._weight_buffer[(self.active_cylinders == 0).cpu()]
+                    if len(success_i) > 0:
+                        success_i = success_i.mean()
+                    else:
+                        success_i = 0.0
+                    self.stats['success_cylinders_{}'.format(i)] = torch.ones(self.num_envs, 1, device=self.device)
+                self.train_GAN()
 
         ep_len = self.progress_buf.unsqueeze(-1)
         self.stats["collision"].div_(
@@ -1296,13 +1249,7 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
 
         return force.type(torch.float32)
 
-    # GAN teacher
-    def update_GAN_buffer(self):
-        # TODO: update GAN buffer
-        share_obs = self.gan_buffer.update_states()
-        weights = None
-        self.gan_buffer.update_weights(weights)
-
+    # GAN
     def create_goalproposal_gan(self):
         self.gan_configs = {
             'cuda':True,
@@ -1315,6 +1262,13 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
             'goal_noise_level': [0.1],
             'gan_noise_size': 16,
             'lr': 0.001,
+        }
+        
+        self.goal_configs = {
+            'num_buffer': 0.7,
+            'num_GAN': 0.3,
+            'R_min': 0.3,
+            'R_max': 0.7,
         }
 
         # init the gan
@@ -1329,10 +1283,10 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
         print('discriminator_loss:',str(dis_loss.cpu()), 'generator_loss:',str(gen_loss.cpu()))
 
     def train_GAN(self):
-        labels = np.zeros((len(self.gan_buffer._weight_buffer),1), dtype = int)
+        labels = np.zeros((len(self.gan_buffer._weight_buffer),1), dtype = float)
         for i in range(len(self.gan_buffer._weight_buffer)):
             if self.gan_buffer._weight_buffer[i] <= self.goal_configs['R_max'] and self.gan_buffer._weight_buffer[i] >= self.goal_configs['R_min']:
-                labels[i] = 1
+                labels[i] = 1.0
         self.gan.train(self.gan_buffer._state_buffer, labels)
 
     # visualize functions

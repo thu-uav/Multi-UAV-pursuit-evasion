@@ -54,8 +54,8 @@ collision_radius: 0.07
 
 cylinder:
   size: 0.1
-  fixed_num: 0 # None: random num and pos, else only fixed num, random pos
-  max_num: 15
+  fixed_num: null # None: random num and pos, else only fixed num, random pos
+  max_num: 5
   obs_max_cylinder: 5
   # max_active: 3
   # min_active: 0

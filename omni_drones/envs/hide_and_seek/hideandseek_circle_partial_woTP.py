@@ -558,6 +558,7 @@ class HideAndSeek_circle_partial_woTP(IsaacEnv):
         self.scenario_flag = self.cfg.task.scenario_flag
         self.use_random_cylinder = self.cfg.task.use_random_cylinder
         self.invalid_z = -20.0 # for invalid cylinders_z, far enough
+        self.boundary = self.arena_size - 0.1
         
         # set all_cylinders under the ground
         all_cylinders_x = torch.arange(self.num_cylinders) * 2 * self.cylinder_size
@@ -687,7 +688,6 @@ class HideAndSeek_circle_partial_woTP(IsaacEnv):
         # init for drones and target
         grid_size = 2 * self.cylinder_size
         num_grid = int(self.arena_size * 2 / grid_size)
-        boundary = self.arena_size * 2 - 0.1
         grid_map = torch.zeros((len(env_ids), num_grid, num_grid), device=self.device, dtype=torch.int)
         # set out of circle = 1
         grid_map = set_outside_circle_to_one(grid_map)
@@ -695,14 +695,13 @@ class HideAndSeek_circle_partial_woTP(IsaacEnv):
         center_grid = torch.ones((len(env_ids), 1, 2), device=self.device, dtype=torch.int) * int(num_grid / 2)
         cylinders_grid = continuous_to_grid(cylinders_pos[..., :2][env_ids], num_grid, grid_size, center_pos, center_grid)
         objects_grid = select_unoccupied_positions_withcylinders(grid_map, cylinders_grid, self.active_cylinders, num_drones=self.num_agents, num_target=1)
-        objects_pos = grid_to_continuous(objects_grid, boundary, grid_size, center_pos, center_grid)
+        objects_pos = grid_to_continuous(objects_grid, self.boundary, grid_size, center_pos, center_grid)
         return objects_pos[:, :self.num_agents], objects_pos[:, self.num_agents:]
 
     def rejection_sampling_random_cylinder(self, env_ids: torch.Tensor):
         # init for drones and target
         grid_size = 2 * self.cylinder_size
         num_grid = int(self.arena_size * 2 / grid_size)
-        boundary = self.arena_size * 2 - 0.1
         grid_map = torch.zeros((len(env_ids), num_grid, num_grid), device=self.device, dtype=torch.int)
         center_pos = torch.zeros((len(env_ids), 1, 2), device=self.device)
         center_grid = torch.ones((len(env_ids), 1, 2), device=self.device, dtype=torch.int) * int(num_grid / 2)
@@ -715,7 +714,7 @@ class HideAndSeek_circle_partial_woTP(IsaacEnv):
 
         objects_grid, _ = select_unoccupied_positions(grid_map, self.num_cylinders, self.num_agents, 1)
         
-        objects_pos = grid_to_continuous(objects_grid, boundary, grid_size, center_pos, center_grid)
+        objects_pos = grid_to_continuous(objects_grid, self.boundary, grid_size, center_pos, center_grid)
         return objects_pos[:, :self.num_cylinders], \
             objects_pos[:, self.num_cylinders:self.num_agents + self.num_cylinders], \
             objects_pos[:, self.num_agents + self.num_cylinders:]

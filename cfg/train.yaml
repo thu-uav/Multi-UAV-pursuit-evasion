@@ -6,8 +6,8 @@ sim: ${task.sim}
 env: ${task.env}
 
 # model_dir: /home/jiayu/OmniDrones/scripts/outputs/catch0_5_TP_window1/07-19_12-00/wandb/run-20240719_120034-qehz35x7/files/checkpoint_629407744.pt
-model_dir: /home/jiayu/OmniDrones/scripts/outputs/empty_catch0_3_v1_3_TP.pt
-# model_dir: null
+# model_dir: /home/jiayu/OmniDrones/scripts/outputs/empty_catch0_3_v1_3_TP.pt
+model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
 max_iters: -1
@@ -25,7 +25,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: random0_catch0_3_v1_3_TP_loadempty_withsimstep
+  run_name: random0to1_catch0_3_v1_3_TP_GAN
   # run_name: debug
   job_type: train
   entity: chenjy
@@ -34,12 +34,12 @@ wandb:
   mode: online # set to 'disabled' when debugging locally, online
   run_id: 
   monitor_gym: True
-  tags: 
+  tags:
 
 defaults:
   # - task: HideAndSeek_square_partial
   # - task: HideAndSeek_circle_partial_woTP
-  - task: HideAndSeek_circle_partial_TP
-  # - task: HideAndSeek_circle_partial_TP_GAN
+  # - task: HideAndSeek_circle_partial_TP
+  - task: HideAndSeek_circle_partial_TP_GAN
   - algo: mappo
   - _self_

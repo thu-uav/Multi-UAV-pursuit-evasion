@@ -133,15 +133,18 @@ class LSGAN(object):
             train_Y = torch.cat((sample_Y, generated_Y), dim=0)
             
             # Train Discriminator
-            sample_output = self.discriminator(train_X)
+            with torch.enable_grad():
+                sample_output = self.discriminator(train_X)
+                discriminator_loss = torch.mean((2*train_Y - 1 - sample_output)**2)
+            
             self.optimizer_D.zero_grad()
-            discriminator_loss = torch.mean((2*train_Y - 1 - sample_output)**2)
             discriminator_loss.backward()
             self.optimizer_D.step()
             # Train Generator
-            generator_output = self.discriminator(generated_X)
+            with torch.enable_grad():
+                generator_output = self.discriminator(generated_X)
+                generator_loss = torch.mean((generator_output - 1)**2)
             self.optimizer_G.zero_grad()
-            generator_loss = torch.mean((generator_output - 1)**2)
             generator_loss.backward()
             self.optimizer_G.step()
         return discriminator_loss, generator_loss
