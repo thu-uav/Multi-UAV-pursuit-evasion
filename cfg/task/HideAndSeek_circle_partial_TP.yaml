@@ -39,7 +39,7 @@ max_height: 1.2
 v_drone: 1.0
 v_prey: 1.3
 
-dist_reward_coef: 5.0
+dist_reward_coef: 1.0
 catch_reward_coef: 5.0
 detect_reward_coef: 0.0
 collision_coef: 100.0

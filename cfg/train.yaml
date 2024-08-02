@@ -25,7 +25,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: empty_catch0_3_v1_3_woTP_entropy0001_dist_coef5
+  run_name: empty_catch0_3_v1_3_TP_entropy0001_dist_coef1
   # run_name: debug
   job_type: train
   entity: chenjy
@@ -38,8 +38,8 @@ wandb:
 
 defaults:
   # - task: HideAndSeek_square_partial
-  - task: HideAndSeek_circle_partial_woTP
-  # - task: HideAndSeek_circle_partial_TP
+  # - task: HideAndSeek_circle_partial_woTP
+  - task: HideAndSeek_circle_partial_TP
   # - task: HideAndSeek_circle_partial_TP_GAN
   - algo: mappo
   - _self_
