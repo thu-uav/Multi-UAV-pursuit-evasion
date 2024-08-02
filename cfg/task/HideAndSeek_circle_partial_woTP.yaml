@@ -42,7 +42,7 @@ speed_coef: 10.0
 smoothness_coef: 5.0
 
 # env param
-catch_radius: 0.5
+catch_radius: 0.3
 drone_detect_radius: 100.0
 target_detect_radius: 100.0
 collision_radius: 0.07
