@@ -808,10 +808,10 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
         # self.candidate_cylinders_pos = torch.from_numpy(self.candidate_cylinders_pos).to(self.device).reshape(len(env_ids), -1, 2)
         # allow cylinders in the same grid
         candidate_cylinders_grid = continuous_to_grid(self.candidate_cylinders_pos, self.num_grid, self.grid_size, center_pos, center_grid)
+        
         objects_grid, self.active_cylinders = select_unoccupied_positions_GAN(grid_map, candidate_cylinders_grid, num_drones=self.num_agents, num_target=1)
         self.active_cylinders = self.active_cylinders.unsqueeze(-1).to(self.device)
-        # objects_grid: cylinders, agents, target
-        
+
         self.inactive_mask = torch.arange(self.num_cylinders, device=self.device).unsqueeze(0).expand(len(env_ids), -1)
         # inactive = True, [envs, self.num_cylinders]
         self.inactive_mask = self.inactive_mask >= self.active_cylinders
@@ -1142,13 +1142,14 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
                 self.gan_buffer.update()
                 # update info
                 for i in range(self.num_cylinders + 1):
-                    self.stats['ratio_cylinders_{}'.format(i)] = (self.active_cylinders == i) / self.active_cylinders.shape[0]
-                    success_i = self.gan_buffer._weight_buffer[(self.active_cylinders == 0).cpu()]
+                    ratio_i = (self.active_cylinders == i).float().sum() / self.active_cylinders.shape[0]
+                    self.stats['ratio_cylinders_{}'.format(i)] = torch.ones(self.num_envs, 1, device=self.device) * ratio_i
+                    success_i = self.gan_buffer._weight_buffer[(self.active_cylinders == i).cpu()]
                     if len(success_i) > 0:
                         success_i = success_i.mean()
                     else:
                         success_i = 0.0
-                    self.stats['success_cylinders_{}'.format(i)] = torch.ones(self.num_envs, 1, device=self.device)
+                    self.stats['success_cylinders_{}'.format(i)] = torch.ones(self.num_envs, 1, device=self.device) * success_i
                 self.train_GAN()
 
         ep_len = self.progress_buf.unsqueeze(-1)
