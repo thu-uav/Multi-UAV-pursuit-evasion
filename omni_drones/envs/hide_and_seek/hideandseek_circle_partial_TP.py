@@ -819,7 +819,8 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         min_dist = torch.min(target_dist, dim=-1).values.unsqueeze(-1)
         active_distance_reward = (min_dist.expand_as(target_dist) > self.catch_radius).float()
         expanded_broadcast_detect = self.broadcast_detect.expand(-1, self.num_agents)
-        distance_reward = - self.dist_reward_coef * target_dist * active_distance_reward
+        # distance_reward = - self.dist_reward_coef * target_dist * active_distance_reward
+        distance_reward = - self.dist_reward_coef * target_dist
         self.stats['distance_reward'].add_(distance_reward.mean(-1).unsqueeze(-1))
         
         # detect
