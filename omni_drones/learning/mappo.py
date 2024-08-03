@@ -89,10 +89,10 @@ class MAPPOPolicy(object):
 
         self.make_actor()
         self.make_critic()
+        self.use_TP_net = self.cfg.use_TP_net
         self.TP_net = TP_net
-        if self.TP_net is not None:
-            self.TP_optimizer = torch.optim.Adam(self.TP_net.parameters(), lr=0.0001)
-            self.TP_criterion = nn.MSELoss()
+        self.TP_optimizer = torch.optim.Adam(self.TP_net.parameters(), lr=0.0001)
+        self.TP_criterion = nn.MSELoss()
 
         self.train_in_keys = list(
             set(
@@ -404,7 +404,7 @@ class MAPPOPolicy(object):
         train_info = []
         TP_info = []
         
-        if self.TP_net is not None:
+        if self.use_TP_net:
             # expand TP_groundtruth
             TP_groundtruth = tensordict['next']['agents']['TP']['TP_groundtruth']
             # TP_output = tensordict['next']['agents']['TP']['TP_output']
@@ -461,7 +461,7 @@ class MAPPOPolicy(object):
                 )
         
         train_info = {k: v.mean().item() for k, v in torch.stack(train_info).items()}
-        if self.TP_net is not None:
+        if self.use_TP_net:
             TP_info = {k: v.mean().item() for k, v in torch.stack(TP_info).items()}
             train_info.update(TP_info)
         train_info["advantages_mean"] = advantages_mean.item()
@@ -475,24 +475,16 @@ class MAPPOPolicy(object):
         return {f"{self.agent_spec.name}/{k}": v for k, v in train_info.items()}
 
     def state_dict(self):
-        if self.TP_net is not None:
-            state_dict = {
-                "TP": self.TP_net.state_dict(),
-                "critic": self.critic.state_dict(),
-                "actor_params": self.actor_params,
-                "value_normalizer": self.value_normalizer.state_dict()
-            }
-        else:
-            state_dict = {
-                "critic": self.critic.state_dict(),
-                "actor_params": self.actor_params,
-                "value_normalizer": self.value_normalizer.state_dict()
-            }
+        state_dict = {
+            "TP": self.TP_net.state_dict(),
+            "critic": self.critic.state_dict(),
+            "actor_params": self.actor_params,
+            "value_normalizer": self.value_normalizer.state_dict()
+        }
         return state_dict
     
     def load_state_dict(self, state_dict):
-        if "TP" in state_dict.keys():
-            self.TP_net.load_state_dict(state_dict["TP"])
+        self.TP_net.load_state_dict(state_dict["TP"])
         self.actor_params = TensorDictParams(state_dict["actor_params"].to_tensordict())
         self.actor_opt = torch.optim.Adam(self.actor_params.parameters(), lr=self.cfg.actor.lr)
         self.critic.load_state_dict(state_dict["critic"])

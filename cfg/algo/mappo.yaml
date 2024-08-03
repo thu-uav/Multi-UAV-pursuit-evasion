@@ -4,6 +4,7 @@ name: mappo
 train_every: 64
 num_minibatches: 16
 ppo_epochs: 4
+use_TP_net: 1
 TP_epochs: 1
 clip_param: 0.2
 entropy_coef: 0.001
