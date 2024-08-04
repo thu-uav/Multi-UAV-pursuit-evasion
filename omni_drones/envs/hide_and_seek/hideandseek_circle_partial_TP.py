@@ -276,12 +276,12 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         )
 
         self.init_drone_pos_dist_z = D.Uniform(
-            torch.tensor([0.1], device=self.device),
-            torch.tensor([self.max_height - 0.1], device=self.device)
+            torch.tensor([self.max_height / 2 - 0.1], device=self.device),
+            torch.tensor([self.max_height / 2 + 0.1], device=self.device)
         )
         self.init_target_pos_dist_z = D.Uniform(
-            torch.tensor([0.1], device=self.device),
-            torch.tensor([self.max_height - 0.1], device=self.device)
+            torch.tensor([self.max_height / 2 - 0.1], device=self.device),
+            torch.tensor([self.max_height / 2 + 0.1], device=self.device)
         )
 
         self.init_rpy_dist = D.Uniform(
@@ -375,6 +375,7 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         stats_spec = CompositeSpec({
             "success": UnboundedContinuousTensorSpec(1),
             "collision": UnboundedContinuousTensorSpec(1),
+            "blocked": UnboundedContinuousTensorSpec(1),
             "distance_reward": UnboundedContinuousTensorSpec(1),
             "distance_predicted_reward": UnboundedContinuousTensorSpec(1),
             "speed_reward": UnboundedContinuousTensorSpec(1),
@@ -585,10 +586,10 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         
         # init, fixed xy and randomize z
         drone_pos = torch.tensor([
-                            [0.6000,  0.0000],
+                            [0.4000,  0.0000],
                             [0.8000,  0.0000],
-                            [0.8000, -0.2000],
-                            [0.8000,  0.2000],
+                            [0.8000, -0.4000],
+                            [0.8000,  0.4000],
                         ], device=self.device).unsqueeze(0).expand(len(env_ids), -1, -1)
         target_pos = torch.tensor([
                             [-0.8000,  0.0000],
@@ -819,8 +820,8 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         min_dist = torch.min(target_dist, dim=-1).values.unsqueeze(-1)
         active_distance_reward = (min_dist.expand_as(target_dist) > self.catch_radius).float()
         expanded_broadcast_detect = self.broadcast_detect.expand(-1, self.num_agents)
-        # distance_reward = - self.dist_reward_coef * target_dist * active_distance_reward
-        distance_reward = - self.dist_reward_coef * target_dist
+        distance_reward = - self.dist_reward_coef * target_dist * active_distance_reward
+        # distance_reward = - self.dist_reward_coef * target_dist
         self.stats['distance_reward'].add_(distance_reward.mean(-1).unsqueeze(-1))
         
         # detect
@@ -839,6 +840,7 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         # if capture, current_capture_step = progress_buf
         # else, current_capture_step = max_episode_length
         capture_flag = torch.any(catch_reward, dim=1)
+        self.stats["blocked"].add_(torch.all(self.blocked,dim=-1).unsqueeze(-1))
         self.stats["success"] = torch.logical_or(capture_flag.unsqueeze(1), self.stats["success"]).float()
         current_capture_step = capture_flag.float() * self.progress_buf + (~capture_flag).float() * self.max_episode_length
         self.stats['first_capture_step'] = torch.min(self.stats['first_capture_step'], current_capture_step.unsqueeze(1))

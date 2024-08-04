@@ -6,7 +6,7 @@ sim: ${task.sim}
 env: ${task.env}
 
 # model_dir: /home/jiayu/OmniDrones/scripts/outputs/catch0_5_TP_window1/07-19_12-00/wandb/run-20240719_120034-qehz35x7/files/checkpoint_629407744.pt
-# model_dir: /home/jiayu/OmniDrones/scripts/outputs/empty_catch0_5_v1_3_TP_new/08-03_17-52/wandb/run-20240803_175300-ds63bfq8/files/checkpoint_576847872.pt
+# model_dir: /home/jiayu/OmniDrones/scripts/outputs/empty_catch0_8_v1_0_TP_add_dist_mask/08-04_01-13/wandb/run-20240804_011313-iglyim8s/files/checkpoint_327811072.pt
 model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
@@ -25,7 +25,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: empty_catch0_5_v1_3_TP
+  run_name: empty_catch0_3_v1_0_TP
   # run_name: debug
   job_type: train
   entity: chenjy
