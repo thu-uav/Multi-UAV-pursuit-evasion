@@ -6,7 +6,7 @@ num_minibatches: 16
 ppo_epochs: 4
 use_TP_net: 1
 TP_epochs: 1
-clip_param: 0.2
+clip_param: 0.1
 entropy_coef: 0.001
 gae_lambda: 0.95
 gamma: 0.995
