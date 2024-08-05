@@ -693,7 +693,6 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         self.k_nearest_cylinders_masked = self.k_nearest_cylinders.clone()
         self.k_nearest_cylinders_masked.masked_fill_(self.k_nearest_cylinders_mask.unsqueeze(-1).expand_as(self.k_nearest_cylinders_masked), self.mask_value)
         obs["cylinders"] = self.k_nearest_cylinders_masked
-        breakpoint()
 
         # state_self
         target_pos, _ = self.get_env_poses(self.target.get_world_poses())

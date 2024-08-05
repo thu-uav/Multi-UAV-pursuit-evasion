@@ -408,12 +408,12 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
         )
 
         self.init_drone_pos_dist_z = D.Uniform(
-            torch.tensor([0.1], device=self.device),
-            torch.tensor([self.max_height - 0.1], device=self.device)
+            torch.tensor([self.max_height / 2 - 0.1], device=self.device),
+            torch.tensor([self.max_height / 2 + 0.1], device=self.device)
         )
         self.init_target_pos_dist_z = D.Uniform(
-            torch.tensor([0.1], device=self.device),
-            torch.tensor([self.max_height - 0.1], device=self.device)
+            torch.tensor([self.max_height / 2 - 0.1], device=self.device),
+            torch.tensor([self.max_height / 2 + 0.1], device=self.device)
         )
 
         self.init_rpy_dist = D.Uniform(
@@ -422,14 +422,6 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
         )
 
         if self.use_eval:
-            # self.init_target_pos_dist = D.Uniform(
-            #     torch.tensor([-0.8, -0.8, 0.5], device=self.device),
-            #     torch.tensor([-0.8, -0.8, 0.5], device=self.device)
-            # )
-            self.init_target_pos_dist = D.Uniform(
-                torch.tensor([0.8, 0.8, 0.5], device=self.device),
-                torch.tensor([0.8, 0.8, 0.5], device=self.device)
-            )
             self.init_rpy_dist = D.Uniform(
                 torch.tensor([0.0, 0.0, 0.0], device=self.device) * torch.pi,
                 torch.tensor([0.0, 0.0, 0.0], device=self.device) * torch.pi
@@ -528,6 +520,8 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
             "action_error_order1_max": UnboundedContinuousTensorSpec(1),
             "target_predicted_error": UnboundedContinuousTensorSpec(1),
             "distance_threshold_L": UnboundedContinuousTensorSpec(1),
+            "dis_loss": UnboundedContinuousTensorSpec(1),
+            "gen_loss": UnboundedContinuousTensorSpec(1),
         })
         # }).expand(self.num_envs).to(self.device)
         # add success and number for all cylinders
@@ -1209,7 +1203,9 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
         for i in range(len(self.gan_buffer._weight_buffer)):
             if self.gan_buffer._weight_buffer[i] <= self.goal_configs['R_max'] and self.gan_buffer._weight_buffer[i] >= self.goal_configs['R_min']:
                 labels[i] = 1.0
-        self.gan.train(self.gan_buffer._state_buffer, labels)
+        dis_loss, gen_loss = self.gan.train(self.gan_buffer._state_buffer, labels)
+        self.stats['dis_loss'] = torch.ones_like(self.stats['dis_loss']) * dis_loss
+        self.stats['gen_loss'] = torch.ones_like(self.stats['dis_loss']) * gen_loss
 
     # visualize functions
     def _draw_court_circle(self):
