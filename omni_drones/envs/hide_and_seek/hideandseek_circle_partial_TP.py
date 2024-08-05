@@ -693,6 +693,7 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         self.k_nearest_cylinders_masked = self.k_nearest_cylinders.clone()
         self.k_nearest_cylinders_masked.masked_fill_(self.k_nearest_cylinders_mask.unsqueeze(-1).expand_as(self.k_nearest_cylinders_masked), self.mask_value)
         obs["cylinders"] = self.k_nearest_cylinders_masked
+        breakpoint()
 
         # state_self
         target_pos, _ = self.get_env_poses(self.target.get_world_poses())
@@ -817,11 +818,10 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         target_dist = torch.norm(target_pos - drone_pos, dim=-1)
 
         # guidance, individual distance reward
-        min_dist = torch.min(target_dist, dim=-1).values.unsqueeze(-1)
-        active_distance_reward = (min_dist.expand_as(target_dist) > self.catch_radius).float()
-        expanded_broadcast_detect = self.broadcast_detect.expand(-1, self.num_agents)
+        # min_dist = torch.min(target_dist, dim=-1).values.unsqueeze(-1)
+        # active_distance_reward = (min_dist.expand_as(target_dist) > self.catch_radius).float()
+        active_distance_reward = (target_dist > self.catch_radius).float()
         distance_reward = - self.dist_reward_coef * target_dist * active_distance_reward
-        # distance_reward = - self.dist_reward_coef * target_dist
         self.stats['distance_reward'].add_(distance_reward.mean(-1).unsqueeze(-1))
         
         # detect

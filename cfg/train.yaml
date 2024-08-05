@@ -25,7 +25,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: empty_catch0_3_v1_0_TP_entropy0001_ppoclip01
+  run_name: random0and1_catch0_3_v1_0_TP
   # run_name: debug
   job_type: train
   entity: chenjy
