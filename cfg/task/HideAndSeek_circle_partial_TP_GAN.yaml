@@ -38,7 +38,7 @@ window_step: 1
 arena_size: 1.1
 max_height: 1.2
 v_drone: 1.0
-v_prey: 1.0
+v_prey: 1.3
 
 dist_reward_coef: 10.0
 catch_reward_coef: 10.0

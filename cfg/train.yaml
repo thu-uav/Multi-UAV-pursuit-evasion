@@ -25,7 +25,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: random0and1_catch0_3_v1_0_TP_GAN
+  run_name: empty_catch0_3_v1_3_TP
   # run_name: debug
   job_type: train
   entity: chenjy
@@ -39,7 +39,7 @@ wandb:
 defaults:
   # - task: HideAndSeek_square_partial
   # - task: HideAndSeek_circle_partial_woTP
-  # - task: HideAndSeek_circle_partial_TP
-  - task: HideAndSeek_circle_partial_TP_GAN
+  - task: HideAndSeek_circle_partial_TP
+  # - task: HideAndSeek_circle_partial_TP_GAN
   - algo: mappo
   - _self_

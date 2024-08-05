@@ -41,6 +41,7 @@ import time
 import collections
 from omni_drones.learning import TP_net
 from omni_drones.envs.hide_and_seek.gan.lsgan import LSGAN
+import math
 
 # *********check whether the capture is blocked***************
 def is_perpendicular_line_intersecting_segment(a, b, c):
@@ -250,6 +251,7 @@ class StateGAN(StateGenerator):
         states = np.random.uniform(
             self.state_center + self.state_bounds[0], self.state_center + self.state_bounds[1], size=(size, self.state_size)
         )
+        breakpoint()
         return self.pretrain(states, outer_iters)
 
     def pretrain(self, states, outer_iters=500, generator_iters=None, discriminator_iters=None):
@@ -405,6 +407,15 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
         
         self.central_env_pos = Float3(
             *self.envs_positions[self.central_env_idx].tolist()
+        )
+
+        self.init_drone_pos_dist = D.Uniform(
+            torch.tensor([0.1, -self.arena_size / math.sqrt(2.0)], device=self.device),
+            torch.tensor([self.arena_size / math.sqrt(2.0), self.arena_size / math.sqrt(2.0)], device=self.device)
+        )
+        self.init_target_pos_dist = D.Uniform(
+            torch.tensor([-self.arena_size / math.sqrt(2.0), -self.arena_size / math.sqrt(2.0)], device=self.device),
+            torch.tensor([-0.1, self.arena_size / math.sqrt(2.0)], device=self.device)
         )
 
         self.init_drone_pos_dist_z = D.Uniform(
@@ -744,16 +755,8 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
         self.drone._reset_idx(env_ids)
 
         # init, fixed xy and randomize z
-        drone_pos = torch.tensor([
-                            [0.6000,  0.0000],
-                            [0.8000,  0.0000],
-                            [0.8000, -0.2000],
-                            [0.8000,  0.2000],
-                        ], device=self.device).unsqueeze(0).expand(len(env_ids), -1, -1)
-        target_pos = torch.tensor([
-                            [-0.8000,  0.0000],
-                        ], device=self.device).unsqueeze(0).expand(len(env_ids), -1, -1)
-        
+        drone_pos = self.init_drone_pos_dist.sample((*env_ids.shape, self.num_agents))
+        target_pos =  self.init_target_pos_dist.sample((*env_ids.shape, 1))
         drone_pos_z = self.init_drone_pos_dist_z.sample((*env_ids.shape, self.num_agents))
         target_pos_z = self.init_target_pos_dist_z.sample((*env_ids.shape, 1))
         drone_pos = torch.concat([drone_pos, drone_pos_z], dim=-1)

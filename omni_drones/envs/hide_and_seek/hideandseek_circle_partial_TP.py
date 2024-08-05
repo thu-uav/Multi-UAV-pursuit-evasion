@@ -40,6 +40,7 @@ from .draw_circle import Float3, _COLOR_ACCENT, _carb_float3_add, draw_court_cir
 import time
 import collections
 from omni_drones.learning import TP_net
+import math
 
 
 # *********check whether the capture is blocked***************
@@ -273,6 +274,15 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         
         self.central_env_pos = Float3(
             *self.envs_positions[self.central_env_idx].tolist()
+        )
+
+        self.init_drone_pos_dist = D.Uniform(
+            torch.tensor([0.1, -self.arena_size / math.sqrt(2.0)], device=self.device),
+            torch.tensor([self.arena_size / math.sqrt(2.0), self.arena_size / math.sqrt(2.0)], device=self.device)
+        )
+        self.init_target_pos_dist = D.Uniform(
+            torch.tensor([-self.arena_size / math.sqrt(2.0), -self.arena_size / math.sqrt(2.0)], device=self.device),
+            torch.tensor([-0.1, self.arena_size / math.sqrt(2.0)], device=self.device)
         )
 
         self.init_drone_pos_dist_z = D.Uniform(
@@ -585,16 +595,8 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         self.drone._reset_idx(env_ids)
         
         # init, fixed xy and randomize z
-        drone_pos = torch.tensor([
-                            [0.4000,  0.0000],
-                            [0.8000,  0.0000],
-                            [0.8000, -0.4000],
-                            [0.8000,  0.4000],
-                        ], device=self.device).unsqueeze(0).expand(len(env_ids), -1, -1)
-        target_pos = torch.tensor([
-                            [-0.8000,  0.0000],
-                        ], device=self.device).unsqueeze(0).expand(len(env_ids), -1, -1)
-        
+        drone_pos = self.init_drone_pos_dist.sample((*env_ids.shape, self.num_agents))
+        target_pos =  self.init_target_pos_dist.sample((*env_ids.shape, 1))
         drone_pos_z = self.init_drone_pos_dist_z.sample((*env_ids.shape, self.num_agents))
         target_pos_z = self.init_target_pos_dist_z.sample((*env_ids.shape, 1))
         drone_pos = torch.concat([drone_pos, drone_pos_z], dim=-1)
