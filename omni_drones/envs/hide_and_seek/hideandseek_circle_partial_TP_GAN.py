@@ -319,6 +319,10 @@ class GANBuffer(object):
         self._temp_state_buffer = []
         self._temp_weight_buffer = []
 
+    def save_task(self, model_dir, episode):
+        np.save('{}/tasks_{}.npy'.format(model_dir,episode), self._state_buffer)
+        np.save('{}/weights_{}.npy'.format(model_dir,episode), self._weight_buffer)
+
 class HideAndSeek_circle_partial_TP_GAN(IsaacEnv): 
     """
     HideAndSeek environment designed for curriculum learning.
@@ -769,11 +773,11 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
                 if self.update_iter == 0: # fixed cylinders for eval_iter
                     # TODO: sample tasks from old goals
                     # sample tasks by GAN
-                    candidate_tasks, _ = self.gan.sample_states_with_noise(len(env_ids))
-                    self.gan_buffer.insert(candidate_tasks)
-                    drone_pos = torch.from_numpy(candidate_tasks[..., :2 * self.num_agents]).to(self.device).reshape(len(env_ids), -1, 2).float()
-                    target_pos = torch.from_numpy(candidate_tasks[..., 2 * self.num_agents: 2 * self.num_agents + 2]).to(self.device).reshape(len(env_ids), -1, 2).float()
-                    self.candidate_cylinders_pos = torch.from_numpy(candidate_tasks[..., 2 * self.num_agents + 2:]).to(self.device).reshape(len(env_ids), -1, 2).float()
+                    self.candidate_tasks, _ = self.gan.sample_states_with_noise(len(env_ids))
+                    self.gan_buffer.insert(self.candidate_tasks)
+                    self.candidate_cylinders_pos = torch.from_numpy(self.candidate_tasks[..., 2 * self.num_agents + 2:]).to(self.device).reshape(len(env_ids), -1, 2).float()
+                drone_pos = torch.from_numpy(self.candidate_tasks[..., :2 * self.num_agents]).to(self.device).reshape(len(env_ids), -1, 2).float()
+                target_pos = torch.from_numpy(self.candidate_tasks[..., 2 * self.num_agents: 2 * self.num_agents + 2]).to(self.device).reshape(len(env_ids), -1, 2).float()
                 cylinders_pos_xy = self.ignore_duplicated_cylinders(env_ids, drone_pos, target_pos)
             else:
                 drone_pos = self.init_drone_pos_dist.sample((*env_ids.shape, self.num_agents))
