@@ -481,6 +481,16 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
                                     [- 2 * self.cylinder_size, -2 * self.cylinder_size, 0.5 * self.cylinder_height],
                                 ], device=self.device)
             elif self.scenario_flag == 'corner':
+                # init
+                drone_pos = torch.tensor([
+                                    [-0.6000,  0.0000, 0.5],
+                                    [-0.8000,  0.0000, 0.5],
+                                    [-0.8000, -0.2000, 0.5],
+                                    [-0.8000,  0.2000, 0.5],
+                                ], device=self.device)
+                target_pos = torch.tensor([
+                                    [0.8000,  0.8000, 0.5],
+                                ], device=self.device)
                 num_fixed_cylinders = 5
                 all_cylinders_pos[:num_fixed_cylinders] = torch.tensor([
                                     [2 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
@@ -498,9 +508,11 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
                                     [0.0, 8 * self.cylinder_size, 0.5 * self.cylinder_height],
                                     [0.0, 10 * self.cylinder_size, 0.5 * self.cylinder_height],
                                 ], device=self.device)
-            elif self.scenario_flag == 'box':
-                num_fixed_cylinders = 12
+            elif self.scenario_flag == '2line':
+                num_fixed_cylinders = 14
                 all_cylinders_pos[:num_fixed_cylinders] = torch.tensor([
+                                    [4 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
+                                    [-4 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
                                     [4 * self.cylinder_size, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
                                     [-4 * self.cylinder_size, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
                                     [-4 * self.cylinder_size, -4 * self.cylinder_size, 0.5 * self.cylinder_height],
@@ -595,12 +607,45 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         self.drone._reset_idx(env_ids)
         
         # init, fixed xy and randomize z
-        drone_pos = self.init_drone_pos_dist.sample((*env_ids.shape, self.num_agents))
-        target_pos =  self.init_target_pos_dist.sample((*env_ids.shape, 1))
-        drone_pos_z = self.init_drone_pos_dist_z.sample((*env_ids.shape, self.num_agents))
-        target_pos_z = self.init_target_pos_dist_z.sample((*env_ids.shape, 1))
-        drone_pos = torch.concat([drone_pos, drone_pos_z], dim=-1)
-        target_pos = torch.concat([target_pos, target_pos_z], dim=-1)
+        if not self.use_eval:
+            drone_pos = self.init_drone_pos_dist.sample((*env_ids.shape, self.num_agents))
+            target_pos =  self.init_target_pos_dist.sample((*env_ids.shape, 1))
+            drone_pos_z = self.init_drone_pos_dist_z.sample((*env_ids.shape, self.num_agents))
+            target_pos_z = self.init_target_pos_dist_z.sample((*env_ids.shape, 1))
+            drone_pos = torch.concat([drone_pos, drone_pos_z], dim=-1)
+            target_pos = torch.concat([target_pos, target_pos_z], dim=-1)
+        else:
+            if self.scenario_flag == 'corner':
+                # init
+                drone_pos = torch.tensor([
+                                    [-0.6000,  0.0000, 0.5],
+                                    [-0.8000,  0.0000, 0.5],
+                                    [-0.8000, -0.2000, 0.5],
+                                    [-0.8000,  0.2000, 0.5],
+                                ], device=self.device).unsqueeze(0).expand(len(env_ids), -1, -1)
+                target_pos = torch.tensor([
+                                    [0.8000,  0.8000, 0.5],
+                                ], device=self.device).unsqueeze(0).expand(len(env_ids), -1, -1)
+            elif self.scenario_flag == 'wall':
+                drone_pos = torch.tensor([
+                                    [0.6000,  0.0000, 0.5],
+                                    [0.8000,  0.0000, 0.5],
+                                    [0.8000, -0.2000, 0.5],
+                                    [0.8000,  0.2000, 0.5],
+                                ], device=self.device)
+                target_pos = torch.tensor([
+                                    [-0.8000,  0.0000, 0.5],
+                                ], device=self.device)
+            elif self.scenario_flag == '2line':
+                drone_pos = torch.tensor([
+                                    [0.6000,  0.0000, 0.5],
+                                    [0.8000,  0.0000, 0.5],
+                                    [0.8000, -0.2000, 0.5],
+                                    [0.8000,  0.2000, 0.5],
+                                ], device=self.device)
+                target_pos = torch.tensor([
+                                    [0.0000,  0.0000, 0.5],
+                                ], device=self.device)
         
         if self.use_random_cylinder:
             cylinders_pos_xy = self.rejection_sampling_random_cylinder(env_ids, drone_pos, target_pos)
@@ -625,7 +670,8 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         self.target.set_world_poses(positions=target_pos + self.envs_positions[env_ids].unsqueeze(1), env_indices=env_ids)
         
         # set cylinders
-        self.cylinders.set_world_poses(positions=cylinders_pos + self.envs_positions[env_ids].unsqueeze(1), env_indices=env_ids)
+        if self.use_random_cylinder:
+            self.cylinders.set_world_poses(positions=cylinders_pos + self.envs_positions[env_ids].unsqueeze(1), env_indices=env_ids)
 
         # reset stats
         self.stats[env_ids] = 0.

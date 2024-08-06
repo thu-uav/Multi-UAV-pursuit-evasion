@@ -251,7 +251,6 @@ class StateGAN(StateGenerator):
         states = np.random.uniform(
             self.state_center + self.state_bounds[0], self.state_center + self.state_bounds[1], size=(size, self.state_size)
         )
-        breakpoint()
         return self.pretrain(states, outer_iters)
 
     def pretrain(self, states, outer_iters=500, generator_iters=None, discriminator_iters=None):
