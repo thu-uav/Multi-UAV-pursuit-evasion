@@ -130,7 +130,7 @@ def select_unoccupied_positions_GAN(occupancy_matrix, candidate_cylinder_grid):
         # set occupied grid by cylinders
         if len(flat_indices) > 0:
             occupancy_matrix[i][flat_indices[:, 0], flat_indices[:, 1]] = 1
-        # choose real cylinders, no duplication, not out of the circle, not on the drones and target
+        # diff means real cylinders, no duplication, not out of the circle, not on the drones and target
         cylinders_coords = torch.nonzero((occupancy_matrix[i] - wall_occupancy_matrix) == 1, as_tuple=False)
         active_cylinders = cylinders_coords.shape[0]
         active_cylinders_list.append(active_cylinders)
@@ -251,6 +251,13 @@ class StateGAN(StateGenerator):
         states = np.random.uniform(
             self.state_center + self.state_bounds[0], self.state_center + self.state_bounds[1], size=(size, self.state_size)
         )
+        return self.pretrain(states, outer_iters)
+
+    def pretrain_uniform_rejection(self, states, outer_iters=500):
+        """
+        :param size: number of uniformly sampled states (that we will try to fit as output of the GAN)
+        :param outer_iters: of the GAN
+        """
         return self.pretrain(states, outer_iters)
 
     def pretrain(self, states, outer_iters=500, generator_iters=None, discriminator_iters=None):
@@ -754,24 +761,26 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
         self.drone._reset_idx(env_ids)
 
         # init, fixed xy and randomize z
-        drone_pos = self.init_drone_pos_dist.sample((*env_ids.shape, self.num_agents))
-        target_pos =  self.init_target_pos_dist.sample((*env_ids.shape, 1))
         drone_pos_z = self.init_drone_pos_dist_z.sample((*env_ids.shape, self.num_agents))
         target_pos_z = self.init_target_pos_dist_z.sample((*env_ids.shape, 1))
-        drone_pos = torch.concat([drone_pos, drone_pos_z], dim=-1)
-        target_pos = torch.concat([target_pos, target_pos_z], dim=-1)
 
         if self.use_random_cylinder:
             if self.use_GAN:
                 if self.update_iter == 0: # fixed cylinders for eval_iter
                     # TODO: sample tasks from old goals
                     # sample tasks by GAN
-                    self.candidate_cylinders_pos, _ = self.gan.sample_states_with_noise(len(env_ids))
-                    self.gan_buffer.insert(self.candidate_cylinders_pos)
-                    self.candidate_cylinders_pos = torch.from_numpy(self.candidate_cylinders_pos).to(self.device).reshape(len(env_ids), -1, 2)
+                    candidate_tasks, _ = self.gan.sample_states_with_noise(len(env_ids))
+                    self.gan_buffer.insert(candidate_tasks)
+                    drone_pos = torch.from_numpy(candidate_tasks[..., :2 * self.num_agents]).to(self.device).reshape(len(env_ids), -1, 2).float()
+                    target_pos = torch.from_numpy(candidate_tasks[..., 2 * self.num_agents: 2 * self.num_agents + 2]).to(self.device).reshape(len(env_ids), -1, 2).float()
+                    self.candidate_cylinders_pos = torch.from_numpy(candidate_tasks[..., 2 * self.num_agents + 2:]).to(self.device).reshape(len(env_ids), -1, 2).float()
                 cylinders_pos_xy = self.ignore_duplicated_cylinders(env_ids, drone_pos, target_pos)
             else:
+                drone_pos = self.init_drone_pos_dist.sample((*env_ids.shape, self.num_agents))
+                target_pos =  self.init_target_pos_dist.sample((*env_ids.shape, 1))
                 cylinders_pos_xy = self.rejection_sampling_random_cylinder(env_ids, drone_pos, target_pos)
+            drone_pos = torch.concat([drone_pos, drone_pos_z], dim=-1)
+            target_pos = torch.concat([target_pos, target_pos_z], dim=-1)
             cylinder_pos_z = torch.ones(len(env_ids), self.num_cylinders, 1, device=self.device) * 0.5 * self.cylinder_height
             # set inactive cylinders under the ground
             cylinder_pos_z[self.inactive_mask] = self.invalid_z
@@ -1190,10 +1199,24 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
         }
 
         # init the gan
-        self.gan_configs['goal_size'] = self.num_cylinders * 2
-        self.gan_configs['goal_center'] = np.zeros(self.num_cylinders * 2, dtype=int)
-        self.gan_configs['goal_range'] = np.vstack([np.array([-self.boundary] * self.num_cylinders * 2),
-                                                    np.array([self.boundary] * self.num_cylinders * 2)])
+        self.gan_configs['goal_size'] = self.num_agents * 2 + 1 * 2 + self.num_cylinders * 2 # pos
+        self.gan_configs['goal_center'] = np.zeros(self.gan_configs['goal_size'], dtype=int)
+        # agent, set x center
+        self.gan_configs['goal_center'][0] = (0.1 + self.arena_size / math.sqrt(2.0)) / 2
+        self.gan_configs['goal_center'][2] = (0.1 + self.arena_size / math.sqrt(2.0)) / 2
+        self.gan_configs['goal_center'][4] = (0.1 + self.arena_size / math.sqrt(2.0)) / 2
+        self.gan_configs['goal_center'][6] = (0.1 + self.arena_size / math.sqrt(2.0)) / 2
+        # target
+        self.gan_configs['goal_center'][8] = (-self.arena_size / math.sqrt(2.0) - 0.1) / 2
+        # init range
+        agent_range_low = [0.1, -self.arena_size / math.sqrt(2.0)]
+        target_range_low = [-self.arena_size / math.sqrt(2.0), -self.arena_size / math.sqrt(2.0)]
+        cylinders_range_low = [-self.boundary, -self.boundary]
+        agent_range_up = [self.arena_size / math.sqrt(2.0), self.arena_size / math.sqrt(2.0)]
+        target_range_up = [-0.1, self.arena_size / math.sqrt(2.0)]
+        cylinders_range_up = [self.boundary, self.boundary]
+        self.gan_configs['goal_range'] = np.vstack([np.array(agent_range_low * self.num_agents + target_range_low * 1 + cylinders_range_low * self.num_cylinders),
+                                                    np.array(agent_range_up * self.num_agents + target_range_up * 1 + cylinders_range_up * self.num_cylinders)])
         self.gan = StateGAN(gan_configs = self.gan_configs, state_range=self.gan_configs['goal_range'])
 
         # pretrain the gan
