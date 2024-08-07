@@ -18,7 +18,7 @@ action_transform: PIDrate
 # # evalution scenario
 # evaluation_flag: null # '3_cylineder_line', '5_cylineder_line', '8_cylineder_ring', '7_cylineder_ring'
 
-scenario_flag: 'empty' # 'empty', 'corner', 'center', 'wall', '2line'
+scenario_flag: '3line' # 'empty', 'corner', '3line', 'wall', '2line'
 
 # exp
 num_agents: 4
