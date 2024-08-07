@@ -26,7 +26,7 @@ viewer:
 wandb:
   group: ${oc.select:..task.name}
   # run_name: debug
-  run_name: random0to5_catch0_3_v1_3_TP_arena0_9
+  run_name: GAN0to5_catch0_3_v1_3_TP_arena0_9_GAN1_unif0
   job_type: train
   entity: chenjy
   project: RAL
@@ -39,7 +39,7 @@ wandb:
 defaults:
   # - task: HideAndSeek_square_partial
   # - task: HideAndSeek_circle_partial_woTP
-  - task: HideAndSeek_circle_partial_TP
-  # - task: HideAndSeek_circle_partial_TP_GAN
+  # - task: HideAndSeek_circle_partial_TP
+  - task: HideAndSeek_circle_partial_TP_GAN
   - algo: mappo
   - _self_

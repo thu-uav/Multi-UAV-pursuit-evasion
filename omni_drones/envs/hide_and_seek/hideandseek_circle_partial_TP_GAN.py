@@ -599,7 +599,7 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
                         ], device=self.device)
         
         if self.use_random_cylinder:
-            cylinders_pos_xy = self.rejection_sampling_random_cylinder(torch.arange(1), drone_pos, target_pos)
+            cylinders_pos_xy = self.rejection_sampling_random_cylinder(1, drone_pos, target_pos)
             cylinder_pos_z = torch.ones(1, self.num_cylinders, 1, device=self.device) * 0.5 * self.cylinder_height
             # set inactive cylinders under the ground
             cylinder_pos_z[self.inactive_mask] = self.invalid_z
@@ -661,6 +661,17 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
                                     [-2 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
                                     [-2 * self.cylinder_size, -2 * self.cylinder_size, 0.5 * self.cylinder_height],
                                 ], device=self.device)
+            elif self.scenario_flag == '3line':
+                num_fixed_cylinders = 7
+                all_cylinders_pos[:num_fixed_cylinders] = torch.tensor([
+                                    [2 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
+                                    [2 * self.cylinder_size, -2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [2 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-2 * self.cylinder_size, -2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-2 * self.cylinder_size, -4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-2 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [-2 * self.cylinder_size, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                ], device=self.device)
 
         if not self.use_random_cylinder:
             self.active_cylinders = torch.ones(self.num_envs, 1, device=self.device) * num_fixed_cylinders
@@ -705,16 +716,16 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
 
         return ["/World/defaultGroundPlane"]
 
-    def rejection_sampling_random_cylinder(self, env_ids: torch.Tensor, drone_pos: torch.Tensor, target_pos: torch.Tensor):
+    def rejection_sampling_random_cylinder(self, num_tasks, drone_pos: torch.Tensor, target_pos: torch.Tensor):
         # init for drones and target
-        grid_map = torch.zeros((len(env_ids), self.num_grid, self.num_grid), device=self.device, dtype=torch.int)
-        center_pos = torch.zeros((len(env_ids), 1, 2), device=self.device)
-        center_grid = torch.ones((len(env_ids), 1, 2), device=self.device, dtype=torch.int) * int(self.num_grid / 2)
+        grid_map = torch.zeros((num_tasks, self.num_grid, self.num_grid), device=self.device, dtype=torch.int)
+        center_pos = torch.zeros((num_tasks, 1, 2), device=self.device)
+        center_grid = torch.ones((num_tasks, 1, 2), device=self.device, dtype=torch.int) * int(self.num_grid / 2)
         grid_map = set_outside_circle_to_one(grid_map)
         # setup drone and target
         drone_grid = continuous_to_grid(drone_pos[..., :2], self.num_grid, self.grid_size, center_pos, center_grid)
         target_grid = continuous_to_grid(target_pos[..., :2], self.num_grid, self.grid_size, center_pos, center_grid)
-        batch_indices = torch.arange(len(env_ids)).unsqueeze(1)
+        batch_indices = torch.arange(num_tasks).unsqueeze(1)
         x_indices = drone_grid[:, :, 0].flatten().long()
         y_indices = drone_grid[:, :, 1].flatten().long()
         grid_map[batch_indices.expand(-1, self.num_agents).flatten(), x_indices, y_indices] = 1
@@ -723,8 +734,8 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
         grid_map[batch_indices.expand(-1, 1).flatten(), x_indices, y_indices] = 1
      
         # randomize number of activate cylinders, use it later
-        self.active_cylinders = torch.randint(low=0, high=self.num_cylinders + 1, size=(len(env_ids), 1), device=self.device)
-        self.inactive_mask = torch.arange(self.num_cylinders, device=self.device).unsqueeze(0).expand(len(env_ids), -1)
+        self.active_cylinders = torch.randint(low=0, high=self.num_cylinders + 1, size=(num_tasks, 1), device=self.device)
+        self.inactive_mask = torch.arange(self.num_cylinders, device=self.device).unsqueeze(0).expand(num_tasks, -1)
         # inactive = True, [envs, self.num_cylinders]
         self.inactive_mask = self.inactive_mask >= self.active_cylinders
 
@@ -770,20 +781,27 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
         target_pos_z = self.init_target_pos_dist_z.sample((*env_ids.shape, 1))
 
         if self.use_random_cylinder:
-            if self.use_GAN:
-                if self.update_iter == 0: # fixed cylinders for eval_iter
-                    # TODO: sample tasks from old goals
-                    # sample tasks by GAN
-                    self.candidate_tasks, _ = self.gan.sample_states_with_noise(len(env_ids))
-                    self.gan_buffer.insert(self.candidate_tasks)
-                    self.candidate_cylinders_pos = torch.from_numpy(self.candidate_tasks[..., 2 * self.num_agents + 2:]).to(self.device).reshape(len(env_ids), -1, 2).float()
-                drone_pos = torch.from_numpy(self.candidate_tasks[..., :2 * self.num_agents]).to(self.device).reshape(len(env_ids), -1, 2).float()
-                target_pos = torch.from_numpy(self.candidate_tasks[..., 2 * self.num_agents: 2 * self.num_agents + 2]).to(self.device).reshape(len(env_ids), -1, 2).float()
-                cylinders_pos_xy = self.ignore_duplicated_cylinders(env_ids, drone_pos, target_pos)
-            else:
-                drone_pos = self.init_drone_pos_dist.sample((*env_ids.shape, self.num_agents))
-                target_pos =  self.init_target_pos_dist.sample((*env_ids.shape, 1))
-                cylinders_pos_xy = self.rejection_sampling_random_cylinder(env_ids, drone_pos, target_pos)
+            if self.update_iter == 0: # fixed cylinders for eval_iter
+                num_GAN = int(len(env_ids) * self.goal_configs['num_GAN'])
+                num_unif = len(env_ids) - num_GAN
+                # sample tasks by GAN
+                tasks_GAN, _ = self.gan.sample_states_with_noise(num_GAN)
+                if num_unif > 0:
+                    # sample from unif
+                    drone_pos_unif = self.init_drone_pos_dist.sample((num_unif, self.num_agents))
+                    target_pos_unif =  self.init_target_pos_dist.sample((num_unif, 1))
+                    cylinders_pos_xy_unif = self.rejection_sampling_random_cylinder(num_unif, drone_pos_unif, target_pos_unif)
+                    # TODO: sample tasks from unif
+                    tasks_unif = torch.concat([drone_pos_unif, target_pos_unif, cylinders_pos_xy_unif], dim=1).cpu().numpy().reshape(num_unif, -1)
+                    self.candidate_tasks = np.concatenate([tasks_unif, tasks_GAN])
+                else:
+                    self.candidate_tasks = tasks_GAN
+                self.gan_buffer.insert(self.candidate_tasks)
+                self.candidate_cylinders_pos = torch.from_numpy(self.candidate_tasks[..., 2 * self.num_agents + 2:]).to(self.device).reshape(len(env_ids), -1, 2).float()
+            drone_pos = torch.from_numpy(self.candidate_tasks[..., :2 * self.num_agents]).to(self.device).reshape(len(env_ids), -1, 2).float()
+            target_pos = torch.from_numpy(self.candidate_tasks[..., 2 * self.num_agents: 2 * self.num_agents + 2]).to(self.device).reshape(len(env_ids), -1, 2).float()
+            cylinders_pos_xy = self.ignore_duplicated_cylinders(env_ids, drone_pos, target_pos)
+
             drone_pos = torch.concat([drone_pos, drone_pos_z], dim=-1)
             target_pos = torch.concat([target_pos, target_pos_z], dim=-1)
             cylinder_pos_z = torch.ones(len(env_ids), self.num_cylinders, 1, device=self.device) * 0.5 * self.cylinder_height
@@ -838,6 +856,16 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
                                     [-0.8000,  0.0000, 0.5],
                                 ], device=self.device)
             elif self.scenario_flag == '2line':
+                drone_pos = torch.tensor([
+                                    [0.6000,  0.0000, 0.5],
+                                    [0.8000,  0.0000, 0.5],
+                                    [0.8000, -0.2000, 0.5],
+                                    [0.8000,  0.2000, 0.5],
+                                ], device=self.device)
+                target_pos = torch.tensor([
+                                    [0.0000,  0.0000, 0.5],
+                                ], device=self.device)
+            elif self.scenario_flag == '3line':
                 drone_pos = torch.tensor([
                                     [0.6000,  0.0000, 0.5],
                                     [0.8000,  0.0000, 0.5],
@@ -1251,10 +1279,9 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
         }
         
         self.goal_configs = {
-            'num_buffer': 0.7,
-            'num_GAN': 0.3,
-            'R_min': 0.0,
-            'R_max': 1.0,
+            'num_GAN': 1.0,
+            'R_min': 0.3,
+            'R_max': 0.7,
         }
 
         # init the gan
