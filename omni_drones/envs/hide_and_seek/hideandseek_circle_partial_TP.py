@@ -615,7 +615,17 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
             drone_pos = torch.concat([drone_pos, drone_pos_z], dim=-1)
             target_pos = torch.concat([target_pos, target_pos_z], dim=-1)
         else:
-            if self.scenario_flag == 'corner':
+            if self.scenario_flag == 'empty':
+                drone_pos = torch.tensor([
+                                    [0.6000,  0.0000, 0.5],
+                                    [0.8000,  0.0000, 0.5],
+                                    [0.8000, -0.2000, 0.5],
+                                    [0.8000,  0.2000, 0.5],
+                                ], device=self.device)
+                target_pos = torch.tensor([
+                                    [-0.8000,  0.0000, 0.5],
+                                ], device=self.device)
+            elif self.scenario_flag == 'corner':
                 # init
                 drone_pos = torch.tensor([
                                     [-0.6000,  0.0000, 0.5],

@@ -793,7 +793,40 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
             self.inactive_mask = torch.arange(self.num_cylinders, device=self.device).unsqueeze(0).expand(len(env_ids), -1)
             # inactive = True, [envs, self.num_cylinders]
             self.inactive_mask = self.inactive_mask >= self.active_cylinders
-                          
+        
+        if not self.use_random_cylinder:
+            if self.scenario_flag == 'corner':
+                # init
+                drone_pos = torch.tensor([
+                                    [-0.6000,  0.0000, 0.5],
+                                    [-0.8000,  0.0000, 0.5],
+                                    [-0.8000, -0.2000, 0.5],
+                                    [-0.8000,  0.2000, 0.5],
+                                ], device=self.device).unsqueeze(0).expand(len(env_ids), -1, -1)
+                target_pos = torch.tensor([
+                                    [0.8000,  0.8000, 0.5],
+                                ], device=self.device).unsqueeze(0).expand(len(env_ids), -1, -1)
+            elif self.scenario_flag == 'wall':
+                drone_pos = torch.tensor([
+                                    [0.6000,  0.0000, 0.5],
+                                    [0.8000,  0.0000, 0.5],
+                                    [0.8000, -0.2000, 0.5],
+                                    [0.8000,  0.2000, 0.5],
+                                ], device=self.device)
+                target_pos = torch.tensor([
+                                    [-0.8000,  0.0000, 0.5],
+                                ], device=self.device)
+            elif self.scenario_flag == '2line':
+                drone_pos = torch.tensor([
+                                    [0.6000,  0.0000, 0.5],
+                                    [0.8000,  0.0000, 0.5],
+                                    [0.8000, -0.2000, 0.5],
+                                    [0.8000,  0.2000, 0.5],
+                                ], device=self.device)
+                target_pos = torch.tensor([
+                                    [0.0000,  0.0000, 0.5],
+                                ], device=self.device)
+                       
         # drone_pos = self.init_drone_pos_dist.sample((*env_ids.shape, self.num_agents))
         rpy = self.init_rpy_dist.sample((*env_ids.shape, self.num_agents))
         rot = euler_to_quaternion(rpy)
@@ -808,7 +841,8 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
         self.target.set_world_poses(positions=target_pos + self.envs_positions[env_ids].unsqueeze(1), env_indices=env_ids)
         
         # set cylinders
-        self.cylinders.set_world_poses(positions=cylinders_pos + self.envs_positions[env_ids].unsqueeze(1), env_indices=env_ids)
+        if self.use_random_cylinder:
+            self.cylinders.set_world_poses(positions=cylinders_pos + self.envs_positions[env_ids].unsqueeze(1), env_indices=env_ids)
 
         # reset stats
         self.stats[env_ids] = 0.
@@ -1198,8 +1232,8 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
         self.goal_configs = {
             'num_buffer': 0.7,
             'num_GAN': 0.3,
-            'R_min': 0.3,
-            'R_max': 0.7,
+            'R_min': 0.0,
+            'R_max': 1.0,
         }
 
         # init the gan
