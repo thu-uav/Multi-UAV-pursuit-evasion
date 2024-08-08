@@ -296,8 +296,9 @@ class StateGAN(StateGenerator):
 class GANBuffer(object):
     def __init__(self):
         self._state_buffer = np.zeros((0, 1), dtype=np.float32)
+        self._history_buffer = np.zeros((0, 20), dtype=np.float32) # task_dim = 20
         self._weight_buffer = np.zeros((0, 1), dtype=np.float32)
-        self.buffer_length = 2000
+        self.buffer_length = 10000
         self._temp_state_buffer = []
         self._temp_weight_buffer = []
     
@@ -311,6 +312,10 @@ class GANBuffer(object):
     def insert_weights(self, weights):
         self._temp_weight_buffer.append(weights.to('cpu').numpy())
 
+    def insert_history(self, states):
+        if len(states) > 0:
+            self._history_buffer = np.concatenate([self._history_buffer, states])[-self.buffer_length:]
+
     def update(self):
         self._state_buffer = np.array(self._temp_state_buffer)
         self._weight_buffer = np.stack(self._temp_weight_buffer, axis=-1).mean(-1)
@@ -318,6 +323,10 @@ class GANBuffer(object):
         # reset temp state and weight buffer
         self._temp_state_buffer = []
         self._temp_weight_buffer = []
+
+    def sample(self, num_tasks):
+        indices = np.random.choice(self._history_buffer.shape[0], num_tasks, replace=False)
+        return self._history_buffer[indices]
 
     def save_task(self, model_dir, episode):
         np.save('{}/tasks_{}.npy'.format(model_dir,episode), self._state_buffer)
@@ -782,18 +791,14 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
 
         if self.use_random_cylinder:
             if self.update_iter == 0: # fixed cylinders for eval_iter
-                num_GAN = int(len(env_ids) * self.goal_configs['num_GAN'])
-                num_unif = len(env_ids) - num_GAN
+                num_buffer = min(self.gan_buffer._history_buffer.shape[0], int(len(env_ids) * (1 - self.goal_configs['num_GAN'])))
+                num_GAN = len(env_ids) - num_buffer
                 # sample tasks by GAN
                 tasks_GAN, _ = self.gan.sample_states_with_noise(num_GAN)
-                if num_unif > 0:
-                    # sample from unif
-                    drone_pos_unif = self.init_drone_pos_dist.sample((num_unif, self.num_agents))
-                    target_pos_unif =  self.init_target_pos_dist.sample((num_unif, 1))
-                    cylinders_pos_xy_unif = self.rejection_sampling_random_cylinder(num_unif, drone_pos_unif, target_pos_unif)
-                    # TODO: sample tasks from unif
-                    tasks_unif = torch.concat([drone_pos_unif, target_pos_unif, cylinders_pos_xy_unif], dim=1).cpu().numpy().reshape(num_unif, -1)
-                    self.candidate_tasks = np.concatenate([tasks_unif, tasks_GAN])
+                if num_buffer > 0:
+                    # sample from GAN_buffer
+                    tasks_buffer = self.gan_buffer.sample(num_buffer)
+                    self.candidate_tasks = np.concatenate([tasks_buffer, tasks_GAN])
                 else:
                     self.candidate_tasks = tasks_GAN
                 self.gan_buffer.insert(self.candidate_tasks)
@@ -1279,7 +1284,7 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
         }
         
         self.goal_configs = {
-            'num_GAN': 1.0,
+            'num_GAN': 0.5,
             'R_min': 0.3,
             'R_max': 0.7,
         }
@@ -1311,9 +1316,12 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
 
     def train_GAN(self):
         labels = np.zeros((len(self.gan_buffer._weight_buffer),1), dtype = float)
+        tmp_buffer = []
         for i in range(len(self.gan_buffer._weight_buffer)):
             if self.gan_buffer._weight_buffer[i] <= self.goal_configs['R_max'] and self.gan_buffer._weight_buffer[i] >= self.goal_configs['R_min']:
                 labels[i] = 1.0
+                tmp_buffer.append(self.gan_buffer._state_buffer[i])
+        self.gan_buffer.insert_history(np.array(tmp_buffer))
         dis_loss, gen_loss = self.gan.train(self.gan_buffer._state_buffer, labels)
         self.stats['dis_loss'] = torch.ones_like(self.stats['dis_loss']) * dis_loss
         self.stats['gen_loss'] = torch.ones_like(self.stats['dis_loss']) * gen_loss

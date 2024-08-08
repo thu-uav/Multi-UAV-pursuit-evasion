@@ -15,7 +15,7 @@ time_encoding: true
 
 action_transform: PIDrate
 
-scenario_flag: 'empty' # 'empty', 'corner', 'center', 'wall', '2line'
+scenario_flag: '3line' # 'empty', 'corner', 'wall', '2line', '3line'
 
 # exp
 num_agents: 4
