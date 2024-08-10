@@ -331,6 +331,7 @@ class GANBuffer(object):
     def save_task(self, model_dir, episode):
         np.save('{}/tasks_{}.npy'.format(model_dir,episode), self._state_buffer)
         np.save('{}/weights_{}.npy'.format(model_dir,episode), self._weight_buffer)
+        np.save('{}/history_{}.npy'.format(model_dir,episode), self._history_buffer)
 
 class HideAndSeek_circle_partial_TP_GAN(IsaacEnv): 
     """
@@ -1284,9 +1285,9 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
         }
         
         self.goal_configs = {
-            'num_GAN': 0.5,
-            'R_min': 0.3,
-            'R_max': 0.7,
+            'num_GAN': 1.0,
+            'R_min': 0.5,
+            'R_max': 0.9,
         }
 
         # init the gan
@@ -1302,9 +1303,13 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
         # init range
         agent_range_low = [0.1, -self.arena_size / math.sqrt(2.0)]
         target_range_low = [-self.arena_size / math.sqrt(2.0), -self.arena_size / math.sqrt(2.0)]
+        # agent_range_low = [-self.boundary, -self.boundary]
+        # target_range_low = [-self.boundary, -self.boundary]
         cylinders_range_low = [-self.boundary, -self.boundary]
         agent_range_up = [self.arena_size / math.sqrt(2.0), self.arena_size / math.sqrt(2.0)]
         target_range_up = [-0.1, self.arena_size / math.sqrt(2.0)]
+        # agent_range_up = [self.boundary, self.boundary]
+        # target_range_up = [self.boundary, self.boundary]
         cylinders_range_up = [self.boundary, self.boundary]
         self.gan_configs['goal_range'] = np.vstack([np.array(agent_range_low * self.num_agents + target_range_low * 1 + cylinders_range_low * self.num_cylinders),
                                                     np.array(agent_range_up * self.num_agents + target_range_up * 1 + cylinders_range_up * self.num_cylinders)])

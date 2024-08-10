@@ -594,14 +594,34 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         self.drone._reset_idx(env_ids)
         
         # init, fixed xy and randomize z
-        if not self.use_eval:
-            drone_pos = self.init_drone_pos_dist.sample((*env_ids.shape, self.num_agents))
-            target_pos =  self.init_target_pos_dist.sample((*env_ids.shape, 1))
+        if self.use_random_cylinder:
+            if not self.use_eval:
+                drone_pos = self.init_drone_pos_dist.sample((*env_ids.shape, self.num_agents))
+                target_pos =  self.init_target_pos_dist.sample((*env_ids.shape, 1))
+                # drone_pos = torch.tensor([
+                #                     [0.6000,  0.0000],
+                #                     [0.8000,  0.0000],
+                #                     [0.8000, -0.2000],
+                #                     [0.8000,  0.2000],
+                #                 ], device=self.device).unsqueeze(0).expand(len(env_ids), -1, -1)
+                # target_pos = torch.tensor([
+                #                     [-0.8000,  0.0000],
+                #                 ], device=self.device).unsqueeze(0).expand(len(env_ids), -1, -1)
+            else:
+                drone_pos = torch.tensor([
+                                    [0.6000,  0.0000, 0.5],
+                                    [0.8000,  0.0000, 0.5],
+                                    [0.8000, -0.2000, 0.5],
+                                    [0.8000,  0.2000, 0.5],
+                                ], device=self.device).unsqueeze(0).expand(len(env_ids), -1, -1)
+                target_pos = torch.tensor([
+                                    [-0.8000,  0.0000, 0.5],
+                                ], device=self.device).unsqueeze(0).expand(len(env_ids), -1, -1)
             drone_pos_z = self.init_drone_pos_dist_z.sample((*env_ids.shape, self.num_agents))
             target_pos_z = self.init_target_pos_dist_z.sample((*env_ids.shape, 1))
             drone_pos = torch.concat([drone_pos, drone_pos_z], dim=-1)
             target_pos = torch.concat([target_pos, target_pos_z], dim=-1)
-        else:
+        else: # fixed scenario
             if self.scenario_flag == 'empty':
                 drone_pos = torch.tensor([
                                     [0.6000,  0.0000, 0.5],
