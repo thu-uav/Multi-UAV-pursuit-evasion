@@ -42,6 +42,7 @@ import collections
 from omni_drones.learning import TP_net
 from omni_drones.envs.hide_and_seek.gan.lsgan import LSGAN
 import math
+from dgl.geometry import farthest_point_sampler
 
 # *********check whether the capture is blocked***************
 def is_perpendicular_line_intersecting_segment(a, b, c):
@@ -292,6 +293,8 @@ class GANBuffer(object):
         self._history_buffer = np.zeros((0, 20), dtype=np.float32) # task_dim = 20
         self._weight_buffer = np.zeros((0, 1), dtype=np.float32)
         self.buffer_length = 10000
+        self.eps = 1e-5
+        self.update_method = 'fps' # 'fifo', 'fps'
         self._temp_state_buffer = []
         self._temp_weight_buffer = []
     
@@ -307,7 +310,18 @@ class GANBuffer(object):
 
     def insert_history(self, states):
         if len(states) > 0:
-            self._history_buffer = np.concatenate([self._history_buffer, states])[-self.buffer_length:]
+            if self.update_method == "fps":
+                all_states = np.concatenate([self._history_buffer, states])
+                min_states = np.min(all_states, axis=0)
+                max_states = np.max(all_states, axis=0)
+                all_states_normalized = (all_states - min_states) / (max_states - min_states + self.eps)
+
+                all_states_tensor = torch.tensor(all_states_normalized[np.newaxis, :, consider_dim])
+                # farthest point sampling
+                fps_idx = farthest_point_sampler(all_states_tensor, self.buffer_length)[0].numpy()
+                self._history_buffer = all_states[fps_idx]
+            elif self.update_method == "fifo":
+                self._history_buffer = np.concatenate([self._history_buffer, states])[-self.buffer_length:]
 
     def update(self):
         self._state_buffer = np.array(self._temp_state_buffer)
