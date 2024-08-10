@@ -1285,9 +1285,9 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
         }
         
         self.goal_configs = {
-            'num_GAN': 1.0,
-            'R_min': 0.5,
-            'R_max': 0.9,
+            'num_GAN': self.cfg.task.num_GAN,
+            'R_min': self.cfg.task.R_min,
+            'R_max': self.cfg.task.R_max,
         }
 
         # init the gan
