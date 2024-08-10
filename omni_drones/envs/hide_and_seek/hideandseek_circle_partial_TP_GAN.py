@@ -1291,26 +1291,29 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
         }
 
         # init the gan
-        self.gan_configs['goal_size'] = self.num_agents * 2 + 1 * 2 + self.num_cylinders * 2 # pos
+        self.gan_configs['goal_size'] = self.num_agents * 2 + 1 * 2 + self.num_cylinders * 2 # agent pos + target pos + num_cylinders * 2
         self.gan_configs['goal_center'] = np.zeros(self.gan_configs['goal_size'], dtype=int)
-        # agent, set x center
+        # agent, set x center, y center = 0
+        # x ~ [0.1, self.arena_size / math.sqrt(2.0)]
+        # y ~ [-self.arena_size / math.sqrt(2.0), self.arena_size / math.sqrt(2.0)]
         self.gan_configs['goal_center'][0] = (0.1 + self.arena_size / math.sqrt(2.0)) / 2
         self.gan_configs['goal_center'][2] = (0.1 + self.arena_size / math.sqrt(2.0)) / 2
         self.gan_configs['goal_center'][4] = (0.1 + self.arena_size / math.sqrt(2.0)) / 2
         self.gan_configs['goal_center'][6] = (0.1 + self.arena_size / math.sqrt(2.0)) / 2
-        # target
+        agent_range_low = [(0.1 - self.arena_size / math.sqrt(2.0)) / 2, -self.arena_size / math.sqrt(2.0)] # x_low, y_low
+        agent_range_up = [(self.arena_size / math.sqrt(2.0) - 0.1) / 2, self.arena_size / math.sqrt(2.0)]
+        
+        # target, y center = 0
+        # x ~ [-self.arena_size / math.sqrt(2.0), -0.1]
+        # y ~ [-self.arena_size / math.sqrt(2.0), self.arena_size / math.sqrt(2.0)]
         self.gan_configs['goal_center'][8] = (-self.arena_size / math.sqrt(2.0) - 0.1) / 2
-        # init range
-        agent_range_low = [0.1, -self.arena_size / math.sqrt(2.0)]
-        target_range_low = [-self.arena_size / math.sqrt(2.0), -self.arena_size / math.sqrt(2.0)]
-        # agent_range_low = [-self.boundary, -self.boundary]
-        # target_range_low = [-self.boundary, -self.boundary]
+        target_range_low = [(0.1 - self.arena_size / math.sqrt(2.0)) / 2, -self.arena_size / math.sqrt(2.0)]
+        target_range_up = [(self.arena_size / math.sqrt(2.0) - 0.1) / 2, self.arena_size / math.sqrt(2.0)]
+        
+        # active_cylinder_low
         cylinders_range_low = [-self.boundary, -self.boundary]
-        agent_range_up = [self.arena_size / math.sqrt(2.0), self.arena_size / math.sqrt(2.0)]
-        target_range_up = [-0.1, self.arena_size / math.sqrt(2.0)]
-        # agent_range_up = [self.boundary, self.boundary]
-        # target_range_up = [self.boundary, self.boundary]
         cylinders_range_up = [self.boundary, self.boundary]
+        
         self.gan_configs['goal_range'] = np.vstack([np.array(agent_range_low * self.num_agents + target_range_low * 1 + cylinders_range_low * self.num_cylinders),
                                                     np.array(agent_range_up * self.num_agents + target_range_up * 1 + cylinders_range_up * self.num_cylinders)])
         self.gan = StateGAN(gan_configs = self.gan_configs, state_range=self.gan_configs['goal_range'])
