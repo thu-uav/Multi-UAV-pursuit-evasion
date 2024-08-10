@@ -288,7 +288,7 @@ class StateGAN(StateGenerator):
         return self.gan.discriminator_predict(states)
 
 class GANBuffer(object):
-    def __init__(self, device):
+    def __init__(self):
         self._state_buffer = np.zeros((0, 1), dtype=np.float32)
         self._history_buffer = np.zeros((0, 20), dtype=np.float32) # task_dim = 20
         self._weight_buffer = np.zeros((0, 1), dtype=np.float32)
