@@ -288,15 +288,16 @@ class StateGAN(StateGenerator):
         return self.gan.discriminator_predict(states)
 
 class GANBuffer(object):
-    def __init__(self):
+    def __init__(self, device):
         self._state_buffer = np.zeros((0, 1), dtype=np.float32)
         self._history_buffer = np.zeros((0, 20), dtype=np.float32) # task_dim = 20
         self._weight_buffer = np.zeros((0, 1), dtype=np.float32)
-        self.buffer_length = 10000
+        self.buffer_length = 2000
         self.eps = 1e-5
         self.update_method = 'fps' # 'fifo', 'fps'
         self._temp_state_buffer = []
         self._temp_weight_buffer = []
+        self.device = device
     
     def insert(self, states):
         """
@@ -312,14 +313,16 @@ class GANBuffer(object):
         if len(states) > 0:
             if self.update_method == "fps":
                 all_states = np.concatenate([self._history_buffer, states])
-                min_states = np.min(all_states, axis=0)
-                max_states = np.max(all_states, axis=0)
-                all_states_normalized = (all_states - min_states) / (max_states - min_states + self.eps)
-
-                all_states_tensor = torch.tensor(all_states_normalized[np.newaxis, :, consider_dim])
-                # farthest point sampling
-                fps_idx = farthest_point_sampler(all_states_tensor, self.buffer_length)[0].numpy()
-                self._history_buffer = all_states[fps_idx]
+                if all_states.shape[0] > self.buffer_length:
+                    min_states = np.min(all_states, axis=0)
+                    max_states = np.max(all_states, axis=0)
+                    all_states_normalized = (all_states - min_states) / (max_states - min_states + self.eps)
+                    all_states_tensor = torch.tensor(all_states_normalized[np.newaxis, :])
+                    # farthest point sampling
+                    fps_idx = farthest_point_sampler(all_states_tensor, self.buffer_length)[0].numpy()
+                    self._history_buffer = all_states[fps_idx]
+                else:
+                    self._history_buffer = all_states
             elif self.update_method == "fifo":
                 self._history_buffer = np.concatenate([self._history_buffer, states])[-self.buffer_length:]
 
@@ -339,7 +342,7 @@ class GANBuffer(object):
         np.save('{}/tasks_{}.npy'.format(model_dir,episode), self._state_buffer)
         np.save('{}/weights_{}.npy'.format(model_dir,episode), self._weight_buffer)
         np.save('{}/history_{}.npy'.format(model_dir,episode), self._history_buffer)
-
+        
 class HideAndSeek_circle_partial_TP_GAN(IsaacEnv): 
     """
     HideAndSeek environment designed for curriculum learning.
