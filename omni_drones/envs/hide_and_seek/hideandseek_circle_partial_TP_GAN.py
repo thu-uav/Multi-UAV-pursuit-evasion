@@ -297,7 +297,6 @@ class GANBuffer(object):
         self.update_method = 'fps' # 'fifo', 'fps'
         self._temp_state_buffer = []
         self._temp_weight_buffer = []
-        self.device = device
     
     def insert(self, states):
         """
