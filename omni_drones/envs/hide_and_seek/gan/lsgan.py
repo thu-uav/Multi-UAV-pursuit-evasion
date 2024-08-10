@@ -144,6 +144,7 @@ class LSGAN(object):
             with torch.enable_grad():
                 generator_output = self.discriminator(generated_X)
                 generator_loss = torch.mean((generator_output - 1)**2)
+            
             self.optimizer_G.zero_grad()
             generator_loss.backward()
             self.optimizer_G.step()

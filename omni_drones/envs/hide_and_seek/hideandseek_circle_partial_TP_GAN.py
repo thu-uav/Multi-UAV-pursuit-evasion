@@ -253,13 +253,6 @@ class StateGAN(StateGenerator):
         )
         return self.pretrain(states, outer_iters)
 
-    def pretrain_uniform_rejection(self, states, outer_iters=500):
-        """
-        :param size: number of uniformly sampled states (that we will try to fit as output of the GAN)
-        :param outer_iters: of the GAN
-        """
-        return self.pretrain(states, outer_iters)
-
     def pretrain(self, states, outer_iters=500, generator_iters=None, discriminator_iters=None):
         """
         Pretrain the state GAN to match the distribution of given states.
@@ -287,7 +280,7 @@ class StateGAN(StateGenerator):
 
     def train(self, states, labels, outer_iters=None, generator_iters=None, discriminator_iters=None):
         # normalize 0~1
-        normalized_states = (states - self.state_center) / self.state_bounds[1][-1]
+        normalized_states = (states - self.state_center) / self.state_bounds[1]
         return self.gan.train(normalized_states, labels, self.gan_configs)
 
     def discriminator_predict(self, states):
@@ -819,7 +812,7 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
             # inactive = True, [envs, self.num_cylinders]
             self.inactive_mask = self.inactive_mask >= self.active_cylinders
         
-        if not self.use_random_cylinder:
+        if not self.use_random_cylinder: # fixed drone and target
             if self.scenario_flag == 'empty':
                 drone_pos = torch.tensor([
                                     [0.6000,  0.0000, 0.5],
@@ -1274,7 +1267,7 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
         self.gan_configs = {
             'cuda':True,
             'batch_size': 64,
-            'gan_outer_iters':100,
+            'gan_outer_iters': 5000,
             'num_labels' : 1,  # normally only 1 label(success or not)  
             'goal_size': 0,
             'goal_center': [0,0],
@@ -1292,7 +1285,7 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
 
         # init the gan
         self.gan_configs['goal_size'] = self.num_agents * 2 + 1 * 2 + self.num_cylinders * 2 # agent pos + target pos + num_cylinders * 2
-        self.gan_configs['goal_center'] = np.zeros(self.gan_configs['goal_size'], dtype=int)
+        self.gan_configs['goal_center'] = np.zeros(self.gan_configs['goal_size'], dtype=float)
         # agent, set x center, y center = 0
         # x ~ [0.1, self.arena_size / math.sqrt(2.0)]
         # y ~ [-self.arena_size / math.sqrt(2.0), self.arena_size / math.sqrt(2.0)]
