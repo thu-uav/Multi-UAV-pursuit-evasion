@@ -595,27 +595,18 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         
         # init, fixed xy and randomize z
         if self.use_random_cylinder:
-            if not self.use_eval:
+            if not self.use_eval: # random pos
                 drone_pos = self.init_drone_pos_dist.sample((*env_ids.shape, self.num_agents))
                 target_pos =  self.init_target_pos_dist.sample((*env_ids.shape, 1))
-                # drone_pos = torch.tensor([
-                #                     [0.6000,  0.0000],
-                #                     [0.8000,  0.0000],
-                #                     [0.8000, -0.2000],
-                #                     [0.8000,  0.2000],
-                #                 ], device=self.device).unsqueeze(0).expand(len(env_ids), -1, -1)
-                # target_pos = torch.tensor([
-                #                     [-0.8000,  0.0000],
-                #                 ], device=self.device).unsqueeze(0).expand(len(env_ids), -1, -1)
-            else:
+            else: # fixed pos
                 drone_pos = torch.tensor([
-                                    [0.6000,  0.0000, 0.5],
-                                    [0.8000,  0.0000, 0.5],
-                                    [0.8000, -0.2000, 0.5],
-                                    [0.8000,  0.2000, 0.5],
+                                    [0.6000,  0.0000],
+                                    [0.8000,  0.0000],
+                                    [0.8000, -0.2000],
+                                    [0.8000,  0.2000],
                                 ], device=self.device).unsqueeze(0).expand(len(env_ids), -1, -1)
                 target_pos = torch.tensor([
-                                    [-0.8000,  0.0000, 0.5],
+                                    [-0.8000,  0.0000],
                                 ], device=self.device).unsqueeze(0).expand(len(env_ids), -1, -1)
             drone_pos_z = self.init_drone_pos_dist_z.sample((*env_ids.shape, self.num_agents))
             target_pos_z = self.init_target_pos_dist_z.sample((*env_ids.shape, 1))
@@ -1069,19 +1060,25 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         force_r[...,2] += - (0.0 - target_pos[..., 2]) / ((0.0 - target_pos[..., 2])**2 + 1e-5)
         force += force_r
         
-        # only get force from the nearest cylinder to the target
-        # get the nearest cylinder to the target
-        target_cylinders_mdist = torch.norm(target_cylinders_rpos, dim=-1) - self.cylinder_size
-        target_min_distance_idx = torch.argmin(target_cylinders_mdist, dim=-1)
-        # inactive mask
-        target_min_distance_mask = self.cylinders_mask.gather(1, target_min_distance_idx)
-        target_min_distance_idx_expanded = target_min_distance_idx.unsqueeze(-1).unsqueeze(-1).expand(-1, -1, 1, target_cylinders_rpos.shape[-1])
-        nearest_cylinder_to_target = target_cylinders_rpos.gather(2, target_min_distance_idx_expanded)
+        # # only get force from the nearest cylinder to the target
+        # target_cylinders_mdist = torch.norm(target_cylinders_rpos, dim=-1) - self.cylinder_size
+        # target_min_distance_idx = torch.argmin(target_cylinders_mdist, dim=-1)
+        # # inactive mask
+        # target_min_distance_mask = self.cylinders_mask.gather(1, target_min_distance_idx)
+        # target_min_distance_idx_expanded = target_min_distance_idx.unsqueeze(-1).unsqueeze(-1).expand(-1, -1, 1, target_cylinders_rpos.shape[-1])
+        # nearest_cylinder_to_target = target_cylinders_rpos.gather(2, target_min_distance_idx_expanded)
+        # force_c = torch.zeros_like(force)
+        # dist_target_cylinder = torch.norm(nearest_cylinder_to_target[..., :2], dim=-1)
+        # detect_cylinder = (dist_target_cylinder < self.target_detect_radius)
+        # force_c[..., :2] = ~target_min_distance_mask.unsqueeze(-1) * detect_cylinder * nearest_cylinder_to_target[..., :2].squeeze(2) / (dist_target_cylinder**2 + 1e-5)
         
+        # get force from all cylinders
+        # inactive mask, self.cylinders_mask
         force_c = torch.zeros_like(force)
-        dist_target_cylinder = torch.norm(nearest_cylinder_to_target[..., :2], dim=-1)
+        dist_target_cylinder = torch.norm(target_cylinders_rpos[..., :2], dim=-1) - self.cylinder_size
         detect_cylinder = (dist_target_cylinder < self.target_detect_radius)
-        force_c[..., :2] = ~target_min_distance_mask.unsqueeze(-1) * detect_cylinder * nearest_cylinder_to_target[..., :2].squeeze(2) / (dist_target_cylinder**2 + 1e-5)
+        force_c[..., :2] = (~self.cylinders_mask.unsqueeze(1).unsqueeze(-1) * detect_cylinder.unsqueeze(-1) * target_cylinders_rpos[..., :2] / (dist_target_cylinder**2 + 1e-5).unsqueeze(-1)).sum(2)    
+
         force += force_c
 
         return force.type(torch.float32)
