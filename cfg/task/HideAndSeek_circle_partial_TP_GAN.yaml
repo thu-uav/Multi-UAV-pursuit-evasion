@@ -15,7 +15,8 @@ time_encoding: true
 
 action_transform: PIDrate
 
-scenario_flag: 'wall' # 'empty', 'corner', 'wall', '2line', '3line'
+# use_random_cylinder = 1: invalid
+scenario_flag: 'empty' # 'empty', 'corner', 'wall', '2line', '3line'
 
 # exp
 num_agents: 4
@@ -25,9 +26,9 @@ use_eval: 0
 use_partial_obs: 1
 use_random_cylinder: 1 # fixed task config
 use_GAN: 1
-num_GAN: 0.7
-R_min: 0.3
-R_max: 0.7
+num_GAN: 0.3
+R_min: 0.5
+R_max: 0.9
 
 # TP net param
 history_step: 10

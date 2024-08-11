@@ -27,7 +27,7 @@ wandb:
   group: ${oc.select:..task.name}
   # run_name: debug
   # run_name: GAN0to5_GAN0_3_fpsbuffer0_7_min0_3_max0_7_eval2line
-  run_name: random0to5_evalcorner
+  run_name: random0to5
   job_type: train
   entity: chenjy
   project: RAL
