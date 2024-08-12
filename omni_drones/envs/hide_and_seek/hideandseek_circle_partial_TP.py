@@ -795,36 +795,36 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         target_vel_masked = target_vel[..., :3].clone()
         target_vel_masked.masked_fill_(target_mask, self.mask_value)
 
-        # use the real target pos to supervise the TP network
-        TP = TensorDict({}, [self.num_envs])
-        frame_state = torch.concat([
-            self.progress_buf.unsqueeze(-1),
-            target_pos_masked.reshape(self.num_envs, -1),
-            target_vel_masked.squeeze(1),
-            drone_pos.reshape(self.num_envs, -1)
-        ], dim=-1)
-        if len(self.history_data) < self.history_step:
-            # init history data
-            for i in range(self.history_step):
-                self.history_data.append(frame_state)
-        else:
-            self.history_data.append(frame_state)
-        TP['TP_input'] = torch.stack(list(self.history_data), dim=1).to(self.device)
-        # target_pos_predicted, x, y -> [-0.5 * self.arena_size, 0.5 * self.arena_size]
-        # z -> [0, self.max_height]
-        self.target_pos_predicted = self.TP(TP['TP_input']).reshape(self.num_envs, self.future_predcition_step, -1) # [num_envs, 3 * future_step]
-        self.target_pos_predicted[..., :2] = self.target_pos_predicted[..., :2] * 0.5 * self.arena_size
-        self.target_pos_predicted[..., 2] = (self.target_pos_predicted[..., 2] + 1.0) / 2.0 * self.max_height
-        # TP["TP_output"] = self.target_pos_predicted
-        TP["TP_done"] = (self.progress_buf <= (self.max_episode_length - self.future_predcition_step)).unsqueeze(-1)
-        # TP_groundtruth: clip to (-1.0, 1.0)
-        TP["TP_groundtruth"] = target_pos.squeeze(1).clone()
-        TP["TP_groundtruth"][..., :2] = TP["TP_groundtruth"][..., :2] / (0.5 * self.arena_size)
-        TP["TP_groundtruth"][..., 2] = TP["TP_groundtruth"][..., 2] / self.max_height * 2.0 - 1.0     
-
-        target_rpos_predicted = (drone_pos.unsqueeze(2) - self.target_pos_predicted.unsqueeze(1)).view(self.num_envs, self.num_agents, -1)
-
         if self.use_TP_net:
+            # use the real target pos to supervise the TP network
+            TP = TensorDict({}, [self.num_envs])
+            frame_state = torch.concat([
+                self.progress_buf.unsqueeze(-1),
+                target_pos_masked.reshape(self.num_envs, -1),
+                target_vel_masked.squeeze(1),
+                drone_pos.reshape(self.num_envs, -1)
+            ], dim=-1)
+            if len(self.history_data) < self.history_step:
+                # init history data
+                for i in range(self.history_step):
+                    self.history_data.append(frame_state)
+            else:
+                self.history_data.append(frame_state)
+            TP['TP_input'] = torch.stack(list(self.history_data), dim=1).to(self.device)
+            # target_pos_predicted, x, y -> [-0.5 * self.arena_size, 0.5 * self.arena_size]
+            # z -> [0, self.max_height]
+            self.target_pos_predicted = self.TP(TP['TP_input']).reshape(self.num_envs, self.future_predcition_step, -1) # [num_envs, 3 * future_step]
+            self.target_pos_predicted[..., :2] = self.target_pos_predicted[..., :2] * 0.5 * self.arena_size
+            self.target_pos_predicted[..., 2] = (self.target_pos_predicted[..., 2] + 1.0) / 2.0 * self.max_height
+            # TP["TP_output"] = self.target_pos_predicted
+            TP["TP_done"] = (self.progress_buf <= (self.max_episode_length - self.future_predcition_step)).unsqueeze(-1)
+            # TP_groundtruth: clip to (-1.0, 1.0)
+            TP["TP_groundtruth"] = target_pos.squeeze(1).clone()
+            TP["TP_groundtruth"][..., :2] = TP["TP_groundtruth"][..., :2] / (0.5 * self.arena_size)
+            TP["TP_groundtruth"][..., 2] = TP["TP_groundtruth"][..., 2] / self.max_height * 2.0 - 1.0     
+
+            target_rpos_predicted = (drone_pos.unsqueeze(2) - self.target_pos_predicted.unsqueeze(1)).view(self.num_envs, self.num_agents, -1)
+
             obs["state_self"] = torch.cat(
                 [
                 target_rpos_masked.reshape(self.num_envs, self.num_agents, -1),
@@ -872,18 +872,31 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         if self._should_render(0) and self.use_eval:
             self._draw_catch()
 
-        return TensorDict(
-            {
-                "agents": {
-                    "observation": obs,
-                    "state": state,
-                    "TP": TP,
+        if self.use_TP_net:
+            return TensorDict(
+                {
+                    "agents": {
+                        "observation": obs,
+                        "state": state,
+                        "TP": TP,
+                    },
+                    "stats": self.stats,
+                    "info": self.info,
                 },
-                "stats": self.stats,
-                "info": self.info,
-            },
-            self.batch_size,
-        )
+                self.batch_size,
+            )
+        else:
+            return TensorDict(
+                {
+                    "agents": {
+                        "observation": obs,
+                        "state": state,
+                    },
+                    "stats": self.stats,
+                    "info": self.info,
+                },
+                self.batch_size,
+            )
 
     def _compute_reward_and_done(self):
         drone_pos, _ = self.get_env_poses(self.drone.get_world_poses())
