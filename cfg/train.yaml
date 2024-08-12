@@ -6,7 +6,7 @@ sim: ${task.sim}
 env: ${task.env}
 
 # model_dir: /home/jiayu/OmniDrones/scripts/outputs/random0to5_catch0_3_v1_3_arena0_9.pt
-# model_dir: /home/jiayu/OmniDrones/scripts/outputs/GAN0to5_GAN0_3_fpsbuffer0_7_min0_3_max0_7/08-10_22-00/wandb/run-20240810_220059-n9mfya03/files/checkpoint_2411855872.pt
+# model_dir: /home/jiayu/OmniDrones/scripts/outputs/GAN0to5_TP/08-11_20-07/wandb/run-20240811_200729-2h1rlusg/files/checkpoint_1953103872.pt
 model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
@@ -26,8 +26,8 @@ viewer:
 wandb:
   group: ${oc.select:..task.name}
   # run_name: debug
-  # run_name: GAN0to5_GAN0_3_fpsbuffer0_7_min0_3_max0_7_eval2line
-  run_name: random0to5
+  run_name: GAN0to5_woTP
+  # run_name: random0to5
   job_type: train
   entity: chenjy
   project: RAL
@@ -40,7 +40,7 @@ wandb:
 defaults:
   # - task: HideAndSeek_square_partial
   # - task: HideAndSeek_circle_partial_woTP
-  - task: HideAndSeek_circle_partial_TP
-  # - task: HideAndSeek_circle_partial_TP_GAN
+  # - task: HideAndSeek_circle_partial_TP
+  - task: HideAndSeek_circle_partial_TP_GAN
   - algo: mappo
   - _self_

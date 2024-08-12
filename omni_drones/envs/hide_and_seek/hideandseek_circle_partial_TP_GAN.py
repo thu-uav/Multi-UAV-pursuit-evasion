@@ -494,15 +494,26 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
         self.history_step = self.cfg.task.history_step
         self.window_step = self.cfg.task.window_step
 
-        observation_spec = CompositeSpec({
-            "state_self": UnboundedContinuousTensorSpec((1, 3 + 3 * self.future_predcition_step + self.time_encoding_dim + 13)),
-            "state_others": UnboundedContinuousTensorSpec((self.drone.n-1, 3)), # pos
-            "cylinders": UnboundedContinuousTensorSpec((self.obs_max_cylinder, 5)), # pos + radius + height
-        }).to(self.device)
-        state_spec = CompositeSpec({
-            "state_drones": UnboundedContinuousTensorSpec((self.drone.n, 3 + 3 * self.future_predcition_step + self.time_encoding_dim + 13)),
-            "cylinders": UnboundedContinuousTensorSpec((self.obs_max_cylinder, 5)), # pos + radius + height
-        }).to(self.device)
+        if self.use_TP_net:
+            observation_spec = CompositeSpec({
+                "state_self": UnboundedContinuousTensorSpec((1, 3 + 3 * self.future_predcition_step + self.time_encoding_dim + 13)),
+                "state_others": UnboundedContinuousTensorSpec((self.drone.n-1, 3)), # pos
+                "cylinders": UnboundedContinuousTensorSpec((self.obs_max_cylinder, 5)), # pos + radius + height
+            }).to(self.device)
+            state_spec = CompositeSpec({
+                "state_drones": UnboundedContinuousTensorSpec((self.drone.n, 3 + 3 * self.future_predcition_step + self.time_encoding_dim + 13)),
+                "cylinders": UnboundedContinuousTensorSpec((self.obs_max_cylinder, 5)), # pos + radius + height
+            }).to(self.device)
+        else:
+            observation_spec = CompositeSpec({
+                "state_self": UnboundedContinuousTensorSpec((1, 3 + self.time_encoding_dim + 13)),
+                "state_others": UnboundedContinuousTensorSpec((self.drone.n-1, 3)), # pos
+                "cylinders": UnboundedContinuousTensorSpec((self.obs_max_cylinder, 5)), # pos + radius + height
+            }).to(self.device)
+            state_spec = CompositeSpec({
+                "state_drones": UnboundedContinuousTensorSpec((self.drone.n, 3 + self.time_encoding_dim + 13)),
+                "cylinders": UnboundedContinuousTensorSpec((self.obs_max_cylinder, 5)), # pos + radius + height
+            }).to(self.device)
         
         # TP network
         TP_spec = CompositeSpec({
@@ -1030,15 +1041,25 @@ class HideAndSeek_circle_partial_TP_GAN(IsaacEnv):
 
         target_rpos_predicted = (drone_pos.unsqueeze(2) - self.target_pos_predicted.unsqueeze(1)).view(self.num_envs, self.num_agents, -1)
 
-        obs["state_self"] = torch.cat(
-            [
-            target_rpos_masked.reshape(self.num_envs, self.num_agents, -1),
-            target_rpos_predicted,
-            self.drone_states[..., 3:10],
-            self.drone_states[..., 13:19],
-            t.expand(-1, self.num_agents, self.time_encoding_dim),
-            ], dim=-1
-        ).unsqueeze(2)
+        if self.use_TP_net:
+            obs["state_self"] = torch.cat(
+                [
+                target_rpos_masked.reshape(self.num_envs, self.num_agents, -1),
+                target_rpos_predicted,
+                self.drone_states[..., 3:10],
+                self.drone_states[..., 13:19],
+                t.expand(-1, self.num_agents, self.time_encoding_dim),
+                ], dim=-1
+            ).unsqueeze(2)
+        else:
+            obs["state_self"] = torch.cat(
+                [
+                target_rpos_masked.reshape(self.num_envs, self.num_agents, -1),
+                self.drone_states[..., 3:10],
+                self.drone_states[..., 13:19],
+                t.expand(-1, self.num_agents, self.time_encoding_dim),
+                ], dim=-1
+            ).unsqueeze(2)
                          
         # state_others
         if self.drone.n > 1:
