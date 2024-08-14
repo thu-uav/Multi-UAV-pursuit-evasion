@@ -1,4 +1,4 @@
-name: HideAndSeek_circle_partial_TP
+name: HideAndSeek_circle_partial_TP_particle
 
 defaults:
   # see https://hydra.cc/docs/advanced/overriding_packages/
@@ -6,7 +6,7 @@ defaults:
   - /base/sim_base@_here_
 
 env:
-  num_envs: 100
+  num_envs: 2048
   max_episode_length: 800
 
 drone_model: Crazyflie
@@ -25,7 +25,10 @@ num_agents: 4
 use_eval: 0
 use_partial_obs: 1
 use_random_cylinder: 1
-use_DFS_validation: 0 # only use_random_cylinder = 1
+use_particle_generator: 1
+num_unif: 0.3
+R_min: 0.3
+R_max: 0.9
 
 # TP net param
 history_step: 10
@@ -52,7 +55,7 @@ collision_radius: 0.07
 
 cylinder:
   size: 0.1
-  fixed_num: 5 # None: random num and pos, else only fixed num, random pos
+  fixed_num: null # None: random num and pos, else only fixed num, random pos
   max_num: 5
   obs_max_cylinder: 5
   # max_active: 3

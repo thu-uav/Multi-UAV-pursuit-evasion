@@ -34,7 +34,7 @@ from .payload import PayloadTrack, PayloadFlyThrough
 from .predatorprey import PredatorPrey
 from .hide_and_seek import HideAndSeek, HideAndSeek_circle_static_UED, HideAndSeek_circle_static_UED_large_cylinder, HideAndSeek_circle_static_UED_large_cylinder_cl, HideAndSeek_circle_static_UED_addeasy, HideAndSeek_circle_static_UED_cl, HideAndSeek_circle_static_UED_cl_v2, HideAndSeek_multiprey, HideAndSeek_circle_eval, HideAndSeek_circle_eval_large
 from .hide_and_seek import HideAndSeek_circle_fully
-from .hide_and_seek import HideAndSeek_circle_partial_TP, HideAndSeek_circle_partial_TP_GAN
+from .hide_and_seek import HideAndSeek_circle_partial_TP, HideAndSeek_circle_partial_TP_GAN, HideAndSeek_circle_partial_TP_GAN_discrete, HideAndSeek_circle_partial_TP_particle
 # from .hideandseek import HideAndSeek
 # from .multi_gate import MultiGate
 # from .rearrange import Rearrange
