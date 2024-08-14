@@ -1082,6 +1082,13 @@ class HideAndSeek_circle_partial_TP_particle(IsaacEnv):
                         success_i = 0.0
                     self.stats['success_cylinders_{}'.format(i)] = torch.ones(self.num_envs, 1, device=self.device) * success_i
                 
+                # update history buffer
+                tmp_buffer = []
+                for i in range(len(self.gen_buffer._weight_buffer)):
+                    if self.gen_buffer._weight_buffer[i] <= self.R_max and self.gen_buffer._weight_buffer[i] >= self.R_min:
+                        tmp_buffer.append(self.gen_buffer._state_buffer[i])
+                self.gen_buffer.insert_history(np.array(tmp_buffer))
+                
         ep_len = self.progress_buf.unsqueeze(-1)
         self.stats["collision"].div_(
             torch.where(done, ep_len, torch.ones_like(ep_len))
