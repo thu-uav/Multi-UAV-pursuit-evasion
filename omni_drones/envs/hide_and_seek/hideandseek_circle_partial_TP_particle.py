@@ -183,7 +183,7 @@ def set_outside_circle_to_one(grid_map):
 class GenBuffer(object):
     def __init__(self):
         self._state_buffer = np.zeros((0, 1), dtype=np.float32)
-        self._history_buffer = np.zeros((0, 20), dtype=np.float32) # task_dim = 20
+        self._history_buffer = np.zeros((0, 30), dtype=np.float32) # task_dim = 30
         self._weight_buffer = np.zeros((0, 1), dtype=np.float32)
         self.buffer_length = 2000
         self.eps = 1e-5

@@ -25,14 +25,14 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: debug
-  run_name: particle0to5_TP_unif0_3_R0_3to0_9
+  run_name: debug
+  # run_name: particle0to5_TP_unif0_3_R0_3to0_9
   # run_name: random0to5
   job_type: train
   entity: chenjy
   project: RAL
-  # mode: disabled
-  mode: online # set to 'disabled' when debugging locally, online
+  mode: disabled
+  # mode: online # set to 'disabled' when debugging locally, online
   run_id: 
   monitor_gym: True
   tags:
