@@ -300,7 +300,7 @@ def main(cfg):
             env.train()
 
         if save_interval > 0 and i % save_interval == 0:
-            base_env.gan_buffer.save_task(run.dir, i)
+            base_env.gen_buffer.save_task(run.dir, i)
             if hasattr(policy, "state_dict"):
                 ckpt_path = os.path.join(run.dir, f"checkpoint_{collector._frames}.pt")
                 logging.info(f"Save checkpoint to {str(ckpt_path)}")
