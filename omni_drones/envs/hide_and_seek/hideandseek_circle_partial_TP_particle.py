@@ -41,7 +41,7 @@ import time
 import collections
 from omni_drones.learning import TP_net
 import math
-
+from dgl.geometry import farthest_point_sampler
 
 # *********check whether the capture is blocked***************
 def is_perpendicular_line_intersecting_segment(a, b, c):
@@ -487,6 +487,7 @@ class HideAndSeek_circle_partial_TP_particle(IsaacEnv):
     def _design_scene(self): # for render
         self.num_agents = self.cfg.task.num_agents
         self.max_cylinders = self.cfg.task.cylinder.max_num
+        self.min_cylinders = self.cfg.task.cylinder.min_num
         self.drone_detect_radius = self.cfg.task.drone_detect_radius
         self.target_detect_radius = self.cfg.task.target_detect_radius
         self.catch_radius = self.cfg.task.catch_radius
@@ -649,7 +650,7 @@ class HideAndSeek_circle_partial_TP_particle(IsaacEnv):
         if self.use_fixed_num:
             active_cylinders = torch.ones(num_tasks, 1, device=self.device) * self.fixed_num
         else:
-            active_cylinders = torch.randint(low=0, high=self.num_cylinders + 1, size=(num_tasks, 1), device=self.device)
+            active_cylinders = torch.randint(low=self.min_cylinders, high=self.num_cylinders + 1, size=(num_tasks, 1), device=self.device)
         inactive_mask = torch.arange(self.num_cylinders, device=self.device).unsqueeze(0).expand(num_tasks, -1)
         # inactive = True, [envs, self.num_cylinders]
         inactive_mask = inactive_mask >= active_cylinders

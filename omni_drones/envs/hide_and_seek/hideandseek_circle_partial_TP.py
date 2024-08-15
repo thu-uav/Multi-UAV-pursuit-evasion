@@ -418,6 +418,7 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
     def _design_scene(self): # for render
         self.num_agents = self.cfg.task.num_agents
         self.max_cylinders = self.cfg.task.cylinder.max_num
+        self.min_cylinders = self.cfg.task.cylinder.min_num
         self.drone_detect_radius = self.cfg.task.drone_detect_radius
         self.target_detect_radius = self.cfg.task.target_detect_radius
         self.catch_radius = self.cfg.task.catch_radius
@@ -481,25 +482,28 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
             elif self.scenario_flag == 'corner':
                 # init
                 drone_pos = torch.tensor([
+                                    [-0.4000,  0.0000, 0.5],
                                     [-0.6000,  0.0000, 0.5],
-                                    [-0.8000,  0.0000, 0.5],
-                                    [-0.8000, -0.2000, 0.5],
-                                    [-0.8000,  0.2000, 0.5],
+                                    [-0.4000,  0.2000, 0.5],
+                                    [-0.6000,  0.2000, 0.5],
                                 ], device=self.device)
                 target_pos = torch.tensor([
-                                    [0.8000,  0.8000, 0.5],
+                                    [0.6000,  0.6000, 0.5],
                                 ], device=self.device)
-                num_fixed_cylinders = 3
+                num_fixed_cylinders = 5
                 all_cylinders_pos[:num_fixed_cylinders] = torch.tensor([
-                                    [2 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                    [2 * self.cylinder_size, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                    [4 * self.cylinder_size, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [0.0,  0.0, 0.5 * self.cylinder_height],
+                                    [0.0, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [0.0, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [2 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
+                                    [4 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
                                 ], device=self.device)
             elif self.scenario_flag == 'wall':
-                num_fixed_cylinders = 4
+                num_fixed_cylinders = 5
                 all_cylinders_pos[:num_fixed_cylinders] = torch.tensor([
                                     [0.0, 0.0, 0.5 * self.cylinder_height],
                                     [0.0, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [0.0, -2 * self.cylinder_size, 0.5 * self.cylinder_height],
                                     [0.0, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
                                     [0.0, 8 * self.cylinder_size, 0.5 * self.cylinder_height],
                                 ], device=self.device)
@@ -572,7 +576,6 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         x_indices = drone_grid[:, :, 0].flatten().long()
         y_indices = drone_grid[:, :, 1].flatten().long()
         grid_map[batch_indices.expand(-1, self.num_agents).flatten(), x_indices, y_indices] = 1
-        breakpoint()
         x_indices = target_grid[:, :, 0].flatten().long()
         y_indices = target_grid[:, :, 1].flatten().long()
         grid_map[batch_indices.expand(-1, 1).flatten(), x_indices, y_indices] = 1
@@ -581,7 +584,7 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         if self.use_fixed_num:
             self.active_cylinders = torch.ones(len(env_ids), 1, device=self.device) * self.fixed_num
         else:
-            self.active_cylinders = torch.randint(low=0, high=self.num_cylinders + 1, size=(len(env_ids), 1), device=self.device)
+            self.active_cylinders = torch.randint(low=self.min_cylinders, high=self.num_cylinders + 1, size=(len(env_ids), 1), device=self.device)
         self.inactive_mask = torch.arange(self.num_cylinders, device=self.device).unsqueeze(0).expand(len(env_ids), -1)
         # inactive = True, [envs, self.num_cylinders]
         self.inactive_mask = self.inactive_mask >= self.active_cylinders
@@ -625,16 +628,15 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
                                     [-0.8000,  0.0000, 0.5],
                                 ], device=self.device)
             elif self.scenario_flag == 'corner':
-                # init
                 drone_pos = torch.tensor([
+                                    [-0.4000,  0.0000, 0.5],
                                     [-0.6000,  0.0000, 0.5],
-                                    [-0.8000,  0.0000, 0.5],
-                                    [-0.8000, -0.2000, 0.5],
-                                    [-0.8000,  0.2000, 0.5],
-                                ], device=self.device).unsqueeze(0).expand(len(env_ids), -1, -1)
+                                    [-0.4000,  0.2000, 0.5],
+                                    [-0.6000,  0.2000, 0.5],
+                                ], device=self.device)
                 target_pos = torch.tensor([
-                                    [0.8000,  0.8000, 0.5],
-                                ], device=self.device).unsqueeze(0).expand(len(env_ids), -1, -1)
+                                    [0.6000,  0.6000, 0.5],
+                                ], device=self.device)
             elif self.scenario_flag == 'wall':
                 drone_pos = torch.tensor([
                                     [0.6000,  0.0000, 0.5],
@@ -1181,10 +1183,11 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
             drange=self.catch_radius,
         )
         # predicted target
-        for step in range(self.target_pos_predicted.shape[1]):
-            point_list.append(Float3(self.target_pos_predicted[self.central_env_idx, step].cpu().numpy().tolist()))
-            colors.append((1.0, 1.0, 0.0, 0.3))
-            sizes.append(20.0)
+        if self.use_TP_net:
+            for step in range(self.target_pos_predicted.shape[1]):
+                point_list.append(Float3(self.target_pos_predicted[self.central_env_idx, step].cpu().numpy().tolist()))
+                colors.append((1.0, 1.0, 0.0, 0.3))
+                sizes.append(20.0)
         point_list = [
             _carb_float3_add(p, self.central_env_pos) for p in point_list
         ]
