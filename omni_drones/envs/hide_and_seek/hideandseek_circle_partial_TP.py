@@ -271,6 +271,7 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         self.use_partial_obs = self.cfg.task.use_partial_obs
         self.capture = torch.zeros(self.num_envs, 3, device=self.device)
         self.min_dist = torch.ones(self.num_envs, 1, device=self.device) * float(torch.inf) # for teacher evaluation
+        self.target_obstacle_threshold = self.cfg.task.target_obstacle_threshold
         
         self.central_env_pos = Float3(
             *self.envs_positions[self.central_env_idx].tolist()
@@ -505,7 +506,7 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
                                     [0.0, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
                                     [0.0, -2 * self.cylinder_size, 0.5 * self.cylinder_height],
                                     [0.0, 4 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                    [0.0, 8 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [0.0, -4 * self.cylinder_size, 0.5 * self.cylinder_height],
                                 ], device=self.device)
             elif self.scenario_flag == '2line':
                 num_fixed_cylinders = 6
@@ -1062,19 +1063,22 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         # active_drone: if drone is in th detect range, get force from it
         active_drone = detect_drone * (~blocked).unsqueeze(-1) # [num_envs, num_agents, 1]      
         force_p = -target_rpos.squeeze(1) * (1 / (dist_pos**2 + 1e-5)) * active_drone.unsqueeze(-1)
-        force += torch.sum(force_p, dim=1)
+        force += torch.sum(force_p, dim=1) * 5
 
         # arena
         # 3D
         force_r = torch.zeros_like(force)
         target_origin_dist = torch.norm(target_pos[..., :2],dim=-1)
-        force_r[..., 0] = - target_pos[...,0] / ((self.arena_size - target_origin_dist)**2 + 1e-5)
-        force_r[..., 1] = - target_pos[...,1] / ((self.arena_size - target_origin_dist)**2 + 1e-5)
+        boundary_mask = (self.arena_size - target_origin_dist) > self.target_obstacle_threshold
+        force_r[..., 0] = - target_pos[...,0] / ((self.arena_size - target_origin_dist)**2 + 1e-5) * boundary_mask.float()
+        force_r[..., 1] = - target_pos[...,1] / ((self.arena_size - target_origin_dist)**2 + 1e-5) * boundary_mask.float()
+        floor_mask = (self.max_height - target_pos[..., 2]) > self.target_obstacle_threshold
+        ground_mask = (target_pos[..., 2] - 0.0) > self.target_obstacle_threshold
         # up
-        force_r[...,2] = - (self.max_height - target_pos[..., 2]) / ((self.max_height - target_pos[..., 2])**2 + 1e-5)
+        force_r[...,2] = - (self.max_height - target_pos[..., 2]) / ((self.max_height - target_pos[..., 2])**2 + 1e-5) * floor_mask.float()
         # down
-        force_r[...,2] += - (0.0 - target_pos[..., 2]) / ((0.0 - target_pos[..., 2])**2 + 1e-5)
-        force += force_r
+        force_r[...,2] += - (0.0 - target_pos[..., 2]) / ((0.0 - target_pos[..., 2])**2 + 1e-5) * ground_mask.float()
+        force += force_r * 5
         
         # # only get force from the nearest cylinder to the target
         # target_cylinders_mdist = torch.norm(target_cylinders_rpos, dim=-1) - self.cylinder_size
@@ -1093,7 +1097,8 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         force_c = torch.zeros_like(force)
         dist_target_cylinder = torch.norm(target_cylinders_rpos[..., :2], dim=-1) - self.cylinder_size
         detect_cylinder = (dist_target_cylinder < self.target_detect_radius)
-        force_c[..., :2] = (~self.cylinders_mask.unsqueeze(1).unsqueeze(-1) * detect_cylinder.unsqueeze(-1) * target_cylinders_rpos[..., :2] / (dist_target_cylinder**2 + 1e-5).unsqueeze(-1)).sum(2)    
+        dist_cylinder_mask = (dist_target_cylinder > self.target_obstacle_threshold)
+        force_c[..., :2] = (~self.cylinders_mask.unsqueeze(1).unsqueeze(-1) * detect_cylinder.unsqueeze(-1) * dist_cylinder_mask.unsqueeze(-1).float() * target_cylinders_rpos[..., :2] / (dist_target_cylinder**2 + 1e-5).unsqueeze(-1)).sum(2)    
 
         force += force_c
 
