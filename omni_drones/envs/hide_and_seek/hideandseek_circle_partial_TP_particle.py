@@ -42,6 +42,7 @@ import collections
 from omni_drones.learning import TP_net
 import math
 from dgl.geometry import farthest_point_sampler
+from collections import deque
 
 # *********check whether the capture is blocked***************
 def is_perpendicular_line_intersecting_segment(a, b, c):
@@ -181,15 +182,74 @@ def set_outside_circle_to_one(grid_map):
     return grid_map
 
 class GenBuffer(object):
-    def __init__(self):
+    def __init__(self, device):
         self._state_buffer = np.zeros((0, 1), dtype=np.float32)
         self._history_buffer = np.zeros((0, 30), dtype=np.float32) # task_dim = 30
         self._weight_buffer = np.zeros((0, 1), dtype=np.float32)
+        self.device = device
+        self.num_agents = 4
         self.buffer_length = 2000
         self.eps = 1e-5
         self.update_method = 'fps' # 'fifo', 'fps'
         self._temp_state_buffer = []
         self._temp_weight_buffer = []
+        # task specific
+        arena_size = 0.9
+        cylinder_size = 0.1
+        self.grid_size = 2 * cylinder_size
+        num_grid = int(arena_size * 2 / self.grid_size)
+        self.boundary = arena_size - 0.1
+        self.max_height = 1.2
+        self.center_pos = torch.zeros((self.buffer_length, 1, 2))
+        self.center_grid = torch.ones((self.buffer_length, 1, 2), dtype=torch.int) * int(num_grid / 2)
+        self.grid_map = torch.zeros((1, num_grid, num_grid), dtype=torch.int)
+        self.grid_map = set_outside_circle_to_one(self.grid_map)
+    
+    def init_easy_cases(self):
+        # init easy cases
+        # grid_map: [n, n], clean
+
+        _, n, _ = self.grid_map.shape
+        result = []
+        
+        for _ in range(self.buffer_length):
+            # init target
+            target_grid = select_unoccupied_positions(self.grid_map, 1)[0] # [1, 2]
+            x, y = target_grid[0, 0].item(), target_grid[0, 1].item()
+            
+            visited = np.zeros((n, n), dtype=bool)
+            queue = deque([(x, y, 0)])  # (x, y, distance)
+            visited[x, y] = True
+            found = []
+            task_one = []
+            
+            while queue and len(found) < self.num_agents:
+                cx, cy, dist = queue.popleft()
+                for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                    nx, ny = cx + dx, cy + dy
+                    if 0 <= nx < n and 0 <= ny < n and not visited[nx, ny]:
+                        visited[nx, ny] = True
+                        if self.grid_map[0][nx, ny] == 0:
+                            found.append((nx, ny))
+                            if len(found) == 4:
+                                break
+                        queue.append((nx, ny, dist + 1))
+            # drone grid
+            for nx, ny in found:
+                task_one.append((nx, ny))
+            # target grid
+            task_one.append((x, y))
+            task_one = np.array(task_one)
+            result.append(task_one)
+        
+        result = torch.from_numpy(np.array(result))
+        drone_target_pos_xy = grid_to_continuous(result, self.boundary, self.grid_size, self.center_pos, self.center_grid)
+        drone_target_pos_z = (torch.rand(self.buffer_length, self.num_agents + 1, 1) * 0.1 * 2 - 0.1) + self.max_height / 2
+        return torch.concat([drone_target_pos_xy, drone_target_pos_z], dim=-1)
+        # self._history_buffer = self._history_buffer.reshape(self.buffer_length, -1).numpy()
+    
+    def init_history(self, init_tasks):
+        self._history_buffer = init_tasks.reshape(self.buffer_length, -1)
     
     def insert(self, states):
         """
@@ -329,12 +389,25 @@ class HideAndSeek_circle_partial_TP_particle(IsaacEnv):
         
         # particle-based generator
         self.use_particle_generator = self.cfg.task.use_particle_generator
-        self.gen_buffer = GenBuffer()
+        self.gen_buffer = GenBuffer(device=self.device)
         self.update_iter = 0 # multiple initialization for agents and target
         self.eval_iter = 5
         self.num_unif = self.cfg.task.num_unif
         self.R_min = self.cfg.task.R_min
         self.R_max = self.cfg.task.R_max
+        
+        # init easy case for history buffer
+        drone_target_init_pos = self.gen_buffer.init_easy_cases()
+        drone_init_pos = drone_target_init_pos[:, :self.num_agents].to(self.device)
+        target_init_pos = drone_target_init_pos[:, self.num_agents:].to(self.device)
+        cylinders_pos_xy, inactive_mask = self.rejection_sampling_random_cylinder(self.gen_buffer.buffer_length, drone_init_pos, target_init_pos)
+        cylinder_pos_z = torch.ones(self.gen_buffer.buffer_length, self.num_cylinders, 1, device=self.device) * 0.5 * self.cylinder_height
+        cylinder_pos_z[inactive_mask] = self.invalid_z
+        cylinders_init_pos = torch.concat([cylinders_pos_xy, cylinder_pos_z], dim=-1).to('cpu')
+        init_history_tasks = torch.concat([drone_target_init_pos, cylinders_init_pos], dim=1).numpy()
+        self.gen_buffer.init_history(init_history_tasks)
+        
+        # > threshold, the force from cylinders is valid
         self.target_obstacle_threshold = self.cfg.task.target_obstacle_threshold
         
         self.central_env_pos = Float3(
@@ -636,6 +709,7 @@ class HideAndSeek_circle_partial_TP_particle(IsaacEnv):
         center_pos = torch.zeros((num_tasks, 1, 2), device=self.device)
         center_grid = torch.ones((num_tasks, 1, 2), device=self.device, dtype=torch.int) * int(num_grid / 2)
         grid_map = set_outside_circle_to_one(grid_map)
+        self.clean_grid_map = grid_map.clone()
         # setup drone and target
         drone_grid = continuous_to_grid(drone_pos[..., :2], num_grid, grid_size, center_pos, center_grid)
         target_grid = continuous_to_grid(target_pos[..., :2], num_grid, grid_size, center_pos, center_grid)
