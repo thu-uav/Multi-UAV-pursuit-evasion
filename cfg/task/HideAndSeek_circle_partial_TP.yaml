@@ -16,7 +16,7 @@ time_encoding: true
 action_transform: PIDrate
 
 # use_random_cylinder = 1: invalid
-scenario_flag: 'wall' # 'corner', 'wall', '2line', '3line'
+scenario_flag: 'corner' # 'corner', 'wall', '2line', '3line'
 
 # exp
 num_agents: 4
@@ -45,14 +45,14 @@ speed_coef: 5.0
 smoothness_coef: 0.0
 
 # env param
-catch_radius: 0.2
+catch_radius: 0.3
 drone_detect_radius: 100.0
 target_detect_radius: 100.0
 collision_radius: 0.07
 
 cylinder:
   size: 0.1
-  fixed_num: 0 # None: random num and pos, else only fixed num, random pos
+  fixed_num: 5 # None: random num and pos, else only fixed num, random pos
   min_num: 5
   max_num: 5
   obs_max_cylinder: 5

@@ -1069,11 +1069,11 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         # 3D
         force_r = torch.zeros_like(force)
         target_origin_dist = torch.norm(target_pos[..., :2],dim=-1)
-        boundary_mask = (self.arena_size - target_origin_dist) > self.target_obstacle_threshold
+        boundary_mask = (self.arena_size - target_origin_dist) <= self.target_obstacle_threshold
         force_r[..., 0] = - target_pos[...,0] / ((self.arena_size - target_origin_dist)**2 + 1e-5) * boundary_mask.float()
         force_r[..., 1] = - target_pos[...,1] / ((self.arena_size - target_origin_dist)**2 + 1e-5) * boundary_mask.float()
-        floor_mask = (self.max_height - target_pos[..., 2]) > self.target_obstacle_threshold
-        ground_mask = (target_pos[..., 2] - 0.0) > self.target_obstacle_threshold
+        floor_mask = (self.max_height - target_pos[..., 2]) <= self.target_obstacle_threshold
+        ground_mask = (target_pos[..., 2] - 0.0) <= self.target_obstacle_threshold
         # up
         force_r[...,2] = - (self.max_height - target_pos[..., 2]) / ((self.max_height - target_pos[..., 2])**2 + 1e-5) * floor_mask.float()
         # down
@@ -1097,7 +1097,7 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         force_c = torch.zeros_like(force)
         dist_target_cylinder = torch.norm(target_cylinders_rpos[..., :2], dim=-1) - self.cylinder_size
         detect_cylinder = (dist_target_cylinder < self.target_detect_radius)
-        dist_cylinder_mask = (dist_target_cylinder > self.target_obstacle_threshold)
+        dist_cylinder_mask = (dist_target_cylinder <= self.target_obstacle_threshold)
         force_c[..., :2] = (~self.cylinders_mask.unsqueeze(1).unsqueeze(-1) * detect_cylinder.unsqueeze(-1) * dist_cylinder_mask.unsqueeze(-1).float() * target_cylinders_rpos[..., :2] / (dist_target_cylinder**2 + 1e-5).unsqueeze(-1)).sum(2)    
 
         force += force_c
