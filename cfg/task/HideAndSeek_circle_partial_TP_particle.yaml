@@ -19,13 +19,14 @@ action_transform: PIDrate
 scenario_flag: '2line' # 'empty', 'corner', '3line', 'wall', '2line'
 
 # exp
-num_agents: 4
+num_agents: 3
 
 # flag
 use_eval: 0
 use_partial_obs: 1
 use_random_cylinder: 1
 use_particle_generator: 1
+use_init_easy: 0
 target_obstacle_threshold: 0.07
 num_unif: 0.3
 R_min: 0.3

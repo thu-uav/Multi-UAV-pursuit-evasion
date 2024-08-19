@@ -16,10 +16,10 @@ time_encoding: true
 action_transform: PIDrate
 
 # use_random_cylinder = 1: invalid
-scenario_flag: 'corner' # 'corner', 'wall', '2line', '3line'
+scenario_flag: '2line' # 'corner', 'wall', '2line', '3line'
 
 # exp
-num_agents: 4
+num_agents: 3
 
 # flag
 use_eval: 0
