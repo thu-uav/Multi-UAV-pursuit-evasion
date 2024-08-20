@@ -16,10 +16,10 @@ time_encoding: true
 action_transform: PIDrate
 
 # use_random_cylinder = 1: invalid
-scenario_flag: '2line' # 'empty', 'corner', '3line', 'wall', '2line'
+scenario_flag: 'corner' # 'empty', 'corner', '3line', 'wall', '2line'
 
 # exp
-num_agents: 4
+num_agents: 3
 
 # flag
 use_eval: 0
@@ -36,7 +36,7 @@ R_max: 0.7
 history_step: 10
 future_predcition_step: 5
 window_step: 1
-use_obstacles: 1
+use_obstacles: 0
 
 arena_size: 0.9
 max_height: 1.2

@@ -19,7 +19,7 @@ action_transform: PIDrate
 scenario_flag: 'wall' # 'corner', 'wall', '2line', '3line'
 
 # exp
-num_agents: 4
+num_agents: 3
 
 # flag
 use_eval: 0
@@ -31,7 +31,7 @@ target_obstacle_threshold: 0.1 # inf means getting force from cylinder or wall a
 history_step: 10
 future_predcition_step: 5
 window_step: 1
-use_obstacles: 1
+use_obstacles: 0
 
 arena_size: 0.9
 max_height: 1.2

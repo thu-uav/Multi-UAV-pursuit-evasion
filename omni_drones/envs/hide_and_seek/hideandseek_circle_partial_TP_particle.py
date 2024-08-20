@@ -58,7 +58,7 @@ def is_perpendicular_line_intersecting_segment(a, b, c):
     
     denom = dx.unsqueeze(2)**2 + dy.unsqueeze(2)**2  # [batch, num_drones, 1]
     
-    t = num / denom  # [batch, num_drones, num_cylinders]
+    t = num / (denom + 1e-5)  # [batch, num_drones, num_cylinders]
     
     # check d in or not in ab
     is_on_segment = (t >= 0) & (t <= 1)  # [batch, num_drones, num_cylinders]
@@ -605,7 +605,7 @@ class HideAndSeek_circle_partial_TP_particle(IsaacEnv):
                             [0.8000,  0.0000, 0.5],
                             [0.8000, -0.2000, 0.5],
                             [0.8000,  0.2000, 0.5],
-                        ], device=self.device)
+                        ], device=self.device)[:self.num_agents]
         target_pos = torch.tensor([
                             [-0.8000,  0.0000, 0.5],
                         ], device=self.device)
