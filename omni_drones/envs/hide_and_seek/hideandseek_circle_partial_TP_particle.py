@@ -182,9 +182,9 @@ def set_outside_circle_to_one(grid_map):
     return grid_map
 
 class GenBuffer(object):
-    def __init__(self, device):
+    def __init__(self, num_agents, device):
         self._state_buffer = np.zeros((0, 1), dtype=np.float32)
-        self._history_buffer = np.zeros((0, 30), dtype=np.float32) # task_dim = 30
+        self._history_buffer = np.zeros((0, 18 + num_agents * 3), dtype=np.float32) # task_dim = 30
         self._weight_buffer = np.zeros((0, 1), dtype=np.float32)
         self.device = device
         self.num_agents = 4
@@ -389,7 +389,7 @@ class HideAndSeek_circle_partial_TP_particle(IsaacEnv):
         
         # particle-based generator
         self.use_particle_generator = self.cfg.task.use_particle_generator
-        self.gen_buffer = GenBuffer(device=self.device)
+        self.gen_buffer = GenBuffer(num_agents=self.num_agents, device=self.device)
         self.update_iter = 0 # multiple initialization for agents and target
         self.eval_iter = 5
         self.num_unif = self.cfg.task.num_unif
