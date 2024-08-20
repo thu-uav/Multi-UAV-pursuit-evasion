@@ -19,7 +19,7 @@ action_transform: PIDrate
 scenario_flag: '2line' # 'empty', 'corner', '3line', 'wall', '2line'
 
 # exp
-num_agents: 3
+num_agents: 4
 
 # flag
 use_eval: 0
@@ -27,7 +27,7 @@ use_partial_obs: 1
 use_random_cylinder: 1
 use_particle_generator: 1
 use_init_easy: 0
-target_obstacle_threshold: 0.07
+target_obstacle_threshold: 0.1
 num_unif: 0.3
 R_min: 0.3
 R_max: 0.7
@@ -36,6 +36,7 @@ R_max: 0.7
 history_step: 10
 future_predcition_step: 5
 window_step: 1
+use_obstacles: 1
 
 arena_size: 0.9
 max_height: 1.2

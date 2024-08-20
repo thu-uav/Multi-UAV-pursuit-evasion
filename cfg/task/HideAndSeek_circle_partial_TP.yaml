@@ -16,21 +16,22 @@ time_encoding: true
 action_transform: PIDrate
 
 # use_random_cylinder = 1: invalid
-scenario_flag: '2line' # 'corner', 'wall', '2line', '3line'
+scenario_flag: 'wall' # 'corner', 'wall', '2line', '3line'
 
 # exp
-num_agents: 3
+num_agents: 4
 
 # flag
 use_eval: 0
 use_partial_obs: 1
 use_random_cylinder: 1
-target_obstacle_threshold: 0.07 # inf means getting force from cylinder or wall all the time
+target_obstacle_threshold: 0.1 # inf means getting force from cylinder or wall all the time
 
 # TP net param
 history_step: 10
 future_predcition_step: 5
 window_step: 1
+use_obstacles: 1
 
 arena_size: 0.9
 max_height: 1.2

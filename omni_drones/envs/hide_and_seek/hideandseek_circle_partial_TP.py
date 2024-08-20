@@ -311,7 +311,10 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
 
         # TP net
         # t, target pos masked, target vel masked, drone_pos
-        self.TP = TP_net(input_dim = 1 + 3 + 3 + 3 * self.num_agents, output_dim = 3 * self.future_predcition_step, future_predcition_step = self.future_predcition_step, window_step=self.window_step).to(self.device)
+        if self.use_obstacles:
+            self.TP = TP_net(input_dim = 1 + 3 + 3 + 3 * self.num_agents + 3 * self.num_cylinders, output_dim = 3 * self.future_predcition_step, future_predcition_step = self.future_predcition_step, window_step=self.window_step).to(self.device)
+        else:
+            self.TP = TP_net(input_dim = 1 + 3 + 3 + 3 * self.num_agents, output_dim = 3 * self.future_predcition_step, future_predcition_step = self.future_predcition_step, window_step=self.window_step).to(self.device)
         self.history_step = self.cfg.task.history_step
         self.history_data = collections.deque(maxlen=self.history_step)
         # self.debug_list = []
@@ -327,6 +330,7 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         self.future_predcition_step = self.cfg.task.future_predcition_step
         self.history_step = self.cfg.task.history_step
         self.window_step = self.cfg.task.window_step
+        self.use_obstacles = self.cfg.task.use_obstacles # TP
 
         if self.use_TP_net:
             observation_spec = CompositeSpec({
@@ -350,12 +354,20 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
             }).to(self.device)
         
         # TP network
-        TP_spec = CompositeSpec({
-            "TP_input": UnboundedContinuousTensorSpec((self.history_step, 1 + 3 + 3 + self.num_agents * 3)),
-            # "TP_output": UnboundedContinuousTensorSpec((self.future_predcition_step, 3)),
-            "TP_groundtruth": UnboundedContinuousTensorSpec((1, 3)),
-            "TP_done": UnboundedContinuousTensorSpec((1, 3)),
-        }).to(self.device)
+        if self.use_obstacles:
+            TP_spec = CompositeSpec({
+                "TP_input": UnboundedContinuousTensorSpec((self.history_step, 1 + 3 + 3 + self.num_agents * 3 + self.num_cylinders * 3)),
+                # "TP_output": UnboundedContinuousTensorSpec((self.future_predcition_step, 3)),
+                "TP_groundtruth": UnboundedContinuousTensorSpec((1, 3)),
+                "TP_done": UnboundedContinuousTensorSpec((1, 3)),
+            }).to(self.device)
+        else:
+            TP_spec = CompositeSpec({
+                "TP_input": UnboundedContinuousTensorSpec((self.history_step, 1 + 3 + 3 + self.num_agents * 3)),
+                # "TP_output": UnboundedContinuousTensorSpec((self.future_predcition_step, 3)),
+                "TP_groundtruth": UnboundedContinuousTensorSpec((1, 3)),
+                "TP_done": UnboundedContinuousTensorSpec((1, 3)),
+            }).to(self.device)
         self.observation_spec = CompositeSpec({
             "agents": CompositeSpec({
                 "observation": observation_spec.expand(self.drone.n),
@@ -802,12 +814,23 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         if self.use_TP_net:
             # use the real target pos to supervise the TP network
             TP = TensorDict({}, [self.num_envs])
-            frame_state = torch.concat([
-                self.progress_buf.unsqueeze(-1),
-                target_pos_masked.reshape(self.num_envs, -1),
-                target_vel_masked.squeeze(1),
-                drone_pos.reshape(self.num_envs, -1)
-            ], dim=-1)
+            if self.use_obstacles:
+                frame_state = torch.concat([
+                    self.progress_buf.unsqueeze(-1),
+                    target_pos_masked.reshape(self.num_envs, -1),
+                    target_vel_masked.squeeze(1),
+                    drone_pos.reshape(self.num_envs, -1),
+                    torch.concat([cylinders_pos[..., :2], \
+                                  self.cylinder_size * torch.ones(self.num_envs, \
+                                  self.num_cylinders, 1, device=self.device)], dim=-1).reshape(self.num_envs, -1)
+                ], dim=-1)
+            else:
+                frame_state = torch.concat([
+                    self.progress_buf.unsqueeze(-1),
+                    target_pos_masked.reshape(self.num_envs, -1),
+                    target_vel_masked.squeeze(1),
+                    drone_pos.reshape(self.num_envs, -1)
+                ], dim=-1)
             if len(self.history_data) < self.history_step:
                 # init history data
                 for i in range(self.history_step):
@@ -1103,9 +1126,9 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         force_c = torch.zeros_like(force)
         dist_target_cylinder = torch.norm(target_cylinders_rpos[..., :2], dim=-1) - self.cylinder_size
         detect_cylinder = (dist_target_cylinder < self.target_detect_radius)
-        # dist_cylinder_mask = (dist_target_cylinder <= self.target_obstacle_threshold)
-        # force_c[..., :2] = (~self.cylinders_mask.unsqueeze(1).unsqueeze(-1) * detect_cylinder.unsqueeze(-1) * dist_cylinder_mask.unsqueeze(-1).float() * target_cylinders_rpos[..., :2] / (dist_target_cylinder**2 + 1e-5).unsqueeze(-1)).sum(2)    
-        force_c[..., :2] = (~self.cylinders_mask.unsqueeze(1).unsqueeze(-1) * detect_cylinder.unsqueeze(-1) * target_cylinders_rpos[..., :2] / (dist_target_cylinder**2 + 1e-5).unsqueeze(-1)).sum(2)    
+        dist_cylinder_mask = (dist_target_cylinder <= self.target_obstacle_threshold)
+        force_c[..., :2] = (~self.cylinders_mask.unsqueeze(1).unsqueeze(-1) * detect_cylinder.unsqueeze(-1) * dist_cylinder_mask.unsqueeze(-1).float() * target_cylinders_rpos[..., :2] / (dist_target_cylinder**2 + 1e-5).unsqueeze(-1)).sum(2)    
+        # force_c[..., :2] = (~self.cylinders_mask.unsqueeze(1).unsqueeze(-1) * detect_cylinder.unsqueeze(-1) * target_cylinders_rpos[..., :2] / (dist_target_cylinder**2 + 1e-5).unsqueeze(-1)).sum(2)    
 
         force += force_c
 
