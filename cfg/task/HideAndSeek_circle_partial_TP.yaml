@@ -25,7 +25,6 @@ num_agents: 3
 use_eval: 0
 use_partial_obs: 1
 use_random_cylinder: 1
-target_obstacle_threshold: 0.1 # inf means getting force from cylinder or wall all the time
 
 # TP net param
 history_step: 10

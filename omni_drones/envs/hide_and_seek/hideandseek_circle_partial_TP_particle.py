@@ -409,9 +409,6 @@ class HideAndSeek_circle_partial_TP_particle(IsaacEnv):
             init_history_tasks = torch.concat([drone_target_init_pos, cylinders_init_pos], dim=1).numpy()
             self.gen_buffer.init_history(init_history_tasks)
         
-        # > threshold, the force from cylinders is valid
-        self.target_obstacle_threshold = self.cfg.task.target_obstacle_threshold
-        
         self.central_env_pos = Float3(
             *self.envs_positions[self.central_env_idx].tolist()
         )
@@ -1252,29 +1249,29 @@ class HideAndSeek_circle_partial_TP_particle(IsaacEnv):
 
         # pursuers
         dist_pos = torch.norm(target_rpos, dim=-1).squeeze(1).unsqueeze(-1)
+
         blocked = is_line_blocked_by_cylinder(drone_pos, target_pos, cylinders_pos, self.cylinder_size)
         detect_drone = (dist_pos < self.target_detect_radius).squeeze(-1)
-
+        drone_pos_z_active = (drone_pos[..., 2] > 0.1).unsqueeze(-1)
         # active_drone: if drone is in th detect range, get force from it
-        active_drone = detect_drone * (~blocked).unsqueeze(-1) # [num_envs, num_agents, 1]      
-        force_p = -target_rpos.squeeze(1) * (1 / (dist_pos**2 + 1e-5)) * active_drone.unsqueeze(-1)
+        active_drone = detect_drone * (~blocked).unsqueeze(-1) * drone_pos_z_active # [num_envs, num_agents, 1]      
+        
+        force_r_xy_direction = - target_rpos / (dist_pos + 1e-5)
+        dist2catch = dist_pos - self.catch_radius
+        force_dist = dist2catch * (dist2catch > 0).float() + dist_pos * (dist2catch < 0).float()
+        force_p = force_r_xy_direction * (1 / (force_dist + 1e-5)) * active_drone.unsqueeze(-1)
+        # force_p = -target_rpos.squeeze(1) * (1 / (dist_pos**2 + 1e-5)) * active_drone.unsqueeze(-1)
         force += torch.sum(force_p, dim=1) * 2
 
         # arena
         # 3D
         force_r = torch.zeros_like(force)
         target_origin_dist = torch.norm(target_pos[..., :2],dim=-1)
-        # boundary_mask = (self.arena_size - target_origin_dist) <= self.target_obstacle_threshold
-        # force_r[..., 0] = - target_pos[...,0] / ((self.arena_size - target_origin_dist)**2 + 1e-5) * boundary_mask.float()
-        # force_r[..., 1] = - target_pos[...,1] / ((self.arena_size - target_origin_dist)**2 + 1e-5) * boundary_mask.float()
-        force_r[..., 0] = - target_pos[...,0] / ((self.arena_size - target_origin_dist)**2 + 1e-5)
-        force_r[..., 1] = - target_pos[...,1] / ((self.arena_size - target_origin_dist)**2 + 1e-5)
-        # floor_mask = (self.max_height - target_pos[..., 2]) <= self.target_obstacle_threshold
-        # ground_mask = (target_pos[..., 2] - 0.0) <= self.target_obstacle_threshold
-        # # up
-        # force_r[...,2] = - (self.max_height - target_pos[..., 2]) / ((self.max_height - target_pos[..., 2])**2 + 1e-5) * floor_mask.float()
-        # # down
-        # force_r[...,2] += - (0.0 - target_pos[..., 2]) / ((0.0 - target_pos[..., 2])**2 + 1e-5) * ground_mask.float()
+        force_r_xy_direction = - target_pos[..., :2] / (target_origin_dist.unsqueeze(-1) + 1e-5)
+        # force_r[..., 0] = - target_pos[...,0] / ((self.arena_size - target_origin_dist)**2 + 1e-5)
+        # force_r[..., 1] = - target_pos[...,1] / ((self.arena_size - target_origin_dist)**2 + 1e-5)
+        force_r[..., 0] = force_r_xy_direction[..., 0] * (1 / ((self.arena_size - target_origin_dist) + 1e-5))
+        force_r[..., 1] = force_r_xy_direction[..., 1] * (1 / ((self.arena_size - target_origin_dist) + 1e-5))
         # up
         force_r[...,2] = - (self.max_height - target_pos[..., 2]) / ((self.max_height - target_pos[..., 2])**2 + 1e-5)
         # down
@@ -1296,10 +1293,13 @@ class HideAndSeek_circle_partial_TP_particle(IsaacEnv):
         # get force from all cylinders
         # inactive mask, self.cylinders_mask
         force_c = torch.zeros_like(force)
-        dist_target_cylinder = torch.norm(target_cylinders_rpos[..., :2], dim=-1) - self.cylinder_size
+        dist_target_cylinder = torch.norm(target_cylinders_rpos[..., :2], dim=-1)
+        dist_target_cylinder_boundary = dist_target_cylinder - self.cylinder_size
+        # detect cylinder
         detect_cylinder = (dist_target_cylinder < self.target_detect_radius)
-        dist_cylinder_mask = (dist_target_cylinder <= self.target_obstacle_threshold)
-        force_c[..., :2] = (~self.cylinders_mask.unsqueeze(1).unsqueeze(-1) * detect_cylinder.unsqueeze(-1) * dist_cylinder_mask.unsqueeze(-1).float() * target_cylinders_rpos[..., :2] / (dist_target_cylinder**2 + 1e-5).unsqueeze(-1)).sum(2)    
+        active_cylinders_force = (~self.cylinders_mask.unsqueeze(1).unsqueeze(-1) * detect_cylinder.unsqueeze(-1)).float()
+        force_c_direction_xy = target_cylinders_rpos[..., :2] / (dist_target_cylinder + 1e-5).unsqueeze(-1)
+        force_c[..., :2] = (active_cylinders_force * force_c_direction_xy * (1 / dist_target_cylinder_boundary.unsqueeze(-1))).sum(2)
         # force_c[..., :2] = (~self.cylinders_mask.unsqueeze(1).unsqueeze(-1) * detect_cylinder.unsqueeze(-1) * target_cylinders_rpos[..., :2] / (dist_target_cylinder**2 + 1e-5).unsqueeze(-1)).sum(2)    
 
         force += force_c
