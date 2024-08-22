@@ -1091,7 +1091,7 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         force_dist = dist2catch * (dist2catch > 0).float() + dist_pos * (dist2catch < 0).float()
         force_p = force_r_xy_direction * (1 / (force_dist + 1e-5)) * active_drone.unsqueeze(-1)
         # force_p = -target_rpos.squeeze(1) * (1 / (dist_pos**2 + 1e-5)) * active_drone.unsqueeze(-1)
-        force += torch.sum(force_p, dim=1) * 2
+        force += torch.sum(force_p, dim=1)
 
         # arena
         # 3D
@@ -1106,7 +1106,7 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         force_r[...,2] = - (self.max_height - target_pos[..., 2]) / ((self.max_height - target_pos[..., 2])**2 + 1e-5)
         # down
         force_r[...,2] += - (0.0 - target_pos[..., 2]) / ((0.0 - target_pos[..., 2])**2 + 1e-5)
-        force += force_r * 2
+        force += force_r
         
         # # only get force from the nearest cylinder to the target
         # target_cylinders_mdist = torch.norm(target_cylinders_rpos, dim=-1) - self.cylinder_size

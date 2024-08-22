@@ -26,7 +26,7 @@ viewer:
 wandb:
   group: ${oc.select:..task.name}
   # run_name: debug
-  run_name: fixed5_obs5_drones3_particle_TP_newprey
+  run_name: fixed0_obs3_drones3_particle_TP
   entity: chenjy
   project: RAL
   # mode: disabled
