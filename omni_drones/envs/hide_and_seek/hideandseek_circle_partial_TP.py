@@ -1100,7 +1100,7 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         # out of arena
         out_of_arena = target_pos[..., 0]**2 + target_pos[..., 1]**2 > self.arena_size**2
         
-        self.stats['out_of_arena'] = torch.logical_or(self.stats['out_of_arena'], out_of_arena)
+        self.stats['out_of_arena'] = torch.logical_or(self.stats['out_of_arena'].bool(), out_of_arena).float()
 
         force_r[..., 0] = out_of_arena.float() * force_r_xy_direction[..., 0] * (1 / 1e-5) + \
             (~out_of_arena).float() * force_r_xy_direction[..., 0] * (1 / ((self.arena_size - target_origin_dist) + 1e-5))
