@@ -417,6 +417,7 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
             "action_error_order1_max": UnboundedContinuousTensorSpec(1),
             "target_predicted_error": UnboundedContinuousTensorSpec(1),
             "distance_threshold_L": UnboundedContinuousTensorSpec(1),
+            "out_of_arena": UnboundedContinuousTensorSpec(1),
         }).expand(self.num_envs).to(self.device)
         info_spec = CompositeSpec({
             "drone_state": UnboundedContinuousTensorSpec((self.drone.n, 13), device=self.device),
@@ -1087,9 +1088,7 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         active_drone = detect_drone * (~blocked).unsqueeze(-1) * drone_pos_z_active # [num_envs, num_agents, 1]      
         
         force_r_xy_direction = - target_rpos / (dist_pos + 1e-5)
-        dist2catch = dist_pos - self.catch_radius
-        force_dist = dist2catch * (dist2catch > 0).float() + dist_pos * (dist2catch < 0).float()
-        force_p = force_r_xy_direction * (1 / (force_dist + 1e-5)) * active_drone.unsqueeze(-1)
+        force_p = force_r_xy_direction * (1 / (dist_pos + 1e-5)) * active_drone.unsqueeze(-1)
         # force_p = -target_rpos.squeeze(1) * (1 / (dist_pos**2 + 1e-5)) * active_drone.unsqueeze(-1)
         force += torch.sum(force_p, dim=1)
 
@@ -1098,10 +1097,15 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         force_r = torch.zeros_like(force)
         target_origin_dist = torch.norm(target_pos[..., :2],dim=-1)
         force_r_xy_direction = - target_pos[..., :2] / (target_origin_dist.unsqueeze(-1) + 1e-5)
-        # force_r[..., 0] = - target_pos[...,0] / ((self.arena_size - target_origin_dist)**2 + 1e-5)
-        # force_r[..., 1] = - target_pos[...,1] / ((self.arena_size - target_origin_dist)**2 + 1e-5)
-        force_r[..., 0] = force_r_xy_direction[..., 0] * (1 / ((self.arena_size - target_origin_dist) + 1e-5))
-        force_r[..., 1] = force_r_xy_direction[..., 1] * (1 / ((self.arena_size - target_origin_dist) + 1e-5))
+        # out of arena
+        out_of_arena = target_pos[..., 0]**2 + target_pos[..., 1]**2 > self.arena_size**2
+        
+        self.stats['out_of_arena'] = torch.logical_or(self.stats['out_of_arena'], out_of_arena)
+
+        force_r[..., 0] = out_of_arena.float() * force_r_xy_direction[..., 0] * (1 / 1e-5) + \
+            (~out_of_arena).float() * force_r_xy_direction[..., 0] * (1 / ((self.arena_size - target_origin_dist) + 1e-5))
+        force_r[..., 1] = out_of_arena.float() * force_r_xy_direction[..., 1] * (1 / 1e-5) + \
+            (~out_of_arena).float() * force_r_xy_direction[..., 1] * (1 / ((self.arena_size - target_origin_dist) + 1e-5))
         # up
         force_r[...,2] = - (self.max_height - target_pos[..., 2]) / ((self.max_height - target_pos[..., 2])**2 + 1e-5)
         # down
