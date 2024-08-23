@@ -1302,7 +1302,7 @@ class HideAndSeek_circle_partial_TP_particle(IsaacEnv):
         detect_cylinder = (dist_target_cylinder < self.target_detect_radius)
         active_cylinders_force = (~self.cylinders_mask.unsqueeze(1).unsqueeze(-1) * detect_cylinder.unsqueeze(-1)).float()
         force_c_direction_xy = target_cylinders_rpos[..., :2] / (dist_target_cylinder + 1e-5).unsqueeze(-1)
-        force_c[..., :2] = (active_cylinders_force * force_c_direction_xy * (1 / dist_target_cylinder_boundary.unsqueeze(-1))).sum(2)
+        force_c[..., :2] = (active_cylinders_force * force_c_direction_xy * (1 / (dist_target_cylinder_boundary.unsqueeze(-1) + 1e-5))).sum(2)
         # force_c[..., :2] = (~self.cylinders_mask.unsqueeze(1).unsqueeze(-1) * detect_cylinder.unsqueeze(-1) * target_cylinders_rpos[..., :2] / (dist_target_cylinder**2 + 1e-5).unsqueeze(-1)).sum(2)    
 
         force += force_c
