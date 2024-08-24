@@ -1253,9 +1253,9 @@ class HideAndSeek_circle_partial_TP_particle(IsaacEnv):
 
         blocked = is_line_blocked_by_cylinder(drone_pos, target_pos, cylinders_pos, self.cylinder_size)
         detect_drone = (dist_pos < self.target_detect_radius).squeeze(-1)
-        drone_pos_z_active = (drone_pos[..., 2] > 0.1).unsqueeze(-1)
+        # drone_pos_z_active = (drone_pos[..., 2] > 0.1).unsqueeze(-1)
         # active_drone: if drone is in th detect range, get force from it
-        active_drone = detect_drone * (~blocked).unsqueeze(-1) * drone_pos_z_active # [num_envs, num_agents, 1]      
+        active_drone = detect_drone * (~blocked).unsqueeze(-1) # [num_envs, num_agents, 1]      
         
         force_r_xy_direction = - target_rpos / (dist_pos + 1e-5)
         force_p = force_r_xy_direction * (1 / (dist_pos + 1e-5)) * active_drone.unsqueeze(-1)
