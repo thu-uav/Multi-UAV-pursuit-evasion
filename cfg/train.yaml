@@ -37,7 +37,7 @@ wandb:
 
 defaults:
   # - task: HideAndSeek_square_partial
-  - task: HideAndSeek_circle_partial_TP
-  # - task: HideAndSeek_circle_partial_TP_particle
+  # - task: HideAndSeek_circle_partial_TP
+  - task: HideAndSeek_circle_partial_TP_particle
   - algo: mappo
   - _self_
