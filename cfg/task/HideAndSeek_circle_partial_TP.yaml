@@ -55,7 +55,7 @@ cylinder:
   fixed_num: 0 # None: random num and pos, else only fixed num, random pos
   min_num: 5
   max_num: 5
-  obs_max_cylinder: 5
+  obs_max_cylinder: 3
   # max_active: 3
   # min_active: 0
   # random_active: False # if False, only train max_active
