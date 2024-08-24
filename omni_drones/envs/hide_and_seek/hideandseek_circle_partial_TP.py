@@ -277,12 +277,12 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         )
 
         self.init_drone_pos_dist = D.Uniform(
-            torch.tensor([0.1, -self.arena_size / math.sqrt(2.0)], device=self.device),
-            torch.tensor([self.arena_size / math.sqrt(2.0), self.arena_size / math.sqrt(2.0)], device=self.device)
+            torch.tensor([0.1, -self.arena_size / math.sqrt(2.0) + 0.1], device=self.device),
+            torch.tensor([self.arena_size / math.sqrt(2.0) - 0.1, self.arena_size / math.sqrt(2.0) - 0.1], device=self.device)
         )
         self.init_target_pos_dist = D.Uniform(
-            torch.tensor([-self.arena_size / math.sqrt(2.0), -self.arena_size / math.sqrt(2.0)], device=self.device),
-            torch.tensor([-0.1, self.arena_size / math.sqrt(2.0)], device=self.device)
+            torch.tensor([-self.arena_size / math.sqrt(2.0) + 0.1, -self.arena_size / math.sqrt(2.0) + 0.1], device=self.device),
+            torch.tensor([-0.1, self.arena_size / math.sqrt(2.0) - 0.1], device=self.device)
         )
 
         self.init_drone_pos_dist_z = D.Uniform(
