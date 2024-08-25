@@ -6,7 +6,7 @@ sim: ${task.sim}
 env: ${task.env}
 
 # model_dir: /home/jiayu/OmniDrones/scripts/outputs/GAN0to5_TP_GAN0_7_R0_3to0_9/08-13_21-03/wandb/run-20240813_210320-2tgj5z22/files/checkpoint_393347072.pt
-# model_dir: /home/jiayu/OmniDrones/scripts/outputs/fixed0_TP.pt
+# model_dir: /home/jiayu/OmniDrones/scripts/outputs/particle_TP_unif01_R03to07/08-25_12-55/wandb/run-20240825_125546-x5vdz221/files/checkpoint_301596672.pt
 model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
@@ -25,12 +25,12 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: debug
-  run_name: particle_TP_unif01_R03to07
+  run_name: debug
+  # run_name: particle_TP_unif01_R03to07
   entity: chenjy
   project: RAL
-  # mode: disabled
-  mode: online # set to 'disabled' when debugging locally, online
+  mode: disabled
+  # mode: online # set to 'disabled' when debugging locally, online
   run_id: 
   monitor_gym: True
   tags:

@@ -187,7 +187,7 @@ class GenBuffer(object):
         self._history_buffer = np.zeros((0, 18 + num_agents * 3), dtype=np.float32) # task_dim = 30
         self._weight_buffer = np.zeros((0, 1), dtype=np.float32)
         self.device = device
-        self.num_agents = 4
+        self.num_agents = num_agents
         self.buffer_length = 2000
         self.eps = 1e-5
         self.update_method = 'fps' # 'fifo', 'fps'
@@ -197,9 +197,9 @@ class GenBuffer(object):
         arena_size = 0.9
         cylinder_size = 0.1
         self.grid_size = 2 * cylinder_size
+        self.max_height = 1.2
         num_grid = int(arena_size * 2 / self.grid_size)
         self.boundary = arena_size - 0.1
-        self.max_height = 1.2
         self.center_pos = torch.zeros((self.buffer_length, 1, 2))
         self.center_grid = torch.ones((self.buffer_length, 1, 2), dtype=torch.int) * int(num_grid / 2)
         self.grid_map = torch.zeros((1, num_grid, num_grid), dtype=torch.int)
