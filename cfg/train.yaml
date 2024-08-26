@@ -25,19 +25,19 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: debug
-  # run_name: particle_TP_unif01_R03to07
+  # run_name: debug
+  run_name: fixed0_woparticle_TP
   entity: chenjy
   project: RAL
-  mode: disabled
-  # mode: online # set to 'disabled' when debugging locally, online
+  # mode: disabled
+  mode: online # set to 'disabled' when debugging locally, online
   run_id: 
   monitor_gym: True
   tags:
 
 defaults:
   # - task: HideAndSeek_square_partial
-  # - task: HideAndSeek_circle_partial_TP
-  - task: HideAndSeek_circle_partial_TP_particle
+  - task: HideAndSeek_circle_partial_TP
+  # - task: HideAndSeek_circle_partial_TP_particle
   - algo: mappo
   - _self_

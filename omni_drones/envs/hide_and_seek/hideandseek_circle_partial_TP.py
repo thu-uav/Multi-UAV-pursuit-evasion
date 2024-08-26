@@ -1099,7 +1099,6 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         force_r_xy_direction = - target_pos[..., :2] / (target_origin_dist.unsqueeze(-1) + 1e-5)
         # out of arena
         out_of_arena = target_pos[..., 0]**2 + target_pos[..., 1]**2 > self.arena_size**2
-        
         self.stats['out_of_arena'] = torch.logical_or(self.stats['out_of_arena'].bool(), out_of_arena).float()
 
         force_r[..., 0] = out_of_arena.float() * force_r_xy_direction[..., 0] * (1 / 1e-5) + \
@@ -1133,7 +1132,7 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         detect_cylinder = (dist_target_cylinder < self.target_detect_radius)
         active_cylinders_force = (~self.cylinders_mask.unsqueeze(1).unsqueeze(-1) * detect_cylinder.unsqueeze(-1)).float()
         force_c_direction_xy = target_cylinders_rpos[..., :2] / (dist_target_cylinder + 1e-5).unsqueeze(-1)
-        force_c[..., :2] = (active_cylinders_force * force_c_direction_xy * (1 / dist_target_cylinder_boundary.unsqueeze(-1))).sum(2)
+        force_c[..., :2] = (active_cylinders_force * force_c_direction_xy * (1 / (dist_target_cylinder_boundary.unsqueeze(-1) + 1e-5))).sum(2)
         # force_c[..., :2] = (~self.cylinders_mask.unsqueeze(1).unsqueeze(-1) * detect_cylinder.unsqueeze(-1) * target_cylinders_rpos[..., :2] / (dist_target_cylinder**2 + 1e-5).unsqueeze(-1)).sum(2)    
 
         force += force_c
