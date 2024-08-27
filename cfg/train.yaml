@@ -25,7 +25,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: particle_TP_smooth02_deploy_slowv1to1_3
+  run_name: particle_TP
   # run_name: fixed0_woparticle_TP_smooth02_deploy_slowv1to1_3
   entity: chenjy
   project: RAL
