@@ -1012,12 +1012,10 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
             (self.progress_buf >= self.max_episode_length).unsqueeze(-1)
         )
 
-        # if torch.any(done):
-        #     breakpoint()
-        #     if self.stats["success"].mean() > 0.95:
-        #         self.current_L = min(100, self.current_L + 1)
-        #     self.stats["distance_threshold_L"].set_(self.current_L * torch.ones_like(self.stats["distance_threshold_L"]))
-
+        if torch.any(done):
+            if self.stats["success"].mean() > 0.99:
+                self.v_prey = 1.3
+                
         ep_len = self.progress_buf.unsqueeze(-1)
         self.stats["collision"].div_(
             torch.where(done, ep_len, torch.ones_like(ep_len))

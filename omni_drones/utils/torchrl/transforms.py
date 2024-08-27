@@ -414,10 +414,6 @@ class PIDRateController(Transform):
         self.target_clip = self.controller.target_clip
         self.max_thrust_ratio = self.controller.max_thrust_ratio
         self.fixed_yaw = self.controller.fixed_yaw
-        # for action smooth
-        self.use_action_smooth = self.controller.use_action_smooth
-        self.use_cbf = self.controller.use_cbf
-        self.epsilon = self.controller.epsilon
         # self.tanh = TanhTransform()
     
     def transform_input_spec(self, input_spec: TensorSpec) -> TensorSpec:
@@ -429,11 +425,6 @@ class PIDRateController(Transform):
     def _inv_call(self, tensordict: TensorDictBase) -> TensorDictBase:
         drone_state = tensordict[("info", "drone_state")][..., :13]
         action = tensordict[self.action_key]
-        device = drone_state.device
-        
-        # if not(self.epsilon is None) and self.use_cbf:
-        #     action = solve_qp_batch(action.to('cpu').numpy(), prev_action.to('cpu').numpy(), self.epsilon)
-        #     action = torch.from_numpy(action).to(device).float()
 
         action = torch.tanh(action)
         target_rate, target_thrust = action.split([3, 1], -1)
@@ -445,11 +436,6 @@ class PIDRateController(Transform):
         # raw action error
         ctbr_action = torch.concat([target_rate, target_thrust], dim=-1)
         prev_ctbr_action = tensordict[("info", "prev_action")]
-
-        # action smoothness
-        if not(self.epsilon is None) and self.use_action_smooth:
-            ctbr_action = prev_ctbr_action + torch.clamp(ctbr_action - prev_ctbr_action, min = - self.epsilon, max = + self.epsilon)        
-            target_rate, target_thrust = ctbr_action.split([3, 1], -1)
 
         action_error = torch.norm(ctbr_action - prev_ctbr_action, dim = -1)
         tensordict.set(("stats", "action_error_order1"), action_error)
