@@ -6,14 +6,14 @@ sim: ${task.sim}
 env: ${task.env}
 
 # model_dir: /home/jiayu/OmniDrones/scripts/outputs/GAN0to5_TP_GAN0_7_R0_3to0_9/08-13_21-03/wandb/run-20240813_210320-2tgj5z22/files/checkpoint_393347072.pt
-# model_dir: /home/jiayu/OmniDrones/scripts/outputs/particle_TP_unif01_R03to07/08-25_12-55/wandb/run-20240825_125546-x5vdz221/files/checkpoint_301596672.pt
+# model_dir: /home/jiayu/OmniDrones/scripts/outputs/fixed0_woparticle_TP_v_prey1_3_smooth0_loadv1_0/08-27_01-57/wandb/run-20240827_015745-tf9v795i/files/checkpoint_367132672.pt
 model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
 max_iters: -1
 eval_interval: -1
 save_interval: 100
-seed: 0
+seed: 2
 
 viewer:
   resolution: [960, 720]
@@ -25,8 +25,8 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: debug
-  run_name: fixed0_woparticle_TP
+  run_name: debug
+  # run_name: particle_woTP_unif03_R03to07_seed2
   entity: chenjy
   project: RAL
   # mode: disabled
@@ -37,7 +37,7 @@ wandb:
 
 defaults:
   # - task: HideAndSeek_square_partial
-  - task: HideAndSeek_circle_partial_TP
-  # - task: HideAndSeek_circle_partial_TP_particle
+  # - task: HideAndSeek_circle_partial_TP
+  - task: HideAndSeek_circle_partial_TP_particle
   - algo: mappo
   - _self_
