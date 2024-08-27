@@ -25,8 +25,8 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: debug
-  # run_name: particle_woTP_unif03_R03to07_seed2
+  # run_name: debug
+  run_name: particle_woTP_unif03_R03to07_seed2
   entity: chenjy
   project: RAL
   # mode: disabled
