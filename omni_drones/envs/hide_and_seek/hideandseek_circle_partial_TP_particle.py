@@ -1163,6 +1163,10 @@ class HideAndSeek_circle_partial_TP_particle(IsaacEnv):
         )
 
         if torch.any(done):
+            if self.stats["success"].mean() >= 0.98:
+                self.v_prey += 0.05
+                self.v_prey = min(1.3, self.v_prey)
+            
             # update weights
             self.gen_buffer.insert_weights(self.stats["success"])
             # update buffer, insert latest tasks
