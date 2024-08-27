@@ -188,7 +188,7 @@ class GenBuffer(object):
         self._weight_buffer = np.zeros((0, 1), dtype=np.float32)
         self.device = device
         self.num_agents = num_agents
-        self.buffer_length = 2000
+        self.buffer_length = 5000
         self.eps = 1e-5
         self.update_method = 'fps' # 'fifo', 'fps'
         self._temp_state_buffer = []
