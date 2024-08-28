@@ -392,7 +392,7 @@ class HideAndSeek_circle_partial_TP_particle(IsaacEnv):
         self.gen_buffer = GenBuffer(num_agents=self.num_agents, device=self.device)
         self.update_iter = 0 # multiple initialization for agents and target
         self.eval_iter = 5
-        self.num_unif = self.cfg.task.num_unif
+        self.ratio_unif = self.cfg.task.ratio_unif
         self.R_min = self.cfg.task.R_min
         self.R_max = self.cfg.task.R_max
         self.use_init_easy = self.cfg.task.use_init_easy
@@ -554,6 +554,7 @@ class HideAndSeek_circle_partial_TP_particle(IsaacEnv):
             "target_predicted_error": UnboundedContinuousTensorSpec(1),
             "distance_threshold_L": UnboundedContinuousTensorSpec(1),
             "out_of_arena": UnboundedContinuousTensorSpec(1),
+            "history_buffer": UnboundedContinuousTensorSpec(1),
         })
         # }).expand(self.num_envs).to(self.device)
         # add success and number for all cylinders
@@ -769,10 +770,10 @@ class HideAndSeek_circle_partial_TP_particle(IsaacEnv):
         if self.use_random_cylinder:
             if self.use_particle_generator:
                 if self.update_iter == 0: # fixed cylinders for eval_iter
-                    num_buffer = min(self.gen_buffer._history_buffer.shape[0], int(len(env_ids) * (1 - self.num_unif)))
-                    num_unif = len(env_ids) - num_buffer
-                    drones_unif, target_unif, cylinders_unif = self.uniform_sampling(num_unif)
-                    tasks_unif = torch.concat([drones_unif.reshape(num_unif, -1), target_unif.reshape(num_unif, -1), cylinders_unif.reshape(num_unif, -1)], dim=-1)
+                    num_buffer = min(self.gen_buffer._history_buffer.shape[0], int(len(env_ids) * (1 - self.ratio_unif)))
+                    self.num_unif = len(env_ids) - num_buffer
+                    drones_unif, target_unif, cylinders_unif = self.uniform_sampling(self.num_unif)
+                    tasks_unif = torch.concat([drones_unif.reshape(self.num_unif, -1), target_unif.reshape(self.num_unif, -1), cylinders_unif.reshape(self.num_unif, -1)], dim=-1)
                     tasks_unif = tasks_unif.to('cpu').numpy()
                     # sample tasks
                     if num_buffer > 0:
@@ -1188,9 +1189,12 @@ class HideAndSeek_circle_partial_TP_particle(IsaacEnv):
                 # update history buffer
                 tmp_buffer = []
                 for i in range(len(self.gen_buffer._weight_buffer)):
-                    if self.gen_buffer._weight_buffer[i] <= self.R_max and self.gen_buffer._weight_buffer[i] >= self.R_min:
-                        tmp_buffer.append(self.gen_buffer._state_buffer[i])
+                    if i < self.num_unif:
+                        if self.gen_buffer._weight_buffer[i] <= self.R_max and self.gen_buffer._weight_buffer[i] >= self.R_min:
+                            tmp_buffer.append(self.gen_buffer._state_buffer[i])
                 self.gen_buffer.insert_history(np.array(tmp_buffer))
+        
+        self.stats["history_buffer"] = torch.ones_like(self.stats["history_buffer"]) * len(self.gen_buffer._history_buffer)
                 
         ep_len = self.progress_buf.unsqueeze(-1)
         self.stats["collision"].div_(

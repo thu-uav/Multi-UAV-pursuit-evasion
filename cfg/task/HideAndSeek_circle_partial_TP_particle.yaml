@@ -28,8 +28,8 @@ use_random_cylinder: 1
 use_particle_generator: 1
 use_init_easy: 0
 num_unif: 0.3
-R_min: 0.3
-R_max: 0.7
+R_min: 0.5
+R_max: 0.9
 
 # TP net param
 history_step: 10
