@@ -48,14 +48,12 @@ task_space = np.zeros((num_points, num_dimensions))
 for i, (low, high) in enumerate(dimension_ranges):
     task_space[:, i] = np.random.uniform(low, high, num_points)
 
-A = np.load('/home/jiayu/OmniDrones/scripts/outputs/particle_TP_v1_3_smooth0_R05to09/08-28_18-22/wandb/run-20240828_182218-3fpvsp1e/files/history_3000.npy')
-# A = np.load('/home/jiayu/OmniDrones/scripts/outputs/particle_TP_unif01_R03to07/08-25_12-55/wandb/run-20240825_125546-x5vdz221/files/tasks_2800.npy')
-# breakpoint()
+A = np.load('/home/jiayu/OmniDrones/scripts/outputs/particle_TP_v1_3_smooth0_R03to07/08-29_01-09/wandb/run-20240829_010921-yjdp3k5g/files/history_14100.npy')
 
-# from collections import Counter
-# arr_tuples = [tuple(row) for row in A]
-# counter = Counter(arr_tuples)
-# duplicate_counts = [counter[tuple(row)] for row in A]
+from collections import Counter
+arr_tuples = [tuple(row) for row in A]
+counter = Counter(arr_tuples)
+duplicate_counts = [counter[tuple(row)] for row in A]
 
 pca = PCA(n_components=2)  # 只取前两个主成分
 task_space_pca = pca.fit_transform(task_space)
