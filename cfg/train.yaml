@@ -6,7 +6,8 @@ sim: ${task.sim}
 env: ${task.env}
 
 # model_dir: /home/jiayu/OmniDrones/scripts/outputs/GAN0to5_TP_GAN0_7_R0_3to0_9/08-13_21-03/wandb/run-20240813_210320-2tgj5z22/files/checkpoint_393347072.pt
-# model_dir: /home/jiayu/OmniDrones/scripts/outputs/particle_TP_v1_3_smooth0_R05to09/08-28_20-44/wandb/run-20240828_204426-uz6aa7ko/files/checkpoint_734134272.pt
+# model_dir: /home/chenjy/OmniDrones/scripts/outputs/fixed5_particle_TP_unif03_R05to09_fifohistory/08-29_11-22/wandb/run-20240829_112241-e7btyvyk/files/checkpoint_721027072.pt
+# model_dir: /home/chenjy/OmniDrones/scripts/outputs/woparticle_TP_v1_3_smooth0/08-28_11-22/wandb/run-20240828_112219-gitugdhf/files/checkpoint_996278272.pt
 model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
@@ -18,15 +19,15 @@ seed: 0
 viewer:
   resolution: [960, 720]
   # up
-  # eye: [-0.005, 0.0, 5.]
-  # lookat: [0., 0., 1.]
-  eye: [-2.5, 0.0, 2.]
-  lookat: [0., 0.0, 0.1]
+  eye: [-0.005, 0.0, 5.]
+  lookat: [0., 0., 1.]
+  # eye: [-2.5, 0.0, 2.]
+  # lookat: [0., 0.0, 0.1]
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: eval
-  run_name: fixed5_particle_TP_unif03_R05to09_fifohistory
+  run_name: fixed5_particle_TP_unif03_R03to09_fifohistory_stopbuffer0_8
+  # run_name: fixed5_particle_TP_unif03_R05to09_fifohistory_eval
   entity: chenjy
   project: RAL
   # mode: disabled

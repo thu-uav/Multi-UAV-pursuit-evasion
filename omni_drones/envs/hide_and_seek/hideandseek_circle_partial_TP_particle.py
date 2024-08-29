@@ -396,6 +396,7 @@ class HideAndSeek_circle_partial_TP_particle(IsaacEnv):
         self.R_min = self.cfg.task.R_min
         self.R_max = self.cfg.task.R_max
         self.use_init_easy = self.cfg.task.use_init_easy
+        self.success_threshold = self.cfg.task.success_threshold
         
         # init easy case for history buffer
         if self.use_init_easy:
@@ -1163,10 +1164,9 @@ class HideAndSeek_circle_partial_TP_particle(IsaacEnv):
             (self.progress_buf >= self.max_episode_length).unsqueeze(-1)
         )
 
-        if torch.any(done):
-            if self.stats["success"].mean() >= 0.98:
-                self.v_prey += 0.05
-                self.v_prey = min(1.3, self.v_prey)
+        if torch.any(done):            
+            if self.stats["success"].mean() > self.success_threshold:
+                self.ratio_unif = 1.0
             
             # update weights
             self.gen_buffer.insert_weights(self.stats["success"])
