@@ -396,6 +396,7 @@ class HideAndSeek_circle_partial_TP_particle(IsaacEnv):
         self.R_min = self.cfg.task.R_min
         self.R_max = self.cfg.task.R_max
         self.use_init_easy = self.cfg.task.use_init_easy
+        self.success_threshold = self.cfg.task.success_threshold
         
         # init easy case for history buffer
         if self.use_init_easy:
@@ -532,6 +533,8 @@ class HideAndSeek_circle_partial_TP_particle(IsaacEnv):
         # stats and infos
         stats_spec = CompositeSpec({
             "success": UnboundedContinuousTensorSpec(1),
+            "success_buffer": UnboundedContinuousTensorSpec(1),
+            "success_unif": UnboundedContinuousTensorSpec(1),
             "collision": UnboundedContinuousTensorSpec(1),
             "blocked": UnboundedContinuousTensorSpec(1),
             "distance_reward": UnboundedContinuousTensorSpec(1),
@@ -555,6 +558,7 @@ class HideAndSeek_circle_partial_TP_particle(IsaacEnv):
             "distance_threshold_L": UnboundedContinuousTensorSpec(1),
             "out_of_arena": UnboundedContinuousTensorSpec(1),
             "history_buffer": UnboundedContinuousTensorSpec(1),
+            "add_history": UnboundedContinuousTensorSpec(1),
         })
         # }).expand(self.num_envs).to(self.device)
         # add success and number for all cylinders
@@ -770,7 +774,10 @@ class HideAndSeek_circle_partial_TP_particle(IsaacEnv):
         if self.use_random_cylinder:
             if self.use_particle_generator:
                 if self.update_iter == 0: # fixed cylinders for eval_iter
-                    num_buffer = min(self.gen_buffer._history_buffer.shape[0], int(len(env_ids) * (1 - self.ratio_unif)))
+                    if self.gen_buffer._history_buffer.shape[0] > 0:
+                        num_buffer = int(len(env_ids) * (1 - self.ratio_unif))
+                    else:
+                        num_buffer = 0
                     self.num_unif = len(env_ids) - num_buffer
                     drones_unif, target_unif, cylinders_unif = self.uniform_sampling(self.num_unif)
                     tasks_unif = torch.concat([drones_unif.reshape(self.num_unif, -1), target_unif.reshape(self.num_unif, -1), cylinders_unif.reshape(self.num_unif, -1)], dim=-1)
@@ -1108,6 +1115,12 @@ class HideAndSeek_circle_partial_TP_particle(IsaacEnv):
         capture_flag = torch.any(catch_reward, dim=1)
         self.stats["blocked"].add_(torch.all(self.blocked,dim=-1).unsqueeze(-1))
         self.stats["success"] = torch.logical_or(capture_flag.unsqueeze(1), self.stats["success"]).float()
+        if self.num_unif < self.num_envs: # num_buffer > 0
+            self.stats["success_buffer"] = torch.ones_like(self.stats["success_buffer"]) * self.stats["success"][self.num_unif:].mean()
+            self.stats["success_unif"] = torch.ones_like(self.stats["success_unif"]) * self.stats["success"][:self.num_unif].mean()
+        else:
+            self.stats["success_buffer"] = torch.zeros_like(self.stats["success_buffer"])
+            self.stats["success_unif"] = self.stats["success"].clone()
         current_capture_step = capture_flag.float() * self.progress_buf + (~capture_flag).float() * self.max_episode_length
         self.stats['first_capture_step'] = torch.min(self.stats['first_capture_step'], current_capture_step.unsqueeze(1))
         self.stats['catch_reward'].add_(catch_reward.mean(-1).unsqueeze(-1))
@@ -1163,10 +1176,9 @@ class HideAndSeek_circle_partial_TP_particle(IsaacEnv):
             (self.progress_buf >= self.max_episode_length).unsqueeze(-1)
         )
 
-        if torch.any(done):
-            if self.stats["success"].mean() >= 0.98:
-                self.v_prey += 0.05
-                self.v_prey = min(1.3, self.v_prey)
+        if torch.any(done):            
+            if self.stats["success"].mean() > self.success_threshold:
+                self.ratio_unif = 1.0
             
             # update weights
             self.gen_buffer.insert_weights(self.stats["success"])
@@ -1193,6 +1205,7 @@ class HideAndSeek_circle_partial_TP_particle(IsaacEnv):
                         if self.gen_buffer._weight_buffer[i] <= self.R_max and self.gen_buffer._weight_buffer[i] >= self.R_min:
                             tmp_buffer.append(self.gen_buffer._state_buffer[i])
                 self.gen_buffer.insert_history(np.array(tmp_buffer))
+                self.stats["add_history"] = torch.ones_like(self.stats["add_history"]) * len(tmp_buffer)
         
         self.stats["history_buffer"] = torch.ones_like(self.stats["history_buffer"]) * len(self.gen_buffer._history_buffer)
                 
