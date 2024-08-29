@@ -190,7 +190,7 @@ class GenBuffer(object):
         self.num_agents = num_agents
         self.buffer_length = 5000
         self.eps = 1e-5
-        self.update_method = 'fps' # 'fifo', 'fps'
+        self.update_method = 'fifo' # 'fifo', 'fps'
         self._temp_state_buffer = []
         self._temp_weight_buffer = []
         # task specific
@@ -770,12 +770,12 @@ class HideAndSeek_circle_partial_TP_particle(IsaacEnv):
         if self.use_random_cylinder:
             if self.use_particle_generator:
                 if self.update_iter == 0: # fixed cylinders for eval_iter
-                    if self.gen_buffer._history_buffer.shape[0] < self.gen_buffer.buffer_length:
-                        num_buffer = 0
-                        self.num_unif = len(env_ids)
-                    else:
-                        num_buffer = min(self.gen_buffer._history_buffer.shape[0], int(len(env_ids) * (1 - self.ratio_unif)))
-                        self.num_unif = len(env_ids) - num_buffer
+                    # if self.gen_buffer._history_buffer.shape[0] < self.gen_buffer.buffer_length:
+                    #     num_buffer = 0
+                    #     self.num_unif = len(env_ids)
+                    # else:
+                    num_buffer = min(self.gen_buffer._history_buffer.shape[0], int(len(env_ids) * (1 - self.ratio_unif)))
+                    self.num_unif = len(env_ids) - num_buffer
                     drones_unif, target_unif, cylinders_unif = self.uniform_sampling(self.num_unif)
                     tasks_unif = torch.concat([drones_unif.reshape(self.num_unif, -1), target_unif.reshape(self.num_unif, -1), cylinders_unif.reshape(self.num_unif, -1)], dim=-1)
                     tasks_unif = tasks_unif.to('cpu').numpy()
