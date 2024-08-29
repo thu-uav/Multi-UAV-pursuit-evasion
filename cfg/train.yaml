@@ -18,10 +18,10 @@ seed: 0
 viewer:
   resolution: [960, 720]
   # up
-  # eye: [-0.005, 0.0, 5.]
-  # lookat: [0., 0., 1.]
-  eye: [-2.5, 0.0, 2.]
-  lookat: [0., 0.0, 0.1]
+  eye: [-0.005, 0.0, 5.]
+  lookat: [0., 0., 1.]
+  # eye: [-2.5, 0.0, 2.]
+  # lookat: [0., 0.0, 0.1]
 
 wandb:
   group: ${oc.select:..task.name}

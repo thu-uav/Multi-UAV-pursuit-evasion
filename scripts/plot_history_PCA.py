@@ -48,7 +48,7 @@ task_space = np.zeros((num_points, num_dimensions))
 for i, (low, high) in enumerate(dimension_ranges):
     task_space[:, i] = np.random.uniform(low, high, num_points)
 
-A = np.load('/home/chenjy/OmniDrones/scripts/outputs/fixed5_particle_TP_unif03_R05to09_fifohistory/08-29_11-22/wandb/run-20240829_112241-e7btyvyk/files/history_5200.npy')
+A = np.load('/home/chenjy/OmniDrones/scripts/outputs/fixed5_particle_TP_unif03_R05to09_fifohistory/08-29_11-22/wandb/run-20240829_112241-e7btyvyk/files/history_6000.npy')
 
 from collections import Counter
 arr_tuples = [tuple(row) for row in A]
