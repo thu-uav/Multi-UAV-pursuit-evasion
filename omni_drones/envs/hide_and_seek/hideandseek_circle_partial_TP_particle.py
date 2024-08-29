@@ -287,7 +287,7 @@ class GenBuffer(object):
         self._temp_weight_buffer = []
 
     def sample(self, num_tasks):
-        indices = np.random.choice(self._history_buffer.shape[0], num_tasks, replace=False)
+        indices = np.random.choice(self._history_buffer.shape[0], num_tasks, replace=True)
         return self._history_buffer[indices]
 
     def save_task(self, model_dir, episode):
