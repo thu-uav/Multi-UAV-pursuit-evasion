@@ -182,24 +182,26 @@ def set_outside_circle_to_one(grid_map):
     return grid_map
 
 class GenBuffer(object):
-    def __init__(self, num_agents, device):
+    def __init__(self, num_agents, num_cylinders, device):
         self._state_buffer = np.zeros((0, 1), dtype=np.float32)
-        self._history_buffer = np.zeros((0, 18 + num_agents * 3), dtype=np.float32) # task_dim = 30
+        self.task_dim = 18 + num_agents * 3
+        self._history_buffer = np.zeros((0, self.task_dim), dtype=np.float32)
         self._weight_buffer = np.zeros((0, 1), dtype=np.float32)
         self.device = device
         self.num_agents = num_agents
+        self.num_cylinders = num_cylinders
         self.buffer_length = 5000
         self.eps = 1e-5
         self.update_method = 'fps' # 'fifo', 'fps'
         self._temp_state_buffer = []
         self._temp_weight_buffer = []
         # task specific
-        arena_size = 0.9
-        cylinder_size = 0.1
-        self.grid_size = 2 * cylinder_size
+        self.arena_size = 0.9
+        self.cylinder_size = 0.1
+        self.grid_size = 2 * self.cylinder_size
         self.max_height = 1.2
-        num_grid = int(arena_size * 2 / self.grid_size)
-        self.boundary = arena_size - 0.1
+        num_grid = int(self.arena_size * 2 / self.grid_size)
+        self.boundary = self.arena_size - 0.1
         self.center_pos = torch.zeros((self.buffer_length, 1, 2))
         self.center_grid = torch.ones((self.buffer_length, 1, 2), dtype=torch.int) * int(num_grid / 2)
         self.grid_map = torch.zeros((1, num_grid, num_grid), dtype=torch.int)
@@ -285,6 +287,35 @@ class GenBuffer(object):
         # reset temp state and weight buffer
         self._temp_state_buffer = []
         self._temp_weight_buffer = []
+
+    def samplenearby(self, num_tasks):
+        indices = np.random.choice(self._history_buffer.shape[0], num_tasks, replace=True)
+        origin_tasks = self._history_buffer[indices]
+        
+        # tasks: drone pos, target pos, cylinders pos
+        cylinder_boundary = int(self.arena_size / self.grid_size) * self.grid_size
+        boundary_xy = self.arena_size / math.sqrt(2.0) - 0.1
+        boundary_drone = [[-boundary_xy, boundary_xy], \
+                          [-boundary_xy, boundary_xy], \
+                          [self.max_height - 0.1, self.max_height + 0.1]]
+        boundary_cylinder = [[-cylinder_boundary, cylinder_boundary], \
+                          [-cylinder_boundary, cylinder_boundary], \
+                          [self.max_height / 2, self.max_height / 2]]
+        boundary_task = []
+        boundary_task += boundary_drone * self.num_agents
+        boundary_task += boundary_drone * 1
+        boundary_task += boundary_cylinder * self.num_cylinders
+        boundary_task = np.array(boundary_task)
+
+        # expand cl space
+        expand_step = self.grid_size
+        cylinders_dim = self.num_cylinders * 3
+        drone_target_noise = np.random.uniform(-1, 1, size=(num_tasks, self.task_dim - cylinders_dim)) * expand_step
+        cylinders_noise = np.random.choice([-1, 0, 1], size=(num_tasks, cylinders_dim)) * expand_step
+        noise = np.concatenate([drone_target_noise, cylinders_noise], axis=-1)
+        generated_tasks = np.clip(origin_tasks + noise, boundary_task[:, 0], boundary_task[:, 1])
+        
+        return generated_tasks
 
     def sample(self, num_tasks):
         indices = np.random.choice(self._history_buffer.shape[0], num_tasks, replace=True)
@@ -389,7 +420,7 @@ class HideAndSeek_circle_partial_TP_particle(IsaacEnv):
         
         # particle-based generator
         self.use_particle_generator = self.cfg.task.use_particle_generator
-        self.gen_buffer = GenBuffer(num_agents=self.num_agents, device=self.device)
+        self.gen_buffer = GenBuffer(num_agents=self.num_agents, num_cylinders=self.num_cylinders, device=self.device)
         self.update_iter = 0 # multiple initialization for agents and target
         self.eval_iter = self.cfg.task.eval_iter
         self.ratio_unif = self.cfg.task.ratio_unif
@@ -726,7 +757,6 @@ class HideAndSeek_circle_partial_TP_particle(IsaacEnv):
         center_pos = torch.zeros((num_tasks, 1, 2), device=self.device)
         center_grid = torch.ones((num_tasks, 1, 2), device=self.device, dtype=torch.int) * int(num_grid / 2)
         grid_map = set_outside_circle_to_one(grid_map)
-        self.clean_grid_map = grid_map.clone()
         # setup drone and target
         drone_grid = continuous_to_grid(drone_pos[..., :2], num_grid, grid_size, center_pos, center_grid)
         target_grid = continuous_to_grid(target_pos[..., :2], num_grid, grid_size, center_pos, center_grid)
@@ -774,10 +804,7 @@ class HideAndSeek_circle_partial_TP_particle(IsaacEnv):
         if self.use_random_cylinder:
             if self.use_particle_generator:
                 if self.update_iter == 0: # fixed cylinders for eval_iter
-                    if self.gen_buffer._history_buffer.shape[0] > 0:
-                        num_buffer = int(len(env_ids) * (1 - self.ratio_unif))
-                    else:
-                        num_buffer = 0
+                    num_buffer = min(self.gen_buffer._history_buffer.shape[0], int(len(env_ids) * (1 - self.ratio_unif)))
                     self.num_unif = len(env_ids) - num_buffer
                     drones_unif, target_unif, cylinders_unif = self.uniform_sampling(self.num_unif)
                     tasks_unif = torch.concat([drones_unif.reshape(self.num_unif, -1), target_unif.reshape(self.num_unif, -1), cylinders_unif.reshape(self.num_unif, -1)], dim=-1)
@@ -785,7 +812,8 @@ class HideAndSeek_circle_partial_TP_particle(IsaacEnv):
                     # sample tasks
                     if num_buffer > 0:
                         # sample from Gen_buffer
-                        tasks_buffer = self.gen_buffer.sample(num_buffer)
+                        # tasks_buffer = self.gen_buffer.sample(num_buffer)
+                        tasks_buffer = self.gen_buffer.samplenearby(num_buffer)
                         self.all_tasks = np.concatenate([tasks_unif, tasks_buffer])
                     else:
                         self.all_tasks = tasks_unif
@@ -1201,9 +1229,8 @@ class HideAndSeek_circle_partial_TP_particle(IsaacEnv):
                 # update history buffer
                 tmp_buffer = []
                 for i in range(len(self.gen_buffer._weight_buffer)):
-                    if i < self.num_unif:
-                        if self.gen_buffer._weight_buffer[i] <= self.R_max and self.gen_buffer._weight_buffer[i] >= self.R_min:
-                            tmp_buffer.append(self.gen_buffer._state_buffer[i])
+                    if self.gen_buffer._weight_buffer[i] <= self.R_max and self.gen_buffer._weight_buffer[i] >= self.R_min:
+                        tmp_buffer.append(self.gen_buffer._state_buffer[i])
                 self.gen_buffer.insert_history(np.array(tmp_buffer))
                 self.stats["add_history"] = torch.ones_like(self.stats["add_history"]) * len(tmp_buffer)
         

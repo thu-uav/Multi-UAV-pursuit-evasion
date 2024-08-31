@@ -25,8 +25,8 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: eval
-  run_name: unif07_R03to07_fps_stop09_eval3
+  # run_name: debug
+  run_name: unif03_R03to07_fps_wostop_eval3_samplenearby
   entity: chenjy
   project: RAL
   # mode: disabled
