@@ -32,8 +32,8 @@ eval_iter: 3
 success_threshold: 1.0 # success > 0.9, only use unif
 expand_cylinders: 0
 expand_step: 0.1
-R_min: 0.3
-R_max: 0.7
+R_min: 0.5
+R_max: 0.9
 
 # TP net param
 history_step: 10

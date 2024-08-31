@@ -165,7 +165,7 @@ def continuous_to_grid(continuous_coords, num_grid, grid_size, center_pos, cente
     
     return grid_coords
 
-# *****************set grid_map = 1*****************
+# *****************set outside = 1*****************
 def set_outside_circle_to_one(grid_map):
     n = grid_map.shape[-1]
     
@@ -181,6 +181,31 @@ def set_outside_circle_to_one(grid_map):
     
     return grid_map
 
+# *****************check if pos is valid*****************
+def sanity_check(grid_map, drone_grid, target_grid, cylinders_grid):
+    num_drones = drone_grid.shape[0]
+    num_target = target_grid.shape[0]
+    num_cylinders = cylinders_grid.shape[0]
+    
+    grid_map_copy = grid_map.copy()
+    
+    init_occupied_one = grid_map_copy.sum()
+    
+    x_indices = drone_grid[:, 0].flatten()
+    y_indices = drone_grid[:, 1].flatten()
+    grid_map_copy[x_indices, y_indices] = 1
+    x_indices = target_grid[:, 0].flatten()
+    y_indices = target_grid[:, 1].flatten()
+    grid_map_copy[x_indices, y_indices] = 1
+    x_indices = cylinders_grid[:, 0].flatten()
+    y_indices = cylinders_grid[:, 1].flatten()
+    grid_map_copy[x_indices, y_indices] = 1
+    
+    if grid_map_copy.sum() - init_occupied_one < (num_drones + num_target + num_cylinders):
+        return False
+    else:
+        return True
+    
 class GenBuffer(object):
     def __init__(self, num_agents, num_cylinders, device):
         self._state_buffer = np.zeros((0, 1), dtype=np.float32)
@@ -200,11 +225,11 @@ class GenBuffer(object):
         self.cylinder_size = 0.1
         self.grid_size = 2 * self.cylinder_size
         self.max_height = 1.2
-        num_grid = int(self.arena_size * 2 / self.grid_size)
+        self.num_grid = int(self.arena_size * 2 / self.grid_size)
         self.boundary = self.arena_size - 0.1
-        self.center_pos = torch.zeros((self.buffer_length, 1, 2))
-        self.center_grid = torch.ones((self.buffer_length, 1, 2), dtype=torch.int) * int(num_grid / 2)
-        self.grid_map = torch.zeros((1, num_grid, num_grid), dtype=torch.int)
+        self.center_pos = np.zeros((1, 2))
+        self.center_grid = np.ones((1, 2), dtype=int) * int(self.num_grid / 2)
+        self.grid_map = np.zeros((1, self.num_grid, self.num_grid), dtype=int)
         self.grid_map = set_outside_circle_to_one(self.grid_map)
     
     def init_easy_cases(self):
@@ -308,14 +333,38 @@ class GenBuffer(object):
         boundary_task = np.array(boundary_task)
 
         # expand cl space
+        generated_tasks = []
         cylinders_dim = self.num_cylinders * 3
-        drone_target_noise = np.random.uniform(-1, 1, size=(num_tasks, self.task_dim - cylinders_dim)) * expand_step
-        cylinders_noise = np.random.choice([-1, 0, 1], size=(num_tasks, cylinders_dim)) * expand_step
-        if not expand_cylinders:
-            cylinders_noise = np.zeros_like(cylinders_noise)
-        noise = np.concatenate([drone_target_noise, cylinders_noise], axis=-1)
-        generated_tasks = np.clip(origin_tasks + noise, boundary_task[:, 0], boundary_task[:, 1])
+        # get grid map, for sanity check
+        for i in range(num_tasks):
+            tmp = 0
+            while tmp < 10:
+                tmp += 1
+                drone_target_noise = np.random.uniform(-1, 1, size=(self.task_dim - cylinders_dim)) * expand_step
+                cylinders_noise = np.random.choice([-1, 0, 1], size=(cylinders_dim)) * self.grid_size
+                if not expand_cylinders:
+                    cylinders_noise = np.zeros_like(cylinders_noise)
+                noise = np.concatenate([drone_target_noise, cylinders_noise], axis=-1)
+                new_task = np.clip(origin_tasks[i] + noise, boundary_task[:, 0], boundary_task[:, 1])
+                
+                drone_pos = new_task[:3 * self.num_agents].reshape(-1, 3)
+                target_pos = new_task[3 * self.num_agents: 3 * self.num_agents + 3].reshape(-1, 3)
+                cylinders_pos = new_task[3 * self.num_agents + 3: ].reshape(-1, 3)
+                
+                drone_grid = continuous_to_grid(torch.from_numpy(drone_pos[..., :2]), self.num_grid, self.grid_size, torch.from_numpy(self.center_pos), torch.from_numpy(self.center_grid))
+                target_grid = continuous_to_grid(torch.from_numpy(target_pos[..., :2]), self.num_grid, self.grid_size, torch.from_numpy(self.center_pos), torch.from_numpy(self.center_grid))
+                cylinders_grid = continuous_to_grid(torch.from_numpy(cylinders_pos[..., :2]), self.num_grid, self.grid_size, torch.from_numpy(self.center_pos), torch.from_numpy(self.center_grid))
+                if sanity_check(self.grid_map[0], drone_grid.numpy(), target_grid.numpy(), cylinders_grid.numpy()):
+                    generated_tasks.append(new_task)
+                    break
         
+        generated_tasks = np.array(generated_tasks)
+        # ensure generated_tasks.shape[0] = num_tasks
+        if generated_tasks.shape[0] < num_tasks:
+            num_add = num_tasks - generated_tasks.shape[0]
+            add_indices = np.random.choice(generated_tasks.shape[0], num_add, replace=True)
+            add_tasks = generated_tasks[add_indices]
+            generated_tasks = np.concatenate([add_tasks, generated_tasks])
         return generated_tasks
 
     def sample(self, num_tasks):
