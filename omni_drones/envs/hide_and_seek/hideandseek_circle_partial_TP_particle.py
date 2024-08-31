@@ -190,7 +190,7 @@ class GenBuffer(object):
         self.num_agents = num_agents
         self.buffer_length = 5000
         self.eps = 1e-5
-        self.update_method = 'fifo' # 'fifo', 'fps'
+        self.update_method = 'fps' # 'fifo', 'fps'
         self._temp_state_buffer = []
         self._temp_weight_buffer = []
         # task specific
@@ -391,7 +391,7 @@ class HideAndSeek_circle_partial_TP_particle(IsaacEnv):
         self.use_particle_generator = self.cfg.task.use_particle_generator
         self.gen_buffer = GenBuffer(num_agents=self.num_agents, device=self.device)
         self.update_iter = 0 # multiple initialization for agents and target
-        self.eval_iter = 5
+        self.eval_iter = self.cfg.task.eval_iter
         self.ratio_unif = self.cfg.task.ratio_unif
         self.R_min = self.cfg.task.R_min
         self.R_max = self.cfg.task.R_max

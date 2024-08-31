@@ -26,7 +26,7 @@ viewer:
 wandb:
   group: ${oc.select:..task.name}
   # run_name: eval
-  run_name: fixed5_particle_TP_unif03_R03to09_fifohistory5000_wostopbuffer
+  run_name: unif07_R03to07_fps_stop09
   entity: chenjy
   project: RAL
   # mode: disabled
