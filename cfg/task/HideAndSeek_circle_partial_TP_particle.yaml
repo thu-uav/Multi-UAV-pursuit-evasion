@@ -30,6 +30,7 @@ use_init_easy: 0
 ratio_unif: 0.3
 eval_iter: 3
 success_threshold: 1.0 # success > 0.9, only use unif
+expand_cylinders: 0
 R_min: 0.3
 R_max: 0.7
 

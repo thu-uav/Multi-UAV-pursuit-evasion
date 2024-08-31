@@ -288,7 +288,7 @@ class GenBuffer(object):
         self._temp_state_buffer = []
         self._temp_weight_buffer = []
 
-    def samplenearby(self, num_tasks):
+    def samplenearby(self, num_tasks, expand_cylinders):
         indices = np.random.choice(self._history_buffer.shape[0], num_tasks, replace=True)
         origin_tasks = self._history_buffer[indices]
         
@@ -312,6 +312,8 @@ class GenBuffer(object):
         cylinders_dim = self.num_cylinders * 3
         drone_target_noise = np.random.uniform(-1, 1, size=(num_tasks, self.task_dim - cylinders_dim)) * expand_step
         cylinders_noise = np.random.choice([-1, 0, 1], size=(num_tasks, cylinders_dim)) * expand_step
+        if not expand_cylinders:
+            cylinders_noise = np.zeros_like(cylinders_noise)
         noise = np.concatenate([drone_target_noise, cylinders_noise], axis=-1)
         generated_tasks = np.clip(origin_tasks + noise, boundary_task[:, 0], boundary_task[:, 1])
         
@@ -428,6 +430,7 @@ class HideAndSeek_circle_partial_TP_particle(IsaacEnv):
         self.R_max = self.cfg.task.R_max
         self.use_init_easy = self.cfg.task.use_init_easy
         self.success_threshold = self.cfg.task.success_threshold
+        self.expand_cylinders = self.cfg.task.expand_cylinders
         
         # init easy case for history buffer
         if self.use_init_easy:
@@ -813,7 +816,7 @@ class HideAndSeek_circle_partial_TP_particle(IsaacEnv):
                     if num_buffer > 0:
                         # sample from Gen_buffer
                         # tasks_buffer = self.gen_buffer.sample(num_buffer)
-                        tasks_buffer = self.gen_buffer.samplenearby(num_buffer)
+                        tasks_buffer = self.gen_buffer.samplenearby(num_buffer, self.expand_cylinders)
                         self.all_tasks = np.concatenate([tasks_unif, tasks_buffer])
                     else:
                         self.all_tasks = tasks_unif
