@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-data = np.load("/home/jiayu/OmniDrones/scripts/outputs/unif07_R03to07_fps_wostopbuffer_stop09/08-30_15-53/wandb/run-20240830_155338-qg2silf4/files/history_5000.npy")
+data = np.load("/home/jiayu/OmniDrones/scripts/outputs/unif03_R05to09_samplenearby_withcylinders_expandstep0_1/08-31_22-18/wandb/run-20240831_221829-hwi2i9sy/files/history_22800.npy")
 n = data.shape[0]
 
 num_drones = 3
