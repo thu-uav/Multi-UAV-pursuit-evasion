@@ -26,7 +26,7 @@ viewer:
 wandb:
   group: ${oc.select:..task.name}
   # run_name: debug
-  run_name: fixed5_unif03_fps
+  run_name: particle_TP_expand_obstacles_expand_step0_5
   entity: chenjy
   project: RAL
   # mode: disabled
@@ -37,7 +37,7 @@ wandb:
 
 defaults:
   # - task: HideAndSeek_square_partial
-  - task: HideAndSeek_circle_partial_TP
-  # - task: HideAndSeek_circle_partial_TP_particle
+  # - task: HideAndSeek_circle_partial_TP
+  - task: HideAndSeek_circle_partial_TP_particle
   - algo: mappo
   - _self_

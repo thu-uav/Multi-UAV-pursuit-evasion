@@ -325,7 +325,7 @@ class GenBuffer(object):
                           [self.max_height - 0.1, self.max_height + 0.1]]
         boundary_cylinder = [[-cylinder_boundary, cylinder_boundary], \
                           [-cylinder_boundary, cylinder_boundary], \
-                          [self.max_height / 2, self.max_height / 2]]
+                          [-20.0, self.max_height / 2]]
         boundary_task = []
         boundary_task += boundary_drone * self.num_agents
         boundary_task += boundary_drone * 1
@@ -334,14 +334,15 @@ class GenBuffer(object):
 
         # expand cl space
         generated_tasks = []
-        cylinders_dim = self.num_cylinders * 3
         # get grid map, for sanity check
         for i in range(num_tasks):
             tmp = 0
             while tmp < 10:
                 tmp += 1
-                drone_target_noise = np.random.uniform(-1, 1, size=(self.task_dim - cylinders_dim)) * expand_step
-                cylinders_noise = np.random.choice([-1, 0, 1], size=(cylinders_dim)) * self.grid_size
+                drone_target_noise = np.random.uniform(-1, 1, size=(self.task_dim - self.num_cylinders * 3)) * expand_step
+                cylinders_xy_noise = np.random.choice([-1, 0, 1], size=(self.num_cylinders, 2)) * self.grid_size
+                cylinders_z_noise = np.zeros((self.num_cylinders, 1))
+                cylinders_noise = np.concatenate([cylinders_xy_noise, cylinders_z_noise], axis=-1).reshape(-1)
                 if not expand_cylinders:
                     cylinders_noise = np.zeros_like(cylinders_noise)
                 noise = np.concatenate([drone_target_noise, cylinders_noise], axis=-1)
@@ -365,6 +366,7 @@ class GenBuffer(object):
             add_indices = np.random.choice(generated_tasks.shape[0], num_add, replace=True)
             add_tasks = generated_tasks[add_indices]
             generated_tasks = np.concatenate([add_tasks, generated_tasks])
+
         return generated_tasks
 
     def sample(self, num_tasks):
@@ -372,8 +374,6 @@ class GenBuffer(object):
         return self._history_buffer[indices]
 
     def save_task(self, model_dir, episode):
-        # np.save('{}/tasks_{}.npy'.format(model_dir,episode), self._state_buffer)
-        # np.save('{}/weights_{}.npy'.format(model_dir,episode), self._weight_buffer)
         np.save('{}/history_{}.npy'.format(model_dir,episode), self._history_buffer)
         
 class HideAndSeek_circle_partial_TP_particle(IsaacEnv): 
@@ -866,6 +866,7 @@ class HideAndSeek_circle_partial_TP_particle(IsaacEnv):
                         # sample from Gen_buffer
                         # tasks_buffer = self.gen_buffer.sample(num_buffer)
                         tasks_buffer = self.gen_buffer.samplenearby(num_buffer, self.expand_cylinders, self.expand_step)
+                        breakpoint()
                         self.all_tasks = np.concatenate([tasks_unif, tasks_buffer])
                     else:
                         self.all_tasks = tasks_unif
