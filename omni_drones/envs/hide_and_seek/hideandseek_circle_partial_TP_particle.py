@@ -372,8 +372,8 @@ class GenBuffer(object):
         return self._history_buffer[indices]
 
     def save_task(self, model_dir, episode):
-        np.save('{}/tasks_{}.npy'.format(model_dir,episode), self._state_buffer)
-        np.save('{}/weights_{}.npy'.format(model_dir,episode), self._weight_buffer)
+        # np.save('{}/tasks_{}.npy'.format(model_dir,episode), self._state_buffer)
+        # np.save('{}/weights_{}.npy'.format(model_dir,episode), self._weight_buffer)
         np.save('{}/history_{}.npy'.format(model_dir,episode), self._history_buffer)
         
 class HideAndSeek_circle_partial_TP_particle(IsaacEnv): 
