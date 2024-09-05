@@ -281,7 +281,6 @@ def main(cfg):
     env.train()
     fps = []
     for i, data in enumerate(pbar):
-        
         # fps.append(collector._fps)
         info = {"env_frames": collector._frames, "rollout_fps": collector._fps}
         episode_stats(data.to_tensordict())

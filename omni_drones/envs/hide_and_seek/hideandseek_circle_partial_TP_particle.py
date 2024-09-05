@@ -642,6 +642,7 @@ class HideAndSeek_circle_partial_TP_particle(IsaacEnv):
             "out_of_arena": UnboundedContinuousTensorSpec(1),
             "history_buffer": UnboundedContinuousTensorSpec(1),
             "add_history": UnboundedContinuousTensorSpec(1),
+            "ratio_unif": UnboundedContinuousTensorSpec(1),
         })
         # }).expand(self.num_envs).to(self.device)
         # add success and number for all cylinders
@@ -1287,6 +1288,7 @@ class HideAndSeek_circle_partial_TP_particle(IsaacEnv):
                 self.stats["add_history"] = torch.ones_like(self.stats["add_history"]) * len(tmp_buffer)
         
         self.stats["history_buffer"] = torch.ones_like(self.stats["history_buffer"]) * len(self.gen_buffer._history_buffer)
+        self.stats["ratio_unif"] = torch.ones_like(self.stats["ratio_unif"]) * self.ratio_unif
                 
         ep_len = self.progress_buf.unsqueeze(-1)
         self.stats["collision"].div_(
