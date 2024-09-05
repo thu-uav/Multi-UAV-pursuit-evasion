@@ -866,7 +866,6 @@ class HideAndSeek_circle_partial_TP_particle(IsaacEnv):
                         # sample from Gen_buffer
                         # tasks_buffer = self.gen_buffer.sample(num_buffer)
                         tasks_buffer = self.gen_buffer.samplenearby(num_buffer, self.expand_cylinders, self.expand_step)
-                        breakpoint()
                         self.all_tasks = np.concatenate([tasks_unif, tasks_buffer])
                     else:
                         self.all_tasks = tasks_unif

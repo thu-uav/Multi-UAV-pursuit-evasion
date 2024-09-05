@@ -26,7 +26,7 @@ viewer:
 wandb:
   group: ${oc.select:..task.name}
   # run_name: debug
-  run_name: particle_TP_expand_obstacles_expand_step0_05
+  run_name: random4to5_particle_TP_step0_1_stop0_8_unif01
   entity: chenjy
   project: RAL
   # mode: disabled
