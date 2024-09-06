@@ -1377,10 +1377,15 @@ class HideAndSeek_circle_partial_TP_particle(IsaacEnv):
             (~out_of_arena).float() * force_r_xy_direction[..., 0] * (1 / ((self.arena_size - target_origin_dist) + 1e-5))
         force_r[..., 1] = out_of_arena.float() * force_r_xy_direction[..., 1] * (1 / 1e-5) + \
             (~out_of_arena).float() * force_r_xy_direction[..., 1] * (1 / ((self.arena_size - target_origin_dist) + 1e-5))
+        
+        higher_than_z = (target_pos[..., 2] > self.max_height)
         # up
-        force_r[...,2] = - (self.max_height - target_pos[..., 2]) / ((self.max_height - target_pos[..., 2])**2 + 1e-5)
+        force_r[...,2] = higher_than_z.float() * (-1 / 1e-5) + \
+            (~higher_than_z).float() * - (self.max_height - target_pos[..., 2]) / ((self.max_height - target_pos[..., 2])**2 + 1e-5)
+        lower_than_ground = (target_pos[..., 2] < 0.0)
         # down
-        force_r[...,2] += - (0.0 - target_pos[..., 2]) / ((0.0 - target_pos[..., 2])**2 + 1e-5)
+        force_r[...,2] += (lower_than_ground.float() * (1 / 1e-5) + \
+            (~lower_than_ground).float() * - (0.0 - target_pos[..., 2]) / ((0.0 - target_pos[..., 2])**2 + 1e-5))
         force += force_r
         
         # # only get force from the nearest cylinder to the target

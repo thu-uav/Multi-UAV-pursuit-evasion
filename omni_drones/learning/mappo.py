@@ -259,7 +259,7 @@ class MAPPOPolicy(object):
         
         TP_outsput = self.TP_net(TP_input)
         loss = self.TP_criterion(TP_outsput, TP_groundtruth.reshape(batch_size, -1))
-        
+                
         self.TP_optimizer.zero_grad()
         loss.backward()
         self.TP_optimizer.step()

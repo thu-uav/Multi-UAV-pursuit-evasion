@@ -1,14 +1,14 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-data = np.load("/home/jiayu/OmniDrones/scripts/outputs/unif07_R03to07_fps_wostopbuffer_stop09/08-30_15-53/wandb/run-20240830_155338-qg2silf4/files/history_5000.npy")
+data = np.load("/home/jiayu/OmniDrones/scripts/outputs/debug_TP_epoch5/09-06_12-13/wandb/run-20240906_121303-cbj7tnup/files/history_1200.npy")
 n = data.shape[0]
 
 num_drones = 3
 num_obstacles = 5
 
 # 选择第i个数据
-i = -3
+i = -4
 
 # 提取无人机、目标点和障碍物的坐标
 drones_coords = data[i, :9].reshape(num_drones, 3)  # [3, 3]
