@@ -649,86 +649,94 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
             drone_pos = torch.concat([drone_pos, drone_pos_z], dim=-1)
             target_pos = torch.concat([target_pos, target_pos_z], dim=-1)
         else: # fixed scenario
-            if self.scenario_flag == 'empty':
-                drone_pos = torch.tensor([
-                                    [0.6000,  0.0000, 0.5],
-                                    [0.8000,  0.0000, 0.5],
-                                    [0.8000, -0.2000, 0.5],
-                                    [0.8000,  0.2000, 0.5],
-                                ], device=self.device)[:self.num_agents]
-                target_pos = torch.tensor([
-                                    [-0.8000,  0.0000, 0.5],
-                                ], device=self.device)
-            elif self.scenario_flag == 'random':
-                drone_pos = torch.tensor([
-                                    [0.4000,  0.0000, 0.5],
-                                    [0.6000,  0.0000, 0.5],
-                                    [0.6000,  0.2000, 0.5],
-                                    [0.4000,  0.2000, 0.5],
-                                ], device=self.device)[:self.num_agents]
-                target_pos = torch.tensor([
-                                    [-0.6000,  0.0000, 0.5],
-                                ], device=self.device)
-            elif self.scenario_flag == 'corner':
-                drone_pos = torch.tensor([
-                                    [-0.4000,  0.0000, 0.5],
-                                    [-0.6000,  0.0000, 0.5],
-                                    [-0.4000,  0.2000, 0.5],
-                                    [-0.6000,  0.2000, 0.5],
-                                ], device=self.device)[:self.num_agents]
-                target_pos = torch.tensor([
-                                    [0.6000,  0.6000, 0.5],
-                                ], device=self.device)
-            elif self.scenario_flag == 'wall':
-                drone_pos = torch.tensor([
-                                    [0.6000,  0.0000, 0.5],
-                                    [0.8000,  0.0000, 0.5],
-                                    [0.8000, -0.2000, 0.5],
-                                    [0.8000,  0.2000, 0.5],
-                                ], device=self.device)[:self.num_agents]
-                target_pos = torch.tensor([
-                                    [-0.8000,  0.0000, 0.5],
-                                ], device=self.device)
-            elif self.scenario_flag == 'center':
-                drone_pos = torch.tensor([
-                                    [0.6000,  0.0000, 0.5],
-                                    [0.8000,  0.0000, 0.5],
-                                    [0.8000, -0.2000, 0.5],
-                                    [0.8000,  0.2000, 0.5],
-                                ], device=self.device)[:self.num_agents]
-                target_pos = torch.tensor([
-                                    [-0.8000,  0.0000, 0.5],
-                                ], device=self.device)
-            elif self.scenario_flag == '2line':
-                drone_pos = torch.tensor([
-                                    [0.6000,  0.0000, 0.5],
-                                    [0.8000,  0.0000, 0.5],
-                                    [0.8000, -0.2000, 0.5],
-                                    [0.8000,  0.2000, 0.5],
-                                ], device=self.device)[:self.num_agents]
-                target_pos = torch.tensor([
-                                    [0.0000,  0.0000, 0.5],
-                                ], device=self.device)
-            elif self.scenario_flag == '6cylinders':
-                drone_pos = torch.tensor([
-                                    [0.6000,  0.4000, 0.5],
-                                    [0.4000,  0.6000, 0.5],
-                                    [0.4000,  0.4000, 0.5],
-                                    [0.8000,  0.2000, 0.5],
-                                ], device=self.device)[:self.num_agents]
-                target_pos = torch.tensor([
-                                    [0.0000,  -0.6000, 0.5],
-                                ], device=self.device)
-            elif self.scenario_flag == '3line':
-                drone_pos = torch.tensor([
-                                    [0.6000,  0.0000, 0.5],
-                                    [0.8000,  0.0000, 0.5],
-                                    [0.8000, -0.2000, 0.5],
-                                    [0.8000,  0.2000, 0.5],
-                                ], device=self.device)[:self.num_agents]
-                target_pos = torch.tensor([
-                                    [0.0000,  0.0000, 0.5],
-                                ], device=self.device)
+            if not self.use_eval: # random pos
+                drone_pos = self.init_drone_pos_dist.sample((*env_ids.shape, self.num_agents))
+                target_pos =  self.init_target_pos_dist.sample((*env_ids.shape, 1))
+                drone_pos_z = self.init_drone_pos_dist_z.sample((*env_ids.shape, self.num_agents))
+                target_pos_z = self.init_target_pos_dist_z.sample((*env_ids.shape, 1))
+                drone_pos = torch.concat([drone_pos, drone_pos_z], dim=-1)
+                target_pos = torch.concat([target_pos, target_pos_z], dim=-1)
+            else: # fixed pos
+                if self.scenario_flag == 'empty':
+                    drone_pos = torch.tensor([
+                                        [0.6000,  0.0000, 0.5],
+                                        [0.8000,  0.0000, 0.5],
+                                        [0.8000, -0.2000, 0.5],
+                                        [0.8000,  0.2000, 0.5],
+                                    ], device=self.device)[:self.num_agents]
+                    target_pos = torch.tensor([
+                                        [-0.8000,  0.0000, 0.5],
+                                    ], device=self.device)
+                elif self.scenario_flag == 'random':
+                    drone_pos = torch.tensor([
+                                        [0.4000,  0.0000, 0.5],
+                                        [0.6000,  0.0000, 0.5],
+                                        [0.6000,  0.2000, 0.5],
+                                        [0.4000,  0.2000, 0.5],
+                                    ], device=self.device)[:self.num_agents]
+                    target_pos = torch.tensor([
+                                        [-0.6000,  0.0000, 0.5],
+                                    ], device=self.device)
+                elif self.scenario_flag == 'corner':
+                    drone_pos = torch.tensor([
+                                        [-0.4000,  0.0000, 0.5],
+                                        [-0.6000,  0.0000, 0.5],
+                                        [-0.4000,  0.2000, 0.5],
+                                        [-0.6000,  0.2000, 0.5],
+                                    ], device=self.device)[:self.num_agents]
+                    target_pos = torch.tensor([
+                                        [0.6000,  0.6000, 0.5],
+                                    ], device=self.device)
+                elif self.scenario_flag == 'wall':
+                    drone_pos = torch.tensor([
+                                        [0.6000,  0.0000, 0.5],
+                                        [0.8000,  0.0000, 0.5],
+                                        [0.8000, -0.2000, 0.5],
+                                        [0.8000,  0.2000, 0.5],
+                                    ], device=self.device)[:self.num_agents]
+                    target_pos = torch.tensor([
+                                        [-0.8000,  0.0000, 0.5],
+                                    ], device=self.device)
+                elif self.scenario_flag == 'center':
+                    drone_pos = torch.tensor([
+                                        [0.6000,  0.0000, 0.5],
+                                        [0.8000,  0.0000, 0.5],
+                                        [0.8000, -0.2000, 0.5],
+                                        [0.8000,  0.2000, 0.5],
+                                    ], device=self.device)[:self.num_agents]
+                    target_pos = torch.tensor([
+                                        [-0.8000,  0.0000, 0.5],
+                                    ], device=self.device)
+                elif self.scenario_flag == '2line':
+                    drone_pos = torch.tensor([
+                                        [0.6000,  0.0000, 0.5],
+                                        [0.8000,  0.0000, 0.5],
+                                        [0.8000, -0.2000, 0.5],
+                                        [0.8000,  0.2000, 0.5],
+                                    ], device=self.device)[:self.num_agents]
+                    target_pos = torch.tensor([
+                                        [0.0000,  0.0000, 0.5],
+                                    ], device=self.device)
+                elif self.scenario_flag == '6cylinders':
+                    drone_pos = torch.tensor([
+                                        [0.6000,  0.4000, 0.5],
+                                        [0.4000,  0.6000, 0.5],
+                                        [0.4000,  0.4000, 0.5],
+                                        [0.8000,  0.2000, 0.5],
+                                    ], device=self.device)[:self.num_agents]
+                    target_pos = torch.tensor([
+                                        [0.0000,  -0.6000, 0.5],
+                                    ], device=self.device)
+                elif self.scenario_flag == '3line':
+                    drone_pos = torch.tensor([
+                                        [0.6000,  0.0000, 0.5],
+                                        [0.8000,  0.0000, 0.5],
+                                        [0.8000, -0.2000, 0.5],
+                                        [0.8000,  0.2000, 0.5],
+                                    ], device=self.device)[:self.num_agents]
+                    target_pos = torch.tensor([
+                                        [0.0000,  0.0000, 0.5],
+                                    ], device=self.device)
         
         if self.use_random_cylinder:
             cylinders_pos_xy = self.rejection_sampling_random_cylinder(env_ids, drone_pos, target_pos)

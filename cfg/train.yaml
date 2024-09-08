@@ -25,7 +25,8 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: random4to5_particle_woTP_seed0
+  # run_name: debug
+  run_name: random_particle_TP_smooth02
   entity: chenjy
   project: RAL
   # mode: disabled
@@ -36,7 +37,7 @@ wandb:
 
 defaults:
   # - task: HideAndSeek_square_partial
-  # - task: HideAndSeek_circle_partial_TP
-  - task: HideAndSeek_circle_partial_TP_particle
+  - task: HideAndSeek_circle_partial_TP
+  # - task: HideAndSeek_circle_partial_TP_particle
   - algo: mappo
   - _self_
