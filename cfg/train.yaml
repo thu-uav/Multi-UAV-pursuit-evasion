@@ -25,7 +25,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: random4to5_particle_TP_unif03_stop08
+  run_name: random4to5_particle_woTP_seed0
   entity: chenjy
   project: RAL
   # mode: disabled
