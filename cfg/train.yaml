@@ -6,8 +6,8 @@ sim: ${task.sim}
 env: ${task.env}
 
 # model_dir: /home/jiayu/OmniDrones/scripts/outputs/GAN0to5_TP_GAN0_7_R0_3to0_9/08-13_21-03/wandb/run-20240813_210320-2tgj5z22/files/checkpoint_393347072.pt
-# model_dir: /home/jiayu/OmniDrones/scripts/outputs/debug_TP_epoch5/09-06_12-13/wandb/run-20240906_121303-cbj7tnup/files/checkpoint_196739072.pt
-model_dir: null
+model_dir: /home/jiayu/OmniDrones/scripts/outputs/random4to5_best.pt
+# model_dir: null
 
 total_frames: 3000_000_000 #1000_000_000
 max_iters: -1
@@ -25,8 +25,8 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: debug
-  run_name: random_particle_TP_smooth02
+  # run_name: debug_load
+  run_name: random_woparticle_TP_smooth05_load
   entity: chenjy
   project: RAL
   # mode: disabled
