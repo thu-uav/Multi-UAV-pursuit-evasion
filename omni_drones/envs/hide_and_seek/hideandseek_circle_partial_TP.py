@@ -271,28 +271,46 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         self.use_partial_obs = self.cfg.task.use_partial_obs
         self.capture = torch.zeros(self.num_envs, 3, device=self.device)
         self.min_dist = torch.ones(self.num_envs, 1, device=self.device) * float(torch.inf) # for teacher evaluation
+        self.use_deployment = self.cfg.task.use_deployment
         
         self.central_env_pos = Float3(
             *self.envs_positions[self.central_env_idx].tolist()
         )
 
-        self.init_drone_pos_dist = D.Uniform(
-            torch.tensor([0.1, -self.arena_size / math.sqrt(2.0) + 0.1], device=self.device),
-            torch.tensor([self.arena_size / math.sqrt(2.0) - 0.1, self.arena_size / math.sqrt(2.0) - 0.1], device=self.device)
-        )
-        self.init_target_pos_dist = D.Uniform(
-            torch.tensor([-self.arena_size / math.sqrt(2.0) + 0.1, -self.arena_size / math.sqrt(2.0) + 0.1], device=self.device),
-            torch.tensor([-0.1, self.arena_size / math.sqrt(2.0) - 0.1], device=self.device)
-        )
-
-        self.init_drone_pos_dist_z = D.Uniform(
-            torch.tensor([self.max_height / 2 - 0.1], device=self.device),
-            torch.tensor([self.max_height / 2 + 0.1], device=self.device)
-        )
-        self.init_target_pos_dist_z = D.Uniform(
-            torch.tensor([self.max_height / 2 - 0.1], device=self.device),
-            torch.tensor([self.max_height / 2 + 0.1], device=self.device)
-        )
+        if self.use_deployment:
+            self.init_drone_pos_dist = D.Uniform(
+                torch.tensor([-self.arena_size / math.sqrt(2.0) + 0.1, -self.arena_size / math.sqrt(2.0) + 0.1], device=self.device),
+                torch.tensor([self.arena_size / math.sqrt(2.0) - 0.1, self.arena_size / math.sqrt(2.0) - 0.1], device=self.device)
+            )
+            self.init_target_pos_dist = D.Uniform(
+                torch.tensor([-self.arena_size / math.sqrt(2.0) + 0.1, -self.arena_size / math.sqrt(2.0) + 0.1], device=self.device),
+                torch.tensor([self.arena_size / math.sqrt(2.0) - 0.1, self.arena_size / math.sqrt(2.0) - 0.1], device=self.device)
+            )
+            self.init_drone_pos_dist_z = D.Uniform(
+                torch.tensor([self.max_height / 2 - 0.1], device=self.device),
+                torch.tensor([self.max_height / 2 + 0.1], device=self.device)
+            )
+            self.init_target_pos_dist_z = D.Uniform(
+                torch.tensor([self.max_height / 2 - 0.1], device=self.device),
+                torch.tensor([self.max_height / 2 + 0.1], device=self.device)
+            )
+        else:
+            self.init_drone_pos_dist = D.Uniform(
+                torch.tensor([0.1, -self.arena_size / math.sqrt(2.0) + 0.1], device=self.device),
+                torch.tensor([self.arena_size / math.sqrt(2.0) - 0.1, self.arena_size / math.sqrt(2.0) - 0.1], device=self.device)
+            )
+            self.init_target_pos_dist = D.Uniform(
+                torch.tensor([-self.arena_size / math.sqrt(2.0) + 0.1, -self.arena_size / math.sqrt(2.0) + 0.1], device=self.device),
+                torch.tensor([-0.1, self.arena_size / math.sqrt(2.0) - 0.1], device=self.device)
+            )
+            self.init_drone_pos_dist_z = D.Uniform(
+                torch.tensor([self.max_height / 2 - 0.1], device=self.device),
+                torch.tensor([self.max_height / 2 + 0.1], device=self.device)
+            )
+            self.init_target_pos_dist_z = D.Uniform(
+                torch.tensor([self.max_height / 2 - 0.1], device=self.device),
+                torch.tensor([self.max_height / 2 + 0.1], device=self.device)
+            )
 
         self.init_rpy_dist = D.Uniform(
             torch.tensor([-0.2, -0.2, 0.0], device=self.device) * torch.pi,
@@ -1042,6 +1060,8 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         
         # smoothness
         smoothness_reward = self.smoothness_coef * torch.exp(-self.action_error_order1)
+        if not self.use_deployment:
+            smoothness_reward = torch.zeros_like(smoothness_reward)
         self.stats['smoothness_reward'].add_(smoothness_reward.mean(-1).unsqueeze(-1))
         self.stats["smoothness_mean"].add_(self.drone.throttle_difference.mean(-1).unsqueeze(-1))
         self.stats["smoothness_max"].set_(torch.max(self.drone.throttle_difference.max(-1).values.unsqueeze(-1), self.stats["smoothness_max"]))
