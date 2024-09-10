@@ -25,6 +25,7 @@ num_agents: 3
 use_eval: 1
 use_partial_obs: 1
 use_random_cylinder: 0
+use_deployment: 0
 
 # TP net param
 history_step: 10
