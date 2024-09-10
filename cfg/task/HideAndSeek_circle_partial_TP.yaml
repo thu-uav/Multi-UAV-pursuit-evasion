@@ -16,7 +16,7 @@ time_encoding: true
 action_transform: PIDrate
 
 # use_random_cylinder = 1: invalid
-scenario_flag: 'empty' # 'empty', 'random', 'wall', 'narrow_gap', '3walls'
+scenario_flag: 'random' # 'empty', 'random', 'wall', 'narrow_gap', '3walls'
 
 # exp
 num_agents: 3
@@ -43,8 +43,8 @@ catch_reward_coef: 20.0
 detect_reward_coef: 0.0
 collision_coef: 100.0
 speed_coef: 10.0
-smoothness_coef: 0.0
-smooth_lr: 0.0001
+smoothness_coef: 0.5
+smooth_lr: 0.0
 
 # env param
 catch_radius: 0.3

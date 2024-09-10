@@ -25,7 +25,8 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: fixed5_deployment_lr00001_load
+  run_name: fixed5_deployment_ctbr0_2pi_smoothcoef0_5
+  # run_name: fixed5_ctbr0_2pi
   entity: chenjy
   project: RAL
   # mode: disabled
