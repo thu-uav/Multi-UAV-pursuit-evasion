@@ -1062,7 +1062,7 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         self.stats['collision_reward'].add_(collision_reward.mean(-1).unsqueeze(-1))
         
         # smoothness
-        self.smoothness_coef += self.smooth_lr * self.update_epoch
+        self.smoothness_coef = self.smooth_lr * self.update_epoch
         self.stats["smoothness_coef"] = torch.ones_like(self.stats["smoothness_coef"]) * self.smoothness_coef
         smoothness_reward = self.smoothness_coef * torch.exp(-self.action_error_order1)
         if not self.use_deployment:
