@@ -51,7 +51,7 @@ catch_reward_coef: 20.0
 detect_reward_coef: 0.0
 collision_coef: 100.0
 speed_coef: 10.0
-smoothness_coef: 0.0
+smoothness_coef: 0.5
 
 # env param
 catch_radius: 0.3
