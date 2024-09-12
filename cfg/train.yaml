@@ -13,7 +13,7 @@ total_frames: 3000_000_000 #1000_000_000
 max_iters: -1
 eval_interval: -1
 save_interval: 100
-seed: 0
+seed: 1
 
 viewer:
   resolution: [960, 720]
@@ -25,7 +25,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: narrow_gap_seed2
+  run_name: narrow_gap_seed0
   entity: chenjy
   project: RAL
   # mode: disabled
