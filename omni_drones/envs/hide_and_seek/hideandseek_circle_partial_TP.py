@@ -722,16 +722,6 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
                                 ], device=self.device)
             elif self.scenario_flag == 'narrow_gap':
                 drone_pos = torch.tensor([
-                                    [0.6000,  0.4000, 0.5],
-                                    [0.4000,  0.6000, 0.5],
-                                    [0.4000,  0.4000, 0.5],
-                                    [0.8000,  0.2000, 0.5],
-                                ], device=self.device)[:self.num_agents]
-                target_pos = torch.tensor([
-                                    [0.0000,  -0.6000, 0.5],
-                                ], device=self.device)
-            elif self.scenario_flag == '6cylinders':
-                drone_pos = torch.tensor([
                                     [0.6000,  0.0000, 0.5],
                                     [0.8000,  0.0000, 0.5],
                                     [0.8000, -0.2000, 0.5],
