@@ -955,9 +955,9 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
             )   # [num_envs, drone.n, drone_state_dim]
         state["cylinders"] = self.k_nearest_cylinders_masked
 
-        # draw drone trajectory and detection range
-        if self._should_render(0) and self.use_eval:
-            self._draw_catch()
+        # # draw drone trajectory and detection range
+        # if self._should_render(0) and self.use_eval:
+        #     self._draw_catch()
 
         if self.use_TP_net:
             return TensorDict(
