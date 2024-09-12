@@ -16,7 +16,7 @@ time_encoding: true
 action_transform: PIDrate
 
 # use_random_cylinder = 1: invalid
-scenario_flag: 'empty' # 'empty', 'random', 'wall', 'narrow_gap', '3walls'
+scenario_flag: '6cylinders' # 'empty', 'random', 'wall', 'circle', '3walls'
 
 # exp
 num_agents: 3
@@ -53,9 +53,9 @@ collision_radius: 0.07
 
 cylinder:
   size: 0.1
-  fixed_num: 7 # None: random num and pos, else only fixed num, random pos
-  min_num: 7
-  max_num: 7
+  fixed_num: 10 # None: random num and pos, else only fixed num, random pos
+  min_num: 10
+  max_num: 10
   obs_max_cylinder: 3
   # max_active: 3
   # min_active: 0

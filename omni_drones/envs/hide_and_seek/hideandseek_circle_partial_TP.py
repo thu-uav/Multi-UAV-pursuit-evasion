@@ -575,6 +575,16 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
                                     [0.0, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
                                     [0.0, -8 * self.cylinder_size, 0.5 * self.cylinder_height],
                                 ], device=self.device)
+            elif self.scenario_flag == '6cylinders':
+                num_fixed_cylinders = 6
+                all_cylinders_pos[:num_fixed_cylinders] = torch.tensor([
+                                    [0.0, 0.0, 0.5 * self.cylinder_height],
+                                    [-2 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
+                                    [-4 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
+                                    [-8 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
+                                    [0.0, -4 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                    [0.0, -8 * self.cylinder_size, 0.5 * self.cylinder_height],
+                                ], device=self.device)
 
         if not self.use_random_cylinder:
             self.active_cylinders = torch.ones(self.num_envs, 1, device=self.device) * num_fixed_cylinders
@@ -744,6 +754,16 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
                                 ], device=self.device)[:self.num_agents]
                 target_pos = torch.tensor([
                                     [0.0000,  -0.6000, 0.5],
+                                ], device=self.device)
+            elif self.scenario_flag == '6cylinders':
+                drone_pos = torch.tensor([
+                                    [0.6000,  0.0000, 0.5],
+                                    [0.8000,  0.0000, 0.5],
+                                    [0.8000, -0.2000, 0.5],
+                                    [0.8000,  0.2000, 0.5],
+                                ], device=self.device)[:self.num_agents]
+                target_pos = torch.tensor([
+                                    [-0.8000,  0.0000, 0.5],
                                 ], device=self.device)
             elif self.scenario_flag == '3walls':
                 drone_pos = torch.tensor([
@@ -960,9 +980,9 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
             )   # [num_envs, drone.n, drone_state_dim]
         state["cylinders"] = self.k_nearest_cylinders_masked
 
-        # # draw drone trajectory and detection range
-        # if self._should_render(0) and self.use_eval:
-        #     self._draw_catch()
+        # draw drone trajectory and detection range
+        if self._should_render(0) and self.use_eval:
+            self._draw_catch()
 
         if self.use_TP_net:
             return TensorDict(
