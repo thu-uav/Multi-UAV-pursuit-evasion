@@ -6,7 +6,7 @@ defaults:
   - /base/sim_base@_here_
 
 env:
-  num_envs: 100
+  num_envs: 2048
   max_episode_length: 800
 
 drone_model: Crazyflie
@@ -22,10 +22,10 @@ scenario_flag: '6cylinders' # 'empty', 'random', 'wall', 'circle', '3walls'
 num_agents: 3
 
 # flag
-use_eval: 1
+use_eval: 0
 use_partial_obs: 1
 use_random_cylinder: 0
-use_deployment: 0
+use_deployment: 1
 
 # TP net param
 history_step: 10
@@ -44,6 +44,7 @@ detect_reward_coef: 0.0
 collision_coef: 100.0
 speed_coef: 10.0
 smoothness_coef: 0.0
+smooth_lr: 0.0001
 
 # env param
 catch_radius: 0.3
@@ -53,9 +54,15 @@ collision_radius: 0.07
 
 cylinder:
   size: 0.1
+<<<<<<< HEAD
   fixed_num: 10 # None: random num and pos, else only fixed num, random pos
   min_num: 10
   max_num: 10
+=======
+  fixed_num: 5 # None: random num and pos, else only fixed num, random pos
+  min_num: 5
+  max_num: 5
+>>>>>>> 1c82a02b5ee920e3bc6e4ed6cee2f7a3db6895a6
   obs_max_cylinder: 3
   # max_active: 3
   # min_active: 0
