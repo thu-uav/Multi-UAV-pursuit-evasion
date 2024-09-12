@@ -16,7 +16,7 @@ time_encoding: true
 action_transform: PIDrate
 
 # use_random_cylinder = 1: invalid
-scenario_flag: '6cylinders' # 'empty', 'random', 'wall', 'circle', '3walls'
+scenario_flag: 'narrow_gap' # 'empty', 'random', 'wall', 'circle', '3walls'
 
 # exp
 num_agents: 3

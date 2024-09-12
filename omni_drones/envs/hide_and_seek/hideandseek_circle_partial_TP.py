@@ -555,16 +555,6 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
                 all_cylinders_pos[:num_fixed_cylinders] = torch.tensor([
                                     [0.0, 0.0, 0.5 * self.cylinder_height],
                                     [-2 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
-                                    [2 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
-                                    [0.0, -2 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                    [0.0, 2 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                    [0.0, -8 * self.cylinder_size, 0.5 * self.cylinder_height],
-                                ], device=self.device)
-            elif self.scenario_flag == '6cylinders':
-                num_fixed_cylinders = 6
-                all_cylinders_pos[:num_fixed_cylinders] = torch.tensor([
-                                    [0.0, 0.0, 0.5 * self.cylinder_height],
-                                    [-2 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
                                     [-4 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
                                     [-8 * self.cylinder_size, 0.0, 0.5 * self.cylinder_height],
                                     [0.0, -4 * self.cylinder_size, 0.5 * self.cylinder_height],
