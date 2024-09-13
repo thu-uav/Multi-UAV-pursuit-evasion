@@ -279,24 +279,6 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
             *self.envs_positions[self.central_env_idx].tolist()
         )
 
-        # if self.use_deployment:
-        #     self.init_drone_pos_dist = D.Uniform(
-        #         torch.tensor([-self.arena_size / math.sqrt(2.0) + 0.1, -self.arena_size / math.sqrt(2.0) + 0.1], device=self.device),
-        #         torch.tensor([self.arena_size / math.sqrt(2.0) - 0.1, self.arena_size / math.sqrt(2.0) - 0.1], device=self.device)
-        #     )
-        #     self.init_target_pos_dist = D.Uniform(
-        #         torch.tensor([-self.arena_size / math.sqrt(2.0) + 0.1, -self.arena_size / math.sqrt(2.0) + 0.1], device=self.device),
-        #         torch.tensor([self.arena_size / math.sqrt(2.0) - 0.1, self.arena_size / math.sqrt(2.0) - 0.1], device=self.device)
-        #     )
-        #     self.init_drone_pos_dist_z = D.Uniform(
-        #         torch.tensor([self.max_height / 2 - 0.1], device=self.device),
-        #         torch.tensor([self.max_height / 2 + 0.1], device=self.device)
-        #     )
-        #     self.init_target_pos_dist_z = D.Uniform(
-        #         torch.tensor([self.max_height / 2 - 0.1], device=self.device),
-        #         torch.tensor([self.max_height / 2 + 0.1], device=self.device)
-        #     )
-        # else:
         self.init_drone_pos_dist = D.Uniform(
             torch.tensor([0.1, -self.arena_size / math.sqrt(2.0) + 0.1], device=self.device),
             torch.tensor([self.arena_size / math.sqrt(2.0) - 0.1, self.arena_size / math.sqrt(2.0) - 0.1], device=self.device)
@@ -899,9 +881,9 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
             )   # [num_envs, drone.n, drone_state_dim]
         state["cylinders"] = self.k_nearest_cylinders_masked
 
-        # # draw drone trajectory and detection range
-        # if self._should_render(0) and self.use_eval:
-        #     self._draw_catch()
+        # draw drone trajectory and detection range
+        if self._should_render(0) and self.use_eval:
+            self._draw_catch()
 
         if self.use_TP_net:
             return TensorDict(

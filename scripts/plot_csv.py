@@ -12,6 +12,7 @@ steps = {
     'Ours': pd.read_csv('/home/chenjy/OmniDrones/scripts/data/ours_seed0.csv')['Step'].to_numpy()[:timestep1] * 131090.0,
     'MAPPO + EP': pd.read_csv('/home/chenjy/OmniDrones/scripts/data/MAPPO_EP_seed0.csv')['Step'].to_numpy()[:timestep2] * 131090.0,
     'MAPPO + Envgen': pd.read_csv('/home/chenjy/OmniDrones/scripts/data/MAPPO_Envgen_seed0.csv')['Step'].to_numpy()[:timestep3] * 131090.0,
+    'MAPPO': pd.read_csv('/home/chenjy/OmniDrones/scripts/data/MAPPO_seed0.csv')['Step'].to_numpy()[:timestep3] * 131090.0,
 }
 data = {
     'Ours': {
@@ -28,6 +29,11 @@ data = {
         'seed0': pd.read_csv('/home/chenjy/OmniDrones/scripts/data/MAPPO_Envgen_seed0.csv')['success'].to_numpy()[:timestep3],
         'seed1': pd.read_csv('/home/chenjy/OmniDrones/scripts/data/MAPPO_Envgen_seed1.csv')['success'].to_numpy()[:timestep3],
         'seed2': pd.read_csv('/home/chenjy/OmniDrones/scripts/data/MAPPO_Envgen_seed2.csv')['success'].to_numpy()[:timestep3],
+    },
+    'MAPPO': {
+        'seed0': pd.read_csv('/home/chenjy/OmniDrones/scripts/data/MAPPO_seed0.csv')['success'].to_numpy()[:timestep3],
+        'seed1': pd.read_csv('/home/chenjy/OmniDrones/scripts/data/MAPPO_seed1.csv')['success'].to_numpy()[:timestep3],
+        'seed2': pd.read_csv('/home/chenjy/OmniDrones/scripts/data/MAPPO_seed2.csv')['success'].to_numpy()[:timestep3],
     }
 }
 
@@ -54,7 +60,7 @@ def plot_mean_std(steps, means, stds):
     
     plt.xlabel('Timesteps', fontsize=fontsize)
     plt.ylabel('Capture rate', fontsize=fontsize)
-    plt.legend(fontsize=fontsize)
+    plt.legend(fontsize=13, loc='lower right')
     plt.tick_params(axis='both', labelsize=fontsize)
     plt.grid(True)
     plt.tight_layout()
