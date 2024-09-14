@@ -5,11 +5,11 @@ headless: true
 sim: ${task.sim}
 env: ${task.env}
 
-model_dir: /home/jiayu/OmniDrones/scripts/outputs/ours_deploy.pt
-# model_dir: /home/jiayu/OmniDrones/scripts/outputs/ours_best.pt
+# model_dir: /home/jiayu/OmniDrones/scripts/outputs/ours_deploy.pt
+model_dir: /home/jiayu/OmniDrones/scripts/outputs/ours_best.pt
 # model_dir: null
 
-total_frames: 6000_000_000 #1000_000_000
+total_frames: 10000_000_000 #1000_000_000
 max_iters: -1
 eval_interval: -1
 save_interval: 100
@@ -26,7 +26,7 @@ viewer:
 wandb:
   group: ${oc.select:..task.name}
   # run_name: random4to5_smooth1_20125_lr00001_load_ctbr0_2_load
-  run_name: best_random4to5_maxsmooth15_init15_load_load
+  run_name: best_random4to5_maxsmooth10_lr00002_load
   entity: chenjy
   project: RAL
   # mode: disabled
