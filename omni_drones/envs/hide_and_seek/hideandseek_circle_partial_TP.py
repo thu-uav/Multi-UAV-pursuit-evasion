@@ -738,7 +738,8 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         forces_target = self._get_dummy_policy_prey()
         
         # fixed velocity
-        target_vel[...,:3] = self.v_prey * forces_target / (torch.norm(forces_target, dim=1).unsqueeze(1) + 1e-5)
+        # target_vel[...,:3] = self.v_prey * forces_target / (torch.norm(forces_target, dim=1).unsqueeze(1) + 1e-5)
+        target_vel[...,:3] = self.v_prey * forces_target / (torch.norm(forces_target, dim=-1).unsqueeze(1) + 1e-5)
         
         self.target.set_velocities(target_vel.type(torch.float32), self.env_ids)
      
@@ -984,9 +985,9 @@ class HideAndSeek_circle_partial_TP(IsaacEnv):
         self.stats['collision_reward'].add_(collision_reward.mean(-1).unsqueeze(-1))
         
         # smoothness
-        if not (self.smooth_lr == 0.0):
-            self.smoothness_coef = self.init_smoothness_coef + self.smooth_lr * self.update_epoch
-            self.smoothness_coef = min(self.max_smoothness_coef, self.smoothness_coef)
+        self.smoothness_coef = self.init_smoothness_coef + self.smooth_lr * self.update_epoch
+        self.smoothness_coef = min(self.max_smoothness_coef, self.smoothness_coef)
+            
         self.stats["smoothness_coef"] = torch.ones_like(self.stats["smoothness_coef"]) * self.smoothness_coef
         smoothness_reward = self.smoothness_coef * torch.exp(-self.action_error_order1)
         if not self.use_deployment:
