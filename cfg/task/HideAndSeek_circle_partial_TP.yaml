@@ -44,7 +44,7 @@ detect_reward_coef: 0.0
 collision_coef: 100.0
 speed_coef: 10.0
 init_smoothness_coef: 0.0
-smooth_lr: 0.0
+smooth_lr: 0.0001
 max_smoothness_coef: 10.0
 
 # env param
