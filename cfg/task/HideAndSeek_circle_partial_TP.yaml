@@ -45,7 +45,7 @@ collision_coef: 100.0
 speed_coef: 10.0
 init_smoothness_coef: 0.0
 smooth_lr: 0.0001
-max_smoothness_coef: 10.0
+max_smoothness_coef: 5.0
 
 # env param
 catch_radius: 0.3
