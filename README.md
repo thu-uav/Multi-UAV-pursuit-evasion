@@ -8,6 +8,8 @@ Website: https://sites.google.com/view/pursuit-evasion-rl
 
 The implementation in this repositorory is used in the paper "Multi-UAV Pursuit-Evasion with Online Planning in Unknown Environments by Deep Reinforcement Learning". This repository is heavily based on https://github.com/btx0424/OmniDrones.git.
 
+## Approach
+
 <div align=center>
 <img src="https://github.com/jiayu-ch15/Multi-UAV-pursuit-evasion/main/figure/overview.png" width="350"/>
 </div>
