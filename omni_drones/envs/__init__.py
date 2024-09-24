@@ -20,25 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-
-from .single import Hover, Exchange, MultiGoto, Goto, Goto_static, Goto_return, Infeasible, Track, ZigZag, Star, TrackV1, Turn, Takeoff, Line
-from .platform import PlatformHover, PlatformFlyThrough
-from .inv_pendulum import InvPendulumHover, InvPendulumFlyThrough, InvPendulumTrack
-from .transport import TransportHover, TransportFlyThrough, TransportTrack
-from .formation_forward import FormationForward
-from .formation_ball_forward import FormationBallForward
-from .multi_catch_old import MultiCatch_old
-from .multi_catch import MultiCatch
-from .payload import PayloadTrack, PayloadFlyThrough
-# from .dragon import DragonHover
-from .predatorprey import PredatorPrey
-from .hide_and_seek import HideAndSeek, HideAndSeek_circle_static_UED, HideAndSeek_circle_static_UED_large_cylinder, HideAndSeek_circle_static_UED_large_cylinder_cl, HideAndSeek_circle_static_UED_addeasy, HideAndSeek_circle_static_UED_cl, HideAndSeek_circle_static_UED_cl_v2, HideAndSeek_multiprey, HideAndSeek_circle_eval, HideAndSeek_circle_eval_large
-from .hide_and_seek import HideAndSeek_circle_fully
-from .hide_and_seek import HideAndSeek_circle_partial_TP, HideAndSeek_circle_partial_TP_GAN, HideAndSeek_circle_partial_TP_GAN_discrete, HideAndSeek_circle_partial_TP_particle
-# from .hideandseek import HideAndSeek
-# from .multi_gate import MultiGate
-# from .rearrange import Rearrange
-# from .pinballV0 import PinballV0
-# from .pinball_multiV0 import PingPongMultiV0
-
+from .single import Hover, Goto, Track
+from .hide_and_seek import HideAndSeek
+from .hide_and_seek import HideAndSeek_circle_partial_TP, HideAndSeek_circle_partial_TP_particle
 from .isaac_env import IsaacEnv
