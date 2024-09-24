@@ -11,7 +11,7 @@ The implementation in this repositorory is used in the paper "Multi-UAV Pursuit-
 ## Approach
 
 <div align=center>
-<img src="https://github.com/jiayu-ch15/Multi-UAV-pursuit-evasion/main/figure/overview.png" width="350"/>
+<img src="https://github.com/jiayu-ch15/Multi-UAV-pursuit-evasion/blob/main/figures/overview.png" width="350"/>
 </div>
 
 ## Install
