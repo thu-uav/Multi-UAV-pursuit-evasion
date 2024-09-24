@@ -1,19 +1,15 @@
-![Visualization of OmniDrones](docs/source/_static/visualization.jpg)
+# Multi-UAV Pursuit-Evasion with Online Planning in Unknown Environments by Deep Reinforcement Learning 
 
----
-
-# OmniDrones
-
-[![IsaacSim](https://img.shields.io/badge/Isaac%20Sim-2022.2.0-orange.svg)](https://docs.omniverse.nvidia.com/app_isaacsim/app_isaacsim/overview.html)
-[![Python](https://img.shields.io/badge/python-3.7-blue.svg)](https://docs.python.org/3/whatsnew/3.7.html)
-[![Docs status](https://img.shields.io/badge/docs-passing-brightgreen.svg)](https://omnidrones.readthedocs.io/en/latest/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+Jiayu Chen, Chao Yu, Guosheng Li, Wenhao Tang, Xinyi Yang, Botian Xu, Huazhong Yang, Yu Wang
 
-*OmniDrones* is an open-source platform designed for reinforcement learning research on multi-rotor drone systems. Built on [Nvidia Isaac Sim](https://docs.omniverse.nvidia.com/app_isaacsim/app_isaacsim/overview.html), *OmniDrones* features highly efficient and flxeible simulation that can be adopted for various research purposes. We also provide a suite of benchmark tasks and algorithm baselines to provide preliminary results for subsequent works.
+Website: https://sites.google.com/view/pursuit-evasion-rl
+
+The implementation in this repositorory is used in the paper "Multi-UAV Pursuit-Evasion with Online Planning in Unknown Environments by Deep Reinforcement Learning". This repository is heavily based on https://github.com/btx0424/OmniDrones.git.
 
 
-## Option 1: install local version
+## Install
 
 #### 1. Download Isaac Sim (local version)
 
@@ -103,93 +99,21 @@ and edit ``.vscode/settings.json`` as:
 }
 ```
 
- 
-## Option 2: install container version (using Docker)
-The Container version is easier to set up compared to the Local version. However, it's important to note that the Container version does not support real-time rendering. Therefore, it only supports the command with ``headless=true``. You can save videos during training and upload them to Wandb. 
-
-First, make sure your computer has installed ``Docker``, ``NVIDIA Driver`` and ``NVIDIA Container Toolkit``. Then, you should successfully run: 
-
-```
-# Verification
-docker run --rm --runtime=nvidia --gpus all ubuntu nvidia-smi
-```
-
-Download the image from Docker Hub:
-```
-docker pull jimmyzhangruize/isaac-sim:2022.2.0_deploy
-```
-This image already includes Isaac sim, so you don't neet to download Isaac sim. However, you need to clone the OmniDrones repository to your local computer because we use OmniDrones mounted in the container.
-
-Then, run the image:
-```
-docker run -dit --gpus all -e "ACCEPT_EULA=Y" --net=host \
-    -v ~/docker/isaac-sim/cache/kit:/isaac-sim/kit/cache/Kit:rw \
-    -v ~/docker/isaac-sim/cache/ov:/root/.cache/ov:rw \
-    -v ~/docker/isaac-sim/cache/pip:/root/.cache/pip:rw \
-    -v ~/docker/isaac-sim/cache/glcache:/root/.cache/nvidia/GLCache:rw \
-    -v ~/docker/isaac-sim/cache/computecache:/root/.nv/ComputeCache:rw \
-    -v ~/docker/isaac-sim/logs:/root/.nvidia-omniverse/logs:rw \
-    -v ~/docker/isaac-sim/data:/root/.local/share/ov/data:rw \
-    -v ~/docker/isaac-sim/documents:/root/Documents:rw \
-    -v ***:/root/OmniDrones:rw \
-    -v /data:/data \
-    -e "WANDB_API_KEY=***" \
-    --runtime=nvidia \
-    jimmyzhangruize/isaac-sim:2022.2.0_deploy /bin/bash
-```
-
-Note that:
-1. You need to replace *** with the directory where OmniDrones is locally located in ```-v ***:/root/OmniDrones:rw```.
-2. You need to replace *** with your own WANDB_API_KEY in ```-e "WANDB_API_KEY=***"``` . If you do not need to use Wandb, you can omit this line.
-3. In the container, OmniDrones is located at ``/root/OmniDrones`` and Isaac-sim is located at ``/isaac-sim``.
-
-
-Install OmniDrones in the container:
-```
-conda activate sim
-cd /root/OmniDrones
-cp -r conda_setup/etc $CONDA_PREFIX
-conda activate sim # re-activate the environment
-pip install -e . # install OmniDrones
-```
-
-Verify you can successfully run OmniDrones in the container (use ``deploy`` branch):
-
-```
-cd /root/OmniDrones/scripts
-python train.py headless=true wandb.mode=disabled total_frames=50000 task=Hover
-```
-
 ## Usage
 
-For usage and more details, please refer to the [documentation](https://omnidrones.readthedocs.io/en/latest/).
+For usage and more details of *Omnidrones*, please refer to the [documentation](https://omnidrones.readthedocs.io/en/latest/).
 
-Note that for this ``deploy`` branch, it currently supports following environments:
-
-| Environment       | Single-agent or Multi-agent task |
-|-------------------|----------------------------------|
-| Hover             | Single                           |
-| Track             | Single                           |
-| InvPendulumHover  | Single                           |
-| InvPendulumTrack  | Single                           |
-| PayloadTrack      | Single                           |
-
+Train the pursuit-evasion task by curriculum learning
+```
+# at OmniDrones/
+cd scripts
+python train.py
+```
 
 ## Citation
 
-Please cite [this paper](https://arxiv.org/abs/2309.12825) if you use *OmniDrones* in your work:
+Please cite [this paper](xxx) if you use *DualCL* in your work:
 
 ```
-@misc{xu2023omnidrones,
-    title={OmniDrones: An Efficient and Flexible Platform for Reinforcement Learning in Drone Control}, 
-    author={Botian Xu and Feng Gao and Chao Yu and Ruize Zhang and Yi Wu and Yu Wang},
-    year={2023},
-    eprint={2309.12825},
-    archivePrefix={arXiv},
-    primaryClass={cs.RO}
-}
+xxx
 ```
-
-## Ackowledgement
-
-Some of the abstractions and implementation was heavily inspired by [Isaac Orbit](https://github.com/NVIDIA-Omniverse/Orbit).
