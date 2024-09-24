@@ -6,8 +6,8 @@ sim: ${task.sim}
 env: ${task.env}
 
 # model_dir: /home/jiayu/OmniDrones/scripts/outputs/true_version_final.pt
-model_dir: /home/jiayu/OmniDrones/scripts/outputs/ours_best.pt
-# model_dir: null
+# model_dir: /home/jiayu/OmniDrones/scripts/outputs/ours_best.pt
+model_dir: null
 
 total_frames: 10000_000_000 #1000_000_000
 max_iters: -1
@@ -25,8 +25,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: random4to5_smooth1_20125_lr00001_load_ctbr0_2_load
-  run_name: random4to5_ctbr0_5_smoothlr00001_max5_loadsmooth0
+  run_name: random4to5
   entity: chenjy
   project: RAL
   # mode: disabled
@@ -37,7 +36,7 @@ wandb:
 
 defaults:
   # - task: HideAndSeek_square_partial
-  - task: HideAndSeek_circle_partial_TP
-  # - task: HideAndSeek_circle_partial_TP_particle
+  # - task: HideAndSeek_circle_partial_TP
+  - task: HideAndSeek_circle_partial_TP_particle
   - algo: mappo
   - _self_
