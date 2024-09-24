@@ -75,7 +75,7 @@ pip install -e .
 ```
 # at OmniDrones/
 cd scripts
-python train.py headless=true wandb.mode=disabled total_frames=50000 task=Hover
+python train_generator.py headless=true wandb.mode=disabled total_frames=50000 task=Hover
 ```
 
 #### 5. Working with VSCode
