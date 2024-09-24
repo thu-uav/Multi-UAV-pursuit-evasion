@@ -75,7 +75,7 @@ pip install -e .
 ```
 # at OmniDrones/
 cd scripts
-python train_generator.py headless=true wandb.mode=disabled total_frames=50000 task=Hover
+python train.py headless=true wandb.mode=disabled total_frames=50000 task=Hover
 ```
 
 #### 5. Working with VSCode
@@ -103,16 +103,17 @@ and edit ``.vscode/settings.json`` as:
 
 For usage and more details of *Omnidrones*, please refer to the [documentation](https://omnidrones.readthedocs.io/en/latest/).
 
-Train the pursuit-evasion task by curriculum learning
 ```
 # at OmniDrones/
 cd scripts
-python train.py
+python train_generator.py # Train the pursuit-evasion task with Automatic Environment Generator
+python train.py # Train the pursuit-evasion task without Automatic Environment Generator
+python train_deploy.py # fine-tune the policy by smoothness reward
 ```
 
 ## Citation
 
-Please cite [this paper](xxx) if you use *DualCL* in your work:
+Please cite [this paper](xxx) if you use our method in your work:
 
 ```
 xxx
