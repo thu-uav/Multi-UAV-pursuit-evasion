@@ -22,13 +22,6 @@ from omni_drones.utils.torchrl.transforms import (
 from omni_drones.utils.wandb import init_wandb
 from omni_drones.learning import (
     MAPPOPolicy, 
-    HAPPOPolicy,
-    QMIXPolicy,
-    DQNPolicy,
-    SACPolicy,
-    TD3Policy,
-    MATD3Policy,
-    TDMPCPolicy,
     Policy,
     PPOPolicy,
     PPOAdaptivePolicy, PPORNNPolicy
