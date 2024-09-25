@@ -157,8 +157,17 @@ python eval.py
 
 ## Citation
 
-Please cite [this paper](xxx) if you use our method in your work:
+Please cite [this paper](http://arxiv.org/abs/2409.15866
+) if you use our method in your work:
 
 ```
-xxx
+@misc{chen2024multiuavpursuitevasiononlineplanning,
+      title={Multi-UAV Pursuit-Evasion with Online Planning in Unknown Environments by Deep Reinforcement Learning}, 
+      author={Jiayu Chen and Chao Yu and Guosheng Li and Wenhao Tang and Xinyi Yang and Botian Xu and Huazhong Yang and Yu Wang},
+      year={2024},
+      eprint={2409.15866},
+      archivePrefix={arXiv},
+      primaryClass={cs.RO},
+      url={https://arxiv.org/abs/2409.15866}, 
+}
 ```
