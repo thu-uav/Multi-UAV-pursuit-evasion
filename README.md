@@ -144,11 +144,9 @@ python train.py
 ```
 
 ```
-# at Multi-UAV-pursuit-evasion/
-cd scripts
-# use_random_cylinder = 0, scenario_flag = 'wall' in HideAndSeek.yaml
-# four evaluation scenarios: # 'wall', 'narrow_gap', 'random', 'passage'
 # evaluate the policy and obtain a video
+# use_random_cylinder = 0, scenario_flag = 'wall' in HideAndSeek.yaml
+# four evaluation scenarios: 'wall', 'narrow_gap', 'random', 'passage'
 python eval.py
 ```
 
