@@ -14,6 +14,8 @@ The implementation in this repositorory is used in the paper "Multi-UAV Pursuit-
 <img src="https://github.com/jiayu-ch15/Multi-UAV-pursuit-evasion/blob/main/figures/overview.png" width="700"/>
 </div>
 
+Pipeline of our method. We begin by calibrating the parameters of the quadrotor dynamics model through system identification. Next, we introduce an Adaptive Environment Generator to automatically generate tasks for policy training and employ an Evader Prediction-Enhanced Network for efficient capture. Finally, with two-stage reward refinement, the learned policy is directly transferred to real quadrotors in a zero-shot manner.
+
 ## Install
 
 #### 1. Download Isaac Sim (local version)
