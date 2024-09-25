@@ -33,7 +33,7 @@ wandb:
   tags:
 
 defaults:
-  - task: HideAndSeek
-  # - task: HideAndSeek_envgen
+  # - task: HideAndSeek
+  - task: HideAndSeek_envgen
   - algo: mappo
   - _self_

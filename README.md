@@ -133,6 +133,7 @@ scripts
 |-- train_generator.py
 ```
 
+For policy training, 
 ```
 # at Multi-UAV-pursuit-evasion/
 cd scripts
@@ -143,8 +144,8 @@ python train.py
 # In the first stage, we get the best model, checkpoint.pt.
 ```
 
+For policy evaluation,
 ```
-# evaluate the policy and obtain a video
 # use_random_cylinder = 0, scenario_flag = 'wall' in HideAndSeek.yaml
 # four evaluation scenarios: 'wall', 'narrow_gap', 'random', 'passage'
 python eval.py
@@ -178,6 +179,7 @@ We fine-tune the policy with two-stage reward refinement.
 # model_dir: /absolute/path/checkpoint.pt
 python train_deploy.py
 ```
+Note that we use Weights & Bias as the defaul visualizattion platform; to use Weights & Bias, please register and login to the platform first.
 
 ## Citation
 
