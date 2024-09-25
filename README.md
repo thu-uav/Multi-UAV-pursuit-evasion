@@ -180,7 +180,7 @@ python train_deploy.py
 Note that we use Weights & Bias as the defaul visualizattion platform; to use Weights & Bias, please register and login to the platform first.
 
 ## Citation
-please cite [our paper] (http://arxiv.org/abs/2409.15866
+please cite [our paper](http://arxiv.org/abs/2409.15866
 ) if you found it useful:
 
 ```
