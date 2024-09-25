@@ -6,9 +6,7 @@ Jiayu Chen, Chao Yu, Guosheng Li, Wenhao Tang, Xinyi Yang, Botian Xu, Huazhong Y
 
 Website: https://sites.google.com/view/pursuit-evasion-rl
 
-The implementation in this repositorory is used in the paper "Multi-UAV Pursuit-Evasion with Online Planning in Unknown Environments by Deep Reinforcement Learning". This repository is heavily based on https://github.com/btx0424/OmniDrones.git.
-
-## Approach
+This is the official repository of the paper "Multi-UAV Pursuit-Evasion with Online Planning in Unknown Environments by Deep Reinforcement Learning". This repository is heavily based on https://github.com/btx0424/OmniDrones.git.
 
 <div align=center>
 <img src="https://github.com/jiayu-ch15/Multi-UAV-pursuit-evasion/blob/main/figures/overview.png" width="700"/>
@@ -155,8 +153,8 @@ python eval.py
 <img src="https://github.com/jiayu-ch15/Multi-UAV-pursuit-evasion/blob/main/figures/evaluation.png" width="700"/>
 </div>
 
-## Real-world deployment
-We deploy the policy on three real CrazyFlie 2.1 quadrotors. The key parameters of dynamics model is listed as follow:
+## Real-world Deployment
+We deploy the policy on three real [CrazyFlie](https://www.bitcraze.io/) 2.1 quadrotors. The key parameters of dynamics model is listed as follow:
 ```
 # in crazyflie.yaml
 mass: 0.0321
@@ -182,9 +180,8 @@ python train_deploy.py
 Note that we use Weights & Bias as the defaul visualizattion platform; to use Weights & Bias, please register and login to the platform first.
 
 ## Citation
-
-Please cite [this paper](http://arxiv.org/abs/2409.15866
-) if you use our method in your work:
+please cite [our paper] (http://arxiv.org/abs/2409.15866
+) if you found it useful:
 
 ```
 @misc{chen2024multiuavpursuitevasiononlineplanning,
