@@ -109,7 +109,7 @@ and edit ``.vscode/settings.json`` as:
 For usage and more details of *Omnidrones*, please refer to the [documentation](https://omnidrones.readthedocs.io/en/latest/).
 
 The code is organized as follow:
-
+```
 cfg
 |-- train.yaml
 |-- algo
@@ -129,6 +129,7 @@ scripts
 |-- train.py
 |-- train.deploy.py
 |-- train_generator.py
+```
 
 ```
 # at Multi-UAV-pursuit-evasion/
@@ -145,10 +146,11 @@ python train_deploy.py
 # at Multi-UAV-pursuit-evasion/
 cd scripts
 # use_random_cylinder = 0, scenario_flag = 'wall' in HideAndSeek.yaml
+# four evaluation scenarios: # 'wall', 'narrow_gap', 'random', 'passage'
 # evaluate the policy
 python eval.py
 ```
-# four evaluation scenarios: # 'wall', 'narrow_gap', 'random', 'passage'
+
 <div align=center>
 <img src="https://github.com/jiayu-ch15/Multi-UAV-pursuit-evasion/blob/main/figures/evaluation.png" width="700"/>
 </div>
