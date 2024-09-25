@@ -22,19 +22,3 @@
 
 
 from .hover import Hover
-from .goto import Goto
-from .goto_return import Goto_return
-from .goto_static import Goto_static
-from .multigoto import MultiGoto
-from .exchange import Exchange
-from .takeoff import Takeoff
-from .turn import Turn
-from .track import Track
-from .zigzag import ZigZag
-from .star import Star
-from .infeasible import Infeasible
-from .line import Line
-from .trackV1 import TrackV1
-from .trackV2 import TrackV2
-from .fly_through import FlyThrough
-from .nav import SDFNav
