@@ -181,7 +181,7 @@ Note that we use Weights & Bias as the defaul visualizattion platform; to use We
 
 ## Citation
 please cite [our paper](http://arxiv.org/abs/2409.15866
-) if you found it useful:
+) if you find it useful:
 
 ```
 @misc{chen2024multiuavpursuitevasiononlineplanning,
