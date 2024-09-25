@@ -140,8 +140,7 @@ cd scripts
 python train_generator.py
 # Train the pursuit-evasion task without Automatic Environment Generator.
 python train.py
-# fine-tune the policy using smoothness reward.
-python train_deploy.py
+# In the first stage, we get the best model, checkpoint.pt.
 ```
 
 ```
@@ -149,13 +148,38 @@ python train_deploy.py
 cd scripts
 # use_random_cylinder = 0, scenario_flag = 'wall' in HideAndSeek.yaml
 # four evaluation scenarios: # 'wall', 'narrow_gap', 'random', 'passage'
-# evaluate the policy
+# evaluate the policy and obtain a video
 python eval.py
 ```
 
 <div align=center>
 <img src="https://github.com/jiayu-ch15/Multi-UAV-pursuit-evasion/blob/main/figures/evaluation.png" width="700"/>
 </div>
+
+## Real-world deployment
+We deploy the policy on three real CrazyFlie 2.1 quadrotors. The key parameters of dynamics model is listed as follow:
+```
+# in crazyflie.yaml
+mass: 0.0321
+inertia:
+  xx: 1.4e-5
+  xy: 0.0
+  xz: 0.0
+  yy: 1.4e-5
+  yz: 0.0
+  zz: 2.17e-5
+force_constants: 2.350347298350041e-08
+max_rotation_velocities: 2315
+moment_constants: 7.24e-10
+time_constant: 0.025
+```
+
+We fine-tune the policy with two-stage reward refinement.
+```
+# in train.yaml, setup the path of the best checkpoint obtained in the first stage
+# model_dir: /absolute/path/checkpoint.pt
+python train_deploy.py
+```
 
 ## Citation
 

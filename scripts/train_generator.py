@@ -103,14 +103,6 @@ def main(cfg):
         "ppo_adaptive": PPOAdaptivePolicy,
         "ppo_rnn": PPORNNPolicy,
         "mappo": MAPPOPolicy, 
-        "happo": HAPPOPolicy,
-        "qmix": QMIXPolicy,
-        "dqn": DQNPolicy,
-        "sac": SACPolicy,
-        "td3": TD3Policy,
-        "matd3": MATD3Policy,
-        "tdmpc": TDMPCPolicy,
-        "test": Policy
     }
 
     env_class = IsaacEnv.REGISTRY[cfg.task.name]
