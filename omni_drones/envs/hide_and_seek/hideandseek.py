@@ -738,8 +738,8 @@ class HideAndSeek(IsaacEnv):
         forces_target = self._get_dummy_policy_prey()
         
         # fixed velocity
-        # target_vel[...,:3] = self.v_prey * forces_target / (torch.norm(forces_target, dim=1).unsqueeze(1) + 1e-5)
-        target_vel[...,:3] = self.v_prey * forces_target / (torch.norm(forces_target, dim=-1).unsqueeze(1) + 1e-5)
+        target_vel[...,:3] = self.v_prey * forces_target / (torch.norm(forces_target, dim=1).unsqueeze(1) + 1e-5)
+        # target_vel[...,:3] = self.v_prey * forces_target / (torch.norm(forces_target, dim=-1).unsqueeze(1) + 1e-5)
         
         self.target.set_velocities(target_vel.type(torch.float32), self.env_ids)
      
