@@ -11,7 +11,7 @@ The implementation in this repositorory is used in the paper "Multi-UAV Pursuit-
 ## Approach
 
 <div align=center>
-<img src="https://github.com/jiayu-ch15/Multi-UAV-pursuit-evasion/blob/main/figures/overview.png" width="350"/>
+<img src="https://github.com/jiayu-ch15/Multi-UAV-pursuit-evasion/blob/main/figures/overview.png" width="700"/>
 </div>
 
 ## Install
@@ -109,6 +109,15 @@ and edit ``.vscode/settings.json`` as:
 For usage and more details of *Omnidrones*, please refer to the [documentation](https://omnidrones.readthedocs.io/en/latest/).
 
 ```
+
+Note that for this ``main`` branch, it currently supports following environments:
+
+| Environment       | Single-agent or Multi-agent task |
+|-------------------|----------------------------------|
+| Hover             | Single                           |
+| Track             | Single                           |
+| hideandseek       | Multi                            |
+
 # at OmniDrones/
 cd scripts
 python train_generator.py # Train the pursuit-evasion task with Automatic Environment Generator
