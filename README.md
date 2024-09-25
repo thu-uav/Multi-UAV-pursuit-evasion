@@ -106,7 +106,7 @@ and edit ``.vscode/settings.json`` as:
 
 ## Usage
 
-For usage and more details of *Omnidrones*, please refer to the [documentation](https://omnidrones.readthedocs.io/en/latest/).
+For usage and more details, please refer to the [documentation](https://omnidrones.readthedocs.io/en/latest/).
 
 The code is organized as follow:
 ```
