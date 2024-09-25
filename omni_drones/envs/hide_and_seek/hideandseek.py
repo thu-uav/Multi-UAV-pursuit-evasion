@@ -180,7 +180,7 @@ def set_outside_circle_to_one(grid_map):
     
     return grid_map
 
-class HideAndSeek_circle_partial_TP(IsaacEnv): 
+class HideAndSeek(IsaacEnv): 
     """
     HideAndSeek environment designed for curriculum learning.
 

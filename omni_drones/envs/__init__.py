@@ -21,6 +21,5 @@
 # SOFTWARE.
 
 from .single import Hover, Goto, Track
-from .hide_and_seek import HideAndSeek
-from .hide_and_seek import HideAndSeek_circle_partial_TP, HideAndSeek_circle_partial_TP_particle
+from .hide_and_seek import HideAndSeek, HideAndSeek_envgen
 from .isaac_env import IsaacEnv

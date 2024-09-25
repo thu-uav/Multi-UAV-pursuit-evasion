@@ -36,17 +36,17 @@ source ~/.bashrc
 
 #### 2. Conda
 
-Although Isaac Sim comes with a built-in Python environment, we recommend using a seperate conda environment which is more flexible. We provide scripts to automate environment setup when activating/deactivating a conda environment at ``OmniDrones/conda_setup``.
+Although Isaac Sim comes with a built-in Python environment, we recommend using a seperate conda environment which is more flexible. We provide scripts to automate environment setup when activating/deactivating a conda environment at ``Multi-UAV-pursuit-evasion/conda_setup``.
 
 ```
 conda create -n sim python=3.7
 conda activate sim
 
-# at OmniDrones/
+# at Multi-UAV-pursuit-evasion/
 cp -r conda_setup/etc $CONDA_PREFIX
 # re-activate the environment
 conda activate sim
-# install OmniDrones
+# install Multi-UAV-pursuit-evasion
 pip install -e .
 
 # verification
@@ -56,29 +56,29 @@ python -c "import torch; print(torch.__path__)"
 ```
 
 #### 3. Third Party Packages
-OmniDrones requires specific versions of the `tensordict` and `torchrl` packages. For the ``deploy`` branch, it supports `tensordict` version 0.1.2+5e6205c and `torchrl` version 0.1.1+e39e701. 
+Multi-UAV-pursuit-evasion requires specific versions of the `tensordict` and `torchrl` packages. For the ``deploy`` branch, it supports `tensordict` version 0.1.2+5e6205c and `torchrl` version 0.1.1+e39e701. 
 
 We manage these two packages using Git submodules to ensure that the correct versions are used. To initialize and update the submodules, follow these steps:
 
 Get the submodules:
 ```
-# at OmniDrones/
+# at Multi-UAV-pursuit-evasion/
 git submodule update --init --recursive
 ```
 Pip install these two packages respectively:
 ```
-# at OmniDrones/
+# at Multi-UAV-pursuit-evasion/
 cd third_party/tensordict
 pip install -e .
 ```
 ```
-# at OmniDrones/
+# at Multi-UAV-pursuit-evasion/
 cd third_party/torchrl
 pip install -e .
 ```
 #### 4. Verification
 ```
-# at OmniDrones/
+# at Multi-UAV-pursuit-evasion/
 cd scripts
 python train.py headless=true wandb.mode=disabled total_frames=50000 task=Hover
 ```
@@ -108,22 +108,52 @@ and edit ``.vscode/settings.json`` as:
 
 For usage and more details of *Omnidrones*, please refer to the [documentation](https://omnidrones.readthedocs.io/en/latest/).
 
+The code is organized as follow:
+cfg
+|-- train.yaml
+|-- algo
+    |-- mappo.yaml
+|-- task
+    |-- HideAndSeek_envgen.yaml
+    |-- HideAndSeek.yaml
+    |-- Hover.yaml
+omni_drones
+|-- envs
+    |-- hide_and_seek
+        |-- hideandseek_envgen.py
+        |-- hideandseek.py
+    |-- single
+        |-- hover.py
+scripts
+|-- train.py
+|-- train.deploy.py
+|-- train_generator.py
+
 ```
-
-Note that for this ``main`` branch, it currently supports following environments:
-
-| Environment       | Single-agent or Multi-agent task |
-|-------------------|----------------------------------|
-| Hover             | Single                           |
-| Track             | Single                           |
-| hideandseek       | Multi                            |
-
-# at OmniDrones/
+# at Multi-UAV-pursuit-evasion/
 cd scripts
-python train_generator.py # Train the pursuit-evasion task with Automatic Environment Generator
-python train.py # Train the pursuit-evasion task without Automatic Environment Generator
-python train_deploy.py # fine-tune the policy by smoothness reward
+# Train the pursuit-evasion task with Automatic Environment Generator.
+python train_generator.py
+# Train the pursuit-evasion task without Automatic Environment Generator.
+python train.py
+# fine-tune the policy using smoothness reward.
+python train_deploy.py
 ```
+
+```
+# at Multi-UAV-pursuit-evasion/
+cd scripts
+# set HideAndSeek.yaml
+use_random_cylinder = 0
+# four evaluation scenarios: # 'wall', 'narrow_gap', 'random', 'passage'
+scenario_flag = 'wall'
+# evaluate the policy
+python eval.py
+```
+
+<div align=center>
+<img src="https://github.com/jiayu-ch15/Multi-UAV-pursuit-evasion/blob/main/figures/evaluation.png" width="700"/>
+</div>
 
 ## Citation
 

@@ -376,7 +376,7 @@ class GenBuffer(object):
     def save_task(self, model_dir, episode):
         np.save('{}/history_{}.npy'.format(model_dir,episode), self._history_buffer)
         
-class HideAndSeek_circle_partial_TP_particle(IsaacEnv): 
+class HideAndSeek_envgen(IsaacEnv): 
     """
     HideAndSeek environment designed for curriculum learning.
 
