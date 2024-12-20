@@ -127,7 +127,7 @@ omni_drones
         |-- hover.py
 scripts
 |-- train.py
-|-- train.deploy.py
+|-- train_deploy.py
 |-- train_generator.py
 ```
 
