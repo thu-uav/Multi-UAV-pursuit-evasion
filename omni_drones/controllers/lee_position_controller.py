@@ -543,7 +543,7 @@ class PIDRateController(nn.Module):
         
         ctbr = torch.concat([r, p, y, target_thrust], dim=1).reshape(*batch_shape, -1)
 
-        cmd = torch.concat([m1,m2,m3,m4], dim=1) / 2**16 * 2 - self.max_thrust_ratio
+        cmd = torch.concat([m1,m2,m3,m4], dim=1) / 2**16 * 2 - 1.0
         
         cmd = cmd.reshape(*batch_shape, -1)
         

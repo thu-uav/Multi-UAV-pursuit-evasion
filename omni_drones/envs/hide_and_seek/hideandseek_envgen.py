@@ -1001,11 +1001,11 @@ class HideAndSeek_envgen(IsaacEnv):
         self.stats[env_ids] = 0.
         self.stats['first_capture_step'].set_(torch.ones_like(self.stats['first_capture_step']) * self.max_episode_length)
 
+        # init prev_actions: hover
         cmd_init = 2.0 * (self.drone.throttle[env_ids]) ** 2 - 1.0
-        max_thrust_ratio = self.drone.params['max_thrust_ratio']
-        self.info['prev_action'][env_ids, :, 3] = (0.5 * (max_thrust_ratio + cmd_init)).mean(dim=-1)
-        self.prev_actions[env_ids] = self.info['prev_action'][env_ids]
-
+        self.info['prev_action'][env_ids, :, 3] = cmd_init.mean(dim=-1)
+        self.prev_actions[env_ids] = self.info['prev_action'][env_ids].clone()
+        
         if self.use_eval and self._should_render(0):
             self._draw_court_circle()
         
