@@ -27,7 +27,7 @@ Set the following environment variables to your ``~/.bashrc`` or ``~/.zshrc`` fi
 export ISAACSIM_PATH="${HOME}/.local/share/ov/pkg/isaac_sim-2022.2.0"
 ```
 
-*(Currently we use isaac_sim-2022.2.0. Whether other versions can work or not is not guaranteed. We provide a .zip flie for [isaac_sim-2022.2.0](https://drive.google.com/file/d/1ZrfhIkQVdRynthJ2FqGBC5jA93J6yEiZ/view?usp=sharing))*
+*(Currently we use isaac_sim-2022.2.0. Whether other versions can work or not is not guaranteed. We provide a .zip flie for [isaac_sim-2022.2.0](https://drive.google.com/file/d/1ZrfhIkQVdRynthJ2FqGBC5jA93J6yEiZ/view?usp=sharing). For easy usage, we also provide a [guide](https://github.com/thu-uav/Multi-UAV-pursuit-evasion/issues/1#issuecomment-2573176995) on the correct usage of Isaac Sim 2022.)*
 
 After adding the environment variable, apply the changes by running:
 ```
