@@ -69,12 +69,16 @@ Pip install these two packages respectively:
 ```
 # at Multi-UAV-pursuit-evasion/
 cd third_party/tensordict
-pip install -e .
+pip install -e . --no-build-isolation
 ```
 ```
 # at Multi-UAV-pursuit-evasion/
 cd third_party/torchrl
-pip install -e .
+pip install -e . --no-build-isolation
+```
+```
+# We need to install dgl for hideandseek_envgen.py 
+pip install dgl -f https://data.dgl.ai/wheels/torch-1.13/cu122/repo.html
 ```
 #### 4. Verification
 ```

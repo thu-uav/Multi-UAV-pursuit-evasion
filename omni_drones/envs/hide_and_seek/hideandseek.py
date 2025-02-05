@@ -610,7 +610,6 @@ class HideAndSeek(IsaacEnv):
         self.drone._reset_idx(env_ids)
         
         # init, fixed xy and randomize z
-        # init, fixed xy and randomize z
         if self.use_random_cylinder:
             if not self.use_eval: # random pos
                 drone_pos = self.init_drone_pos_dist.sample((*env_ids.shape, self.num_agents))
