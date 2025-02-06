@@ -6,6 +6,7 @@ sim: ${task.sim}
 env: ${task.env}
 
 model_dir: null
+# model_dir: /home/jiayu/Multi-UAV-pursuit-evasion/scripts/outputs/debug/02-05_18-17/wandb/run-20250205_181733-iprt5yf3/files/checkpoint_3761897472.pt
 
 total_frames: 10000_000_000 #1000_000_000
 max_iters: -1
@@ -23,11 +24,11 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: debug
+  run_name: train_0to5
   entity: chenjy
   project: RAL
-  mode: disabled
-  # mode: online # set to 'disabled' when debugging locally, online
+  # mode: disabled
+  mode: online # set to 'disabled' when debugging locally, online
   run_id: 
   monitor_gym: True
   tags:
