@@ -76,8 +76,8 @@ pip install -e . --no-build-isolation
 cd third_party/torchrl
 pip install -e . --no-build-isolation
 ```
+Install dgl:
 ```
-# We need to install dgl for hideandseek_envgen.py 
 pip install dgl -f https://data.dgl.ai/wheels/torch-1.13/cu122/repo.html
 ```
 #### 4. Verification
