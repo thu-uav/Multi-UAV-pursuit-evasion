@@ -529,12 +529,16 @@ class HideAndSeek_envgen(IsaacEnv):
         self.mask_value = -5
         self.draw = _debug_draw.acquire_debug_draw_interface()
 
+        self.max_agents = 3 # TODO: flexible
+        # use self.masked_drone_pos to expand drone_pos
+        self.masked_drone_pos = self.mask_value * torch.ones(self.num_envs, self.max_agents - self.num_agents, 3, device=self.device)
+
         # TP net
         # t, target pos masked, target vel masked, drone_pos
         if self.use_obstacles:
-            self.TP = TP_net(input_dim = 1 + 3 + 3 + 3 * self.num_agents + 3 * self.num_cylinders, output_dim = 3 * self.future_predcition_step, future_predcition_step = self.future_predcition_step, window_step=self.window_step).to(self.device)
+            self.TP = TP_net(input_dim = 1 + 3 + 3 + 3 * self.max_agents + 3 * self.num_cylinders, output_dim = 3 * self.future_predcition_step, future_predcition_step = self.future_predcition_step, window_step=self.window_step).to(self.device)
         else:
-            self.TP = TP_net(input_dim = 1 + 3 + 3 + 3 * self.num_agents, output_dim = 3 * self.future_predcition_step, future_predcition_step = self.future_predcition_step, window_step=self.window_step).to(self.device)
+            self.TP = TP_net(input_dim = 1 + 3 + 3 + 3 * self.max_agents, output_dim = 3 * self.future_predcition_step, future_predcition_step = self.future_predcition_step, window_step=self.window_step).to(self.device)
         self.history_step = self.cfg.task.history_step
         self.history_data = collections.deque(maxlen=self.history_step)
 
@@ -1093,6 +1097,8 @@ class HideAndSeek_envgen(IsaacEnv):
         target_vel_masked.masked_fill_(target_mask, self.mask_value)
 
         if self.use_TP_net:
+            # expand drone_pos with mask_value, drone_pos: [num_envs, num_agents, 3]
+            expanded_drone_pos = torch.concat([drone_pos, self.masked_drone_pos], dim=1)
             # use the real target pos to supervise the TP network
             TP = TensorDict({}, [self.num_envs])
             if self.use_obstacles:
@@ -1100,7 +1106,7 @@ class HideAndSeek_envgen(IsaacEnv):
                     self.progress_buf.unsqueeze(-1),
                     target_pos_masked.reshape(self.num_envs, -1),
                     target_vel_masked.squeeze(1),
-                    drone_pos.reshape(self.num_envs, -1),
+                    expanded_drone_pos.reshape(self.num_envs, -1),
                     torch.concat([cylinders_pos[..., :2], \
                                   self.cylinder_size * torch.ones(self.num_envs, \
                                   self.num_cylinders, 1, device=self.device)], dim=-1).reshape(self.num_envs, -1)
@@ -1110,7 +1116,7 @@ class HideAndSeek_envgen(IsaacEnv):
                     self.progress_buf.unsqueeze(-1),
                     target_pos_masked.reshape(self.num_envs, -1),
                     target_vel_masked.squeeze(1),
-                    drone_pos.reshape(self.num_envs, -1)
+                    expanded_drone_pos.reshape(self.num_envs, -1)
                 ], dim=-1)
             if len(self.history_data) < self.history_step:
                 # init history data
@@ -1124,7 +1130,8 @@ class HideAndSeek_envgen(IsaacEnv):
             self.target_pos_predicted = self.TP(TP['TP_input']).reshape(self.num_envs, self.future_predcition_step, -1) # [num_envs, 3 * future_step]
             self.target_pos_predicted[..., :2] = self.target_pos_predicted[..., :2] * 0.5 * self.arena_size
             self.target_pos_predicted[..., 2] = (self.target_pos_predicted[..., 2] + 1.0) / 2.0 * self.max_height
-            # TP["TP_output"] = self.target_pos_predicted
+            self.stats["target_predicted_error"].add_(torch.norm(target_pos.squeeze(1) - self.target_pos_predicted[:, 0], dim=-1).unsqueeze(-1))
+            
             TP["TP_done"] = (self.progress_buf <= (self.max_episode_length - self.future_predcition_step)).unsqueeze(-1)
             # TP_groundtruth: clip to (-1.0, 1.0)
             TP["TP_groundtruth"] = target_pos.squeeze(1).clone()
