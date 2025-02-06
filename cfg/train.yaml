@@ -1,6 +1,7 @@
 # hydra.job.chdir: false
 
 headless: true
+use_local_usd: true
 
 sim: ${task.sim}
 env: ${task.env}
@@ -35,7 +36,7 @@ wandb:
   tags:
 
 defaults:
-  - task: HideAndSeek
-  # - task: HideAndSeek_envgen
+  # - task: HideAndSeek
+  - task: HideAndSeek_envgen
   - algo: mappo
   - _self_
