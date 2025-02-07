@@ -12,6 +12,7 @@ from functorch import vmap
 from omni_drones.utils.torch import cpos, off_diag, quat_axis, others
 import torch.distributions as D
 from torch.masked import masked_tensor, as_masked_tensor
+import os
 
 import omni.isaac.core.objects as objects
 # from omni.isaac.core.objects import VisualSphere, DynamicSphere, FixedCuboid, VisualCylinder, FixedCylinder, DynamicCylinder
@@ -666,6 +667,7 @@ class HideAndSeek_envgen(IsaacEnv):
         self.info = info_spec.zero()
         
     def _design_scene(self): # for render
+        self.use_local_usd = self.cfg.use_local_usd
         self.num_agents = self.cfg.task.num_agents
         self.max_cylinders = self.cfg.task.cylinder.max_num
         self.min_cylinders = self.cfg.task.cylinder.min_num
@@ -821,12 +823,24 @@ class HideAndSeek_envgen(IsaacEnv):
             disable_gravity=True
         )        
 
-        kit_utils.create_ground_plane(
-            "/World/defaultGroundPlane",
-            static_friction=1.0,
-            dynamic_friction=1.0,
-            restitution=0.0,
-        )
+        if self.use_local_usd:
+            # use local usd resources
+            usd_path = os.path.join(os.path.dirname(__file__), os.pardir, "assets", "default_environment.usd")
+            kit_utils.create_ground_plane(
+                "/World/defaultGroundPlane",
+                static_friction=1.0,
+                dynamic_friction=1.0,
+                restitution=0.0,
+                usd_path=usd_path
+            )
+        else:
+            # use online usd resources
+            kit_utils.create_ground_plane(
+                "/World/defaultGroundPlane",
+                static_friction=1.0,
+                dynamic_friction=1.0,
+                restitution=0.0,
+            )
 
         return ["/World/defaultGroundPlane"]
 

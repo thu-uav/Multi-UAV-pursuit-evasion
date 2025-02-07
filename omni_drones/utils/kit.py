@@ -51,9 +51,12 @@ def create_ground_plane(
     # Retrieve path to the plane
     if "usd_path" in kwargs:
         usd_path = kwargs["usd_path"]
+        print("Local USD path:", usd_path)
     else:
         # get path to the nucleus server
-        assets_root_path = nucleus_utils.get_assets_root_path()
+        # assets_root_path = nucleus_utils.get_assets_root_path() # 2023.1.1
+        assets_root_path = "http://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/2023.1.0" # 2023.1.0
+        print("Assets root path: ", assets_root_path)
         if assets_root_path is None:
             carb.log_error(
                 "Unable to access the Isaac Sim assets folder on Nucleus server."
@@ -61,6 +64,18 @@ def create_ground_plane(
             return
         # prepend path to the grid plane
         usd_path = f"{assets_root_path}/Isaac/Environments/Grid/default_environment.usd"
+    # if "usd_path" in kwargs:
+    #     usd_path = kwargs["usd_path"]
+    # else:
+    #     # get path to the nucleus server
+    #     assets_root_path = nucleus_utils.get_assets_root_path()
+    #     if assets_root_path is None:
+    #         carb.log_error(
+    #             "Unable to access the Isaac Sim assets folder on Nucleus server."
+    #         )
+    #         return
+    #     # prepend path to the grid plane
+    #     usd_path = f"{assets_root_path}/Isaac/Environments/Grid/default_environment.usd"
     # Spawn Ground-plane
     prim_utils.create_prim(
         prim_path, usd_path=usd_path, translation=(0.0, 0.0, z_position)
