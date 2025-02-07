@@ -312,7 +312,7 @@ class HideAndSeek(IsaacEnv):
         self.mask_value = -5
         self.draw = _debug_draw.acquire_debug_draw_interface()
         
-        self.max_agents = 3 # TODO: flexible
+        self.max_agents = self.cfg.task.max_agents
         # use self.masked_drone_pos to expand drone_pos
         self.masked_drone_pos = self.mask_value * torch.ones(self.num_envs, self.max_agents - self.num_agents, 3, device=self.device)
 

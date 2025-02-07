@@ -1,16 +1,14 @@
 # hydra.job.chdir: false
 
 headless: true
-use_local_usd: true
+use_local_usd: false
 
 sim: ${task.sim}
 env: ${task.env}
 
 model_dir: null
 load_history_dir: null
-# model_dir: /home/chenjy/Multi-UAV-pursuit-evasion/scripts/outputs/train_0to5_envgen/02-06_16-19/wandb/run-20250206_161955-la6l2s9h/files/checkpoint_1232207872.pt
-# load_history_dir: /home/chenjy/Multi-UAV-pursuit-evasion/scripts/outputs/train_0to5_envgen/02-06_16-19/wandb/run-20250206_161955-la6l2s9h/files/history_9400.npy
-
+# model_dir: /home/jiayu/Multi-UAV-pursuit-evasion/scripts/outputs/2agents.pt
 
 total_frames: 10000_000_000 #1000_000_000
 max_iters: -1
@@ -28,8 +26,8 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: train_0to5_envgen_load
-  # run_name: eval
+  run_name: envgen_4to5
+  # run_name: debug
   entity: chenjy
   project: RAL
   # mode: disabled
