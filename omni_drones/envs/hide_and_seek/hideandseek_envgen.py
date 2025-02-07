@@ -207,11 +207,13 @@ def sanity_check(grid_map, drone_grid, target_grid, cylinders_grid):
         return True
     
 class GenBuffer(object):
-    def __init__(self, num_agents, num_cylinders, device):
+    def __init__(self, num_agents, num_cylinders, load_history_dir, device):
         self._state_buffer = np.zeros((0, 1), dtype=np.float32)
         self.task_dim = 18 + num_agents * 3
         self._history_buffer = np.zeros((0, self.task_dim), dtype=np.float32)
         self._weight_buffer = np.zeros((0, 1), dtype=np.float32)
+        if load_history_dir:
+            self._history_buffer = np.load(load_history_dir)
         self.device = device
         self.num_agents = num_agents
         self.num_cylinders = num_cylinders
@@ -273,7 +275,6 @@ class GenBuffer(object):
         drone_target_pos_xy = grid_to_continuous(result, self.boundary, self.grid_size, self.center_pos, self.center_grid)
         drone_target_pos_z = (torch.rand(self.buffer_length, self.num_agents + 1, 1) * 0.1 * 2 - 0.1) + self.max_height / 2
         return torch.concat([drone_target_pos_xy, drone_target_pos_z], dim=-1)
-        # self._history_buffer = self._history_buffer.reshape(self.buffer_length, -1).numpy()
     
     def init_history(self, init_tasks):
         self._history_buffer = init_tasks.reshape(self.buffer_length, -1)
@@ -470,7 +471,8 @@ class HideAndSeek_envgen(IsaacEnv):
         
         # particle-based generator
         self.use_particle_generator = self.cfg.task.use_particle_generator
-        self.gen_buffer = GenBuffer(num_agents=self.num_agents, num_cylinders=self.num_cylinders, device=self.device)
+        self.gen_buffer = GenBuffer(num_agents=self.num_agents, num_cylinders=self.num_cylinders, \
+            load_history_dir=self.cfg.load_history_dir, device=self.device)
         self.update_iter = 0 # multiple initialization for agents and target
         self.eval_iter = self.cfg.task.eval_iter
         self.ratio_unif = self.cfg.task.ratio_unif

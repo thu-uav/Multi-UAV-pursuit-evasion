@@ -6,7 +6,10 @@ sim: ${task.sim}
 env: ${task.env}
 
 model_dir: null
-# model_dir: /home/jiayu/Multi-UAV-pursuit-evasion/scripts/outputs/debug/02-05_18-17/wandb/run-20250205_181733-iprt5yf3/files/checkpoint_3761897472.pt
+load_history_dir: null
+# model_dir: /home/chenjy/Multi-UAV-pursuit-evasion/scripts/outputs/train_0to5_envgen/02-06_16-19/wandb/run-20250206_161955-la6l2s9h/files/checkpoint_1232207872.pt
+# load_history_dir: /home/chenjy/Multi-UAV-pursuit-evasion/scripts/outputs/train_0to5_envgen/02-06_16-19/wandb/run-20250206_161955-la6l2s9h/files/history_9400.npy
+
 
 total_frames: 10000_000_000 #1000_000_000
 max_iters: -1
@@ -24,18 +27,18 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: train_0to5
-  run_name: eval
+  run_name: train_0to5_envgen_load
+  # run_name: eval
   entity: chenjy
   project: RAL
-  mode: disabled
-  # mode: online # set to 'disabled' when debugging locally, online
+  # mode: disabled
+  mode: online # set to 'disabled' when debugging locally, online
   run_id: 
   monitor_gym: True
   tags:
 
 defaults:
-  - task: HideAndSeek
-  # - task: HideAndSeek_envgen
+  # - task: HideAndSeek
+  - task: HideAndSeek_envgen
   - algo: mappo
   - _self_
