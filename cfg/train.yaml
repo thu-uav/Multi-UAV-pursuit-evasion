@@ -8,7 +8,8 @@ env: ${task.env}
 
 model_dir: null
 load_history_dir: null
-# model_dir: /home/jiayu/Multi-UAV-pursuit-evasion/scripts/outputs/2agents.pt
+# model_dir: /home/jiayu/Multi-UAV-pursuit-evasion/scripts/outputs/envgen_4to5/02-07_17-41/wandb/run-20250207_174113-pj99qo8t/files/checkpoint_747241472.pt
+# load_history_dir: /home/jiayu/Multi-UAV-pursuit-evasion/scripts/outputs/envgen_4to5/02-07_17-41/wandb/run-20250207_174113-pj99qo8t/files/history_5700.npy
 
 total_frames: 10000_000_000 #1000_000_000
 max_iters: -1

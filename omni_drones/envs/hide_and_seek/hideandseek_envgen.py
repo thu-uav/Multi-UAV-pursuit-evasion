@@ -324,7 +324,7 @@ class GenBuffer(object):
         boundary_xy = self.arena_size / math.sqrt(2.0) - 0.1
         boundary_drone = [[-boundary_xy, boundary_xy], \
                           [-boundary_xy, boundary_xy], \
-                          [self.max_height - 0.1, self.max_height + 0.1]]
+                          [self.max_height / 2 - 0.1, self.max_height / 2 + 0.1]]
         boundary_cylinder = [[-cylinder_boundary, cylinder_boundary], \
                           [-cylinder_boundary, cylinder_boundary], \
                           [-20.0, self.max_height / 2]]
@@ -1002,6 +1002,11 @@ class HideAndSeek_envgen(IsaacEnv):
                                     [0.0000,  0.0000, 0.5],
                                 ], device=self.device)
 
+        # TODO: debug
+        print('drone pos', torch.amax(drone_pos, dim=(0, 1)), torch.amin(drone_pos, dim=(0, 1)))
+        print('target pos', torch.amax(target_pos, dim=(0, 1)), torch.amin(target_pos, dim=(0, 1)))
+        print('cylinder pos', torch.amax(cylinders_pos, dim=(0, 1)), torch.amin(cylinders_pos, dim=(0, 1)))
+
         # drone_pos = self.init_drone_pos_dist.sample((*env_ids.shape, self.num_agents))
         rpy = self.init_rpy_dist.sample((*env_ids.shape, self.num_agents))
         rot = euler_to_quaternion(rpy)
@@ -1141,18 +1146,22 @@ class HideAndSeek_envgen(IsaacEnv):
             else:
                 self.history_data.append(frame_state)
             TP['TP_input'] = torch.stack(list(self.history_data), dim=1).to(self.device)
-            # target_pos_predicted, x, y -> [-0.5 * self.arena_size, 0.5 * self.arena_size]
+            # target_pos_predicted, x, y -> [-self.arena_size, self.arena_size]
             # z -> [0, self.max_height]
-            self.target_pos_predicted = self.TP(TP['TP_input']).reshape(self.num_envs, self.future_predcition_step, -1) # [num_envs, 3 * future_step]
-            self.target_pos_predicted[..., :2] = self.target_pos_predicted[..., :2] * 0.5 * self.arena_size
+            normalized_target_pos_predicted = self.TP(TP['TP_input'])
+            self.target_pos_predicted = normalized_target_pos_predicted.reshape(self.num_envs, self.future_predcition_step, -1) # [num_envs, 3 * future_step]
+            self.target_pos_predicted[..., :2] = self.target_pos_predicted[..., :2] * self.arena_size
             self.target_pos_predicted[..., 2] = (self.target_pos_predicted[..., 2] + 1.0) / 2.0 * self.max_height
             self.stats["target_predicted_error"].add_(torch.norm(target_pos.squeeze(1) - self.target_pos_predicted[:, 0], dim=-1).unsqueeze(-1))
             
             TP["TP_done"] = (self.progress_buf <= (self.max_episode_length - self.future_predcition_step)).unsqueeze(-1)
             # TP_groundtruth: clip to (-1.0, 1.0)
             TP["TP_groundtruth"] = target_pos.squeeze(1).clone()
-            TP["TP_groundtruth"][..., :2] = TP["TP_groundtruth"][..., :2] / (0.5 * self.arena_size)
+            TP["TP_groundtruth"][..., :2] = TP["TP_groundtruth"][..., :2] / self.arena_size
             TP["TP_groundtruth"][..., 2] = TP["TP_groundtruth"][..., 2] / self.max_height * 2.0 - 1.0     
+
+            # # normalized error
+            # self.stats["target_predicted_error"].add_(torch.norm(TP["TP_groundtruth"] - normalized_target_pos_predicted, dim=-1).unsqueeze(-1))
 
             target_rpos_predicted = (drone_pos.unsqueeze(2) - self.target_pos_predicted.unsqueeze(1)).view(self.num_envs, self.num_agents, -1)
 
