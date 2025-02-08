@@ -25,7 +25,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: envgen_0to5
+  run_name: envgen_1to5
   # run_name: debug
   entity: chenjy
   project: RAL
