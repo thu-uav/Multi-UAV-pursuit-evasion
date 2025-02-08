@@ -8,8 +8,6 @@ env: ${task.env}
 
 model_dir: null
 load_history_dir: null
-# model_dir: /home/jiayu/Multi-UAV-pursuit-evasion/scripts/outputs/envgen_4to5/02-07_17-41/wandb/run-20250207_174113-pj99qo8t/files/checkpoint_747241472.pt
-# load_history_dir: /home/jiayu/Multi-UAV-pursuit-evasion/scripts/outputs/envgen_4to5/02-07_17-41/wandb/run-20250207_174113-pj99qo8t/files/history_5700.npy
 
 total_frames: 10000_000_000 #1000_000_000
 max_iters: -1
@@ -27,7 +25,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: envgen_4to5
+  run_name: envgen_0to5
   # run_name: debug
   entity: chenjy
   project: RAL
@@ -38,7 +36,7 @@ wandb:
   tags:
 
 defaults:
-  # - task: HideAndSeek
+  # - task: HideAndSeek # for evaluation and baseline
   - task: HideAndSeek_envgen
   - algo: mappo
   - _self_
