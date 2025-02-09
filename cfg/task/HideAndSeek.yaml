@@ -6,7 +6,7 @@ defaults:
   - /base/sim_base@_here_
 
 env:
-  num_envs: 2048
+  num_envs: 100
   max_episode_length: 800
 
 drone_model: Crazyflie
@@ -22,7 +22,7 @@ num_agents: 3
 # flag
 use_eval: 0
 use_random_cylinder: 1 # set use_random_cylinder = 0 when use_eval = 1
-scenario_flag: 'empty' # 'empty', 'wall', 'narrow_gap', 'random', 'passage'
+scenario_flag: 'random' # 'empty', 'wall', 'narrow_gap', 'random', 'passage'
 use_partial_obs: 1
 use_deployment: 0
 
