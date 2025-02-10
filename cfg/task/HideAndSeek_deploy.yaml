@@ -1,4 +1,4 @@
-name: HideAndSeek_envgen
+name: HideAndSeek_deploy
 
 defaults:
   # see https://hydra.cc/docs/advanced/overriding_packages/
@@ -21,18 +21,10 @@ num_agents: 3
 
 # flag
 use_eval: 0
-use_random_cylinder: 1
-scenario_flag: 'random' # 'empty', 'wall', 'narrow_gap', 'random', 'passage'
-use_particle_generator: 1
+use_random_cylinder: 1 # set use_random_cylinder = 0 when use_eval = 1
+scenario_flag: 'wall' # 'empty', 'wall', 'narrow_gap', 'random', 'passage'
 use_partial_obs: 1
-use_init_easy: 0 # default 0
-ratio_unif: 0.3
-eval_iter: 3
-success_threshold: 1.0 # success > 0.8, only use unif
-expand_cylinders: 0
-expand_step: 0.2
-R_min: 0.5
-R_max: 0.9
+use_deployment: 0
 
 # TP net param
 history_step: 10
@@ -50,7 +42,9 @@ catch_reward_coef: 20.0
 detect_reward_coef: 0.0
 collision_coef: 100.0
 speed_coef: 10.0
-smoothness_coef: 0.0
+init_smoothness_coef: 20.0
+smooth_lr: 0.0
+max_smoothness_coef: 20.0
 
 # env param
 catch_radius: 0.3

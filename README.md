@@ -179,6 +179,7 @@ We fine-tune the policy with two-stage reward refinement.
 ```
 # in train.yaml, setup the path of the best checkpoint obtained in the first stage
 # model_dir: /absolute/path/checkpoint.pt
+# setup task: HideAndSeek_deploy
 python train_deploy.py
 ```
 Note that we use Weights & Bias as the defaul visualizattion platform; to use Weights & Bias, please register and login to the platform first.

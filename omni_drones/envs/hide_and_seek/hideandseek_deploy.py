@@ -181,7 +181,7 @@ def set_outside_circle_to_one(grid_map):
     
     return grid_map
 
-class HideAndSeek(IsaacEnv): 
+class HideAndSeek_deploy(IsaacEnv): 
     """
     HideAndSeek environment designed for curriculum learning.
 
@@ -267,10 +267,15 @@ class HideAndSeek(IsaacEnv):
         self.collision_coef = self.cfg.task.collision_coef
         self.speed_coef = self.cfg.task.speed_coef
         self.dist_reward_coef = self.cfg.task.dist_reward_coef
+        self.init_smoothness_coef = self.cfg.task.init_smoothness_coef
+        self.max_smoothness_coef = self.cfg.task.max_smoothness_coef
+        self.smooth_lr = self.cfg.task.smooth_lr
+        self.update_epoch = 0
         self.use_eval = self.cfg.task.use_eval
         self.use_partial_obs = self.cfg.task.use_partial_obs
         self.capture = torch.zeros(self.num_envs, 3, device=self.device)
         self.min_dist = torch.ones(self.num_envs, 1, device=self.device) * float(torch.inf) # for teacher evaluation
+        self.use_deployment = self.cfg.task.use_deployment
         
         self.central_env_pos = Float3(
             *self.envs_positions[self.central_env_idx].tolist()
@@ -1006,6 +1011,15 @@ class HideAndSeek(IsaacEnv):
         self.stats['collision_wall'].add_(collision_wall.mean(-1).unsqueeze(-1))
         self.stats['collision_reward'].add_(collision_reward.mean(-1).unsqueeze(-1))
         
+        # smoothness
+        self.smoothness_coef = self.init_smoothness_coef + self.smooth_lr * self.update_epoch
+        self.smoothness_coef = min(self.max_smoothness_coef, self.smoothness_coef)
+            
+        self.stats["smoothness_coef"] = torch.ones_like(self.stats["smoothness_coef"]) * self.smoothness_coef
+        smoothness_reward = self.smoothness_coef * torch.exp(-self.action_error_order1)
+        if not self.use_deployment:
+            smoothness_reward = torch.zeros_like(smoothness_reward)
+        self.stats['smoothness_reward'].add_(smoothness_reward.mean(-1).unsqueeze(-1))
         self.stats["smoothness_mean"].add_(self.drone.throttle_difference.mean(-1).unsqueeze(-1))
         self.stats["smoothness_max"].set_(torch.max(self.drone.throttle_difference.max(-1).values.unsqueeze(-1), self.stats["smoothness_max"]))
         
@@ -1015,6 +1029,7 @@ class HideAndSeek(IsaacEnv):
             + catch_reward
             + collision_reward
             + speed_reward
+            + smoothness_reward
         )
 
         done  = (

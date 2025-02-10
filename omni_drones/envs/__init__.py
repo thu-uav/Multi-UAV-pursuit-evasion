@@ -21,5 +21,5 @@
 # SOFTWARE.
 
 from .single import Hover
-from .hide_and_seek import HideAndSeek, HideAndSeek_envgen
+from .hide_and_seek import HideAndSeek, HideAndSeek_envgen, HideAndSeek_deploy
 from .isaac_env import IsaacEnv
