@@ -322,9 +322,12 @@ class GenBuffer(object):
         # tasks: drone pos, target pos, cylinders pos
         cylinder_boundary = int(self.arena_size / self.grid_size) * self.grid_size
         boundary_xy = self.arena_size / math.sqrt(2.0) - 0.1
+        # boundary_drone = [[-boundary_xy, boundary_xy], \
+        #                   [-boundary_xy, boundary_xy], \
+        #                   [self.max_height / 2 - 0.1, self.max_height / 2 + 0.1]]
         boundary_drone = [[-boundary_xy, boundary_xy], \
                           [-boundary_xy, boundary_xy], \
-                          [self.max_height / 2 - 0.1, self.max_height / 2 + 0.1]]
+                          [0.1, self.max_height - 0.1]]
         boundary_cylinder = [[-cylinder_boundary, cylinder_boundary], \
                           [-cylinder_boundary, cylinder_boundary], \
                           [-20.0, self.max_height / 2]]
@@ -509,13 +512,22 @@ class HideAndSeek_envgen(IsaacEnv):
             torch.tensor([-0.1, self.arena_size / math.sqrt(2.0) - 0.1], device=self.device)
         )
 
+        # self.init_drone_pos_dist_z = D.Uniform(
+        #     torch.tensor([self.max_height / 2 - 0.1], device=self.device),
+        #     torch.tensor([self.max_height / 2 + 0.1], device=self.device)
+        # )
+        # self.init_target_pos_dist_z = D.Uniform(
+        #     torch.tensor([self.max_height / 2 - 0.1], device=self.device),
+        #     torch.tensor([self.max_height / 2 + 0.1], device=self.device)
+        # )
+
         self.init_drone_pos_dist_z = D.Uniform(
-            torch.tensor([self.max_height / 2 - 0.1], device=self.device),
-            torch.tensor([self.max_height / 2 + 0.1], device=self.device)
+            torch.tensor([0.1], device=self.device),
+            torch.tensor([self.max_height - 0.1], device=self.device)
         )
         self.init_target_pos_dist_z = D.Uniform(
-            torch.tensor([self.max_height / 2 - 0.1], device=self.device),
-            torch.tensor([self.max_height / 2 + 0.1], device=self.device)
+            torch.tensor([0.1], device=self.device),
+            torch.tensor([self.max_height - 0.1], device=self.device)
         )
 
         self.init_rpy_dist = D.Uniform(

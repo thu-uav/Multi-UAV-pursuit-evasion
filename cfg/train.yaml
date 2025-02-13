@@ -26,7 +26,7 @@ viewer:
 wandb:
   group: ${oc.select:..task.name}
   # run_name: debug
-  run_name: envgen_4to5_seed0
+  run_name: envgen_4to5_large_init_space_seed0_again
   entity: chenjy
   project: RAL
   # mode: disabled
