@@ -22,7 +22,7 @@ num_agents: 3
 # flag
 use_eval: 0
 use_random_cylinder: 1 # set use_random_cylinder = 0 when use_eval = 1
-scenario_flag: 'wall' # 'empty', 'wall', 'narrow_gap', 'random', 'passage'
+scenario_flag: 'passage' # 'empty', 'wall', 'narrow_gap', 'random', 'passage'
 use_partial_obs: 1
 
 # TP net param
