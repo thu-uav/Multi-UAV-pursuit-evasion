@@ -13,7 +13,7 @@ total_frames: 10000_000_000 #1000_000_000
 max_iters: -1
 eval_interval: -1
 save_interval: 100
-seed: 1
+seed: 0
 
 viewer:
   resolution: [960, 720]
@@ -25,19 +25,19 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: eval
-  # run_name: envgen_woTP_4to5_seed1
+  # run_name: eval
+  run_name: envgen_0to5_largespace_trueevader_seed0
   entity: chenjy
   project: RAL
-  mode: disabled
-  # mode: online # set to 'disabled' when debugging locally, online
+  # mode: disabled
+  mode: online # set to 'disabled' when debugging locally, online
   run_id: 
   monitor_gym: True
   tags:
 
 defaults:
-  - task: HideAndSeek # evaluation and baseline
-  # - task: HideAndSeek_envgen # adaptive env generator
+  # - task: HideAndSeek # evaluation and baseline
+  - task: HideAndSeek_envgen # adaptive env generator
   # - task: HideAndSeek_deploy # two-stage reward refinement 
   - algo: mappo
   - _self_
