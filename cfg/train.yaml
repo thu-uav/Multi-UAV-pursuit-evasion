@@ -25,8 +25,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: eval
-  run_name: envgen_0to5_largespace_trueevader_seed0
+  run_name: envgen
   entity: chenjy
   project: RAL
   # mode: disabled
