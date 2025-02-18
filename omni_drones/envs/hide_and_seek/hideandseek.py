@@ -639,19 +639,9 @@ class HideAndSeek(IsaacEnv):
         
         # init, fixed xy and randomize z
         if self.use_random_cylinder:
-            if not self.use_eval: # random pos
-                drone_pos = self.init_drone_pos_dist.sample((*env_ids.shape, self.num_agents))
-                target_pos =  self.init_target_pos_dist.sample((*env_ids.shape, 1))
-            else: # fixed pos
-                drone_pos = torch.tensor([
-                                    [0.6000,  0.0000],
-                                    [0.8000,  0.0000],
-                                    [0.8000, -0.2000],
-                                    [0.8000,  0.2000],
-                                ], device=self.device).unsqueeze(0).expand(len(env_ids), -1, -1)[:, :self.num_agents]
-                target_pos = torch.tensor([
-                                    [-0.8000,  0.0000],
-                                ], device=self.device).unsqueeze(0).expand(len(env_ids), -1, -1)
+            # random pos
+            drone_pos = self.init_drone_pos_dist.sample((*env_ids.shape, self.num_agents))
+            target_pos =  self.init_target_pos_dist.sample((*env_ids.shape, 1))
             drone_pos_z = self.init_drone_pos_dist_z.sample((*env_ids.shape, self.num_agents))
             target_pos_z = self.init_target_pos_dist_z.sample((*env_ids.shape, 1))
             drone_pos = torch.concat([drone_pos, drone_pos_z], dim=-1)
@@ -1005,7 +995,7 @@ class HideAndSeek(IsaacEnv):
         collision_reward += - self.collision_coef * collision_drone
         self.stats['collision_drone'].add_(collision_drone.mean(-1).unsqueeze(-1))
         # for wall
-        collision_wall = ((drone_pos[..., -1] > self.max_height).type(torch.float32) + ((drone_pos[..., 0]**2 + drone_pos[..., 1]**2) > self.arena_size**2).type(torch.float32))
+        collision_wall = ((drone_pos[..., -1] > self.max_height).type(torch.float32) + (drone_pos[..., -1] < 0.1).type(torch.float32) + ((drone_pos[..., 0]**2 + drone_pos[..., 1]**2) > self.arena_size**2).type(torch.float32))
         collision_reward += - self.collision_coef * collision_wall
         
         collision_flag = torch.any(collision_reward < 0, dim=1)

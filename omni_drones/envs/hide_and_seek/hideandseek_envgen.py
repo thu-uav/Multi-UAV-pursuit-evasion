@@ -1315,7 +1315,7 @@ class HideAndSeek_envgen(IsaacEnv):
         collision_reward += - self.collision_coef * collision_drone
         self.stats['collision_drone'].add_(collision_drone.mean(-1).unsqueeze(-1))
         # for wall
-        collision_wall = ((drone_pos[..., -1] > self.max_height).type(torch.float32) + ((drone_pos[..., 0]**2 + drone_pos[..., 1]**2) > self.arena_size**2).type(torch.float32))
+        collision_wall = ((drone_pos[..., -1] > self.max_height).type(torch.float32) + (drone_pos[..., -1] < 0.1).type(torch.float32) + ((drone_pos[..., 0]**2 + drone_pos[..., 1]**2) > self.arena_size**2).type(torch.float32))
         collision_reward += - self.collision_coef * collision_wall
         
         collision_flag = torch.any(collision_reward < 0, dim=1)
@@ -1323,7 +1323,7 @@ class HideAndSeek_envgen(IsaacEnv):
         
         self.stats['collision_wall'].add_(collision_wall.mean(-1).unsqueeze(-1))
         self.stats['collision_reward'].add_(collision_reward.mean(-1).unsqueeze(-1))
-        
+                
         # smoothness
         smoothness_reward = self.smoothness_coef * torch.exp(-self.action_error_order1)
         self.stats['smoothness_reward'].add_(smoothness_reward.mean(-1).unsqueeze(-1))
@@ -1336,6 +1336,7 @@ class HideAndSeek_envgen(IsaacEnv):
             + catch_reward
             + collision_reward
             + speed_reward
+            + height_reward
             + smoothness_reward
         )
 
