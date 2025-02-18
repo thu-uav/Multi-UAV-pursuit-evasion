@@ -1336,7 +1336,6 @@ class HideAndSeek_envgen(IsaacEnv):
             + catch_reward
             + collision_reward
             + speed_reward
-            + height_reward
             + smoothness_reward
         )
 

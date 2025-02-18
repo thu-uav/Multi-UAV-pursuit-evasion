@@ -25,7 +25,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: envgen_seed0
+  run_name: envgen_height_seed0
   entity: chenjy
   project: RAL
   # mode: disabled
