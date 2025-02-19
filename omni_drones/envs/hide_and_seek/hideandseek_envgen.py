@@ -210,7 +210,7 @@ def sanity_check(grid_map, drone_grid, target_grid, cylinders_grid):
 class GenBuffer(object):
     def __init__(self, num_agents, num_cylinders, load_history_dir, device):
         self._state_buffer = np.zeros((0, 1), dtype=np.float32)
-        self.task_dim = 18 + num_agents * 3
+        self.task_dim = num_cylinders * 3 + 1 * 3 + num_agents * 3
         self._history_buffer = np.zeros((0, self.task_dim), dtype=np.float32)
         self._weight_buffer = np.zeros((0, 1), dtype=np.float32)
         if load_history_dir:
