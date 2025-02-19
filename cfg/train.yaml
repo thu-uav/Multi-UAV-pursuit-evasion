@@ -25,7 +25,8 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: ours_sharedistancereward_distcoef1
+  run_name: ours_sharedistance_allspace_cylinder1_evader1
+  # run_name: debug
   entity: chenjy
   project: RAL
   # mode: disabled
