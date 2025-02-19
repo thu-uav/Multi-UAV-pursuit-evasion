@@ -284,22 +284,22 @@ class HideAndSeek(IsaacEnv):
             torch.tensor([-self.arena_size / math.sqrt(2.0) + 0.1, -self.arena_size / math.sqrt(2.0) + 0.1], device=self.device),
             torch.tensor([-0.1, self.arena_size / math.sqrt(2.0) - 0.1], device=self.device)
         )
-        # self.init_drone_pos_dist_z = D.Uniform(
-        #     torch.tensor([self.max_height / 2 - 0.1], device=self.device),
-        #     torch.tensor([self.max_height / 2 + 0.1], device=self.device)
-        # )
-        # self.init_target_pos_dist_z = D.Uniform(
-        #     torch.tensor([self.max_height / 2 - 0.1], device=self.device),
-        #     torch.tensor([self.max_height / 2 + 0.1], device=self.device)
-        # )
         self.init_drone_pos_dist_z = D.Uniform(
-            torch.tensor([0.1], device=self.device),
-            torch.tensor([self.max_height - 0.1], device=self.device)
+            torch.tensor([self.max_height / 2 - 0.1], device=self.device),
+            torch.tensor([self.max_height / 2 + 0.1], device=self.device)
         )
         self.init_target_pos_dist_z = D.Uniform(
-            torch.tensor([0.1], device=self.device),
-            torch.tensor([self.max_height - 0.1], device=self.device)
+            torch.tensor([self.max_height / 2 - 0.1], device=self.device),
+            torch.tensor([self.max_height / 2 + 0.1], device=self.device)
         )
+        # self.init_drone_pos_dist_z = D.Uniform(
+        #     torch.tensor([0.1], device=self.device),
+        #     torch.tensor([self.max_height - 0.1], device=self.device)
+        # )
+        # self.init_target_pos_dist_z = D.Uniform(
+        #     torch.tensor([0.1], device=self.device),
+        #     torch.tensor([self.max_height - 0.1], device=self.device)
+        # )
 
         self.init_rpy_dist = D.Uniform(
             torch.tensor([-0.2, -0.2, 0.0], device=self.device) * torch.pi,
@@ -943,13 +943,13 @@ class HideAndSeek(IsaacEnv):
         # [num_envs, num_agents]
         target_dist = torch.norm(target_pos - drone_pos, dim=-1)
 
-        # choice 1, share distance reward
-        min_dist = torch.min(target_dist, dim=-1).values.unsqueeze(-1)
-        active_distance_reward = (min_dist.expand_as(target_dist) > self.catch_radius).float()
-        judge_target_dist = min_dist.expand_as(target_dist)
-        # # choice 2, individual distance reward
-        # active_distance_reward = (target_dist > self.catch_radius).float()
-        # judge_target_dist = target_dist
+        # # choice 1, share distance reward
+        # min_dist = torch.min(target_dist, dim=-1).values.unsqueeze(-1)
+        # active_distance_reward = (min_dist.expand_as(target_dist) > self.catch_radius).float()
+        # judge_target_dist = min_dist.expand_as(target_dist)
+        # choice 2, individual distance reward
+        active_distance_reward = (target_dist > self.catch_radius).float()
+        judge_target_dist = target_dist
         
         distance_reward = - self.dist_reward_coef * judge_target_dist * active_distance_reward
         self.stats['distance_reward'].add_(distance_reward.mean(-1).unsqueeze(-1))
@@ -999,7 +999,7 @@ class HideAndSeek(IsaacEnv):
         collision_reward += - self.collision_coef * collision_drone
         self.stats['collision_drone'].add_(collision_drone.mean(-1).unsqueeze(-1))
         # for wall
-        collision_wall = ((drone_pos[..., -1] > self.max_height).type(torch.float32) + (drone_pos[..., -1] < 0.1).type(torch.float32) + ((drone_pos[..., 0]**2 + drone_pos[..., 1]**2) > self.arena_size**2).type(torch.float32))
+        collision_wall = ((drone_pos[..., -1] > self.max_height).type(torch.float32) + ((drone_pos[..., 0]**2 + drone_pos[..., 1]**2) > self.arena_size**2).type(torch.float32))
         collision_reward += - self.collision_coef * collision_wall
         
         collision_flag = torch.any(collision_reward < 0, dim=1)
