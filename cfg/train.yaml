@@ -25,7 +25,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: ours_4to5_originspace
+  run_name: ours_4to5_originspace_catchreward100
   # run_name: debug
   entity: chenjy
   project: RAL
@@ -36,8 +36,8 @@ wandb:
   tags:
 
 defaults:
-  - task: HideAndSeek # evaluation and baseline
-  # - task: HideAndSeek_envgen # adaptive env generator
+  # - task: HideAndSeek # evaluation and baseline
+  - task: HideAndSeek_envgen # adaptive env generator
   # - task: HideAndSeek_deploy # two-stage reward refinement 
   - algo: mappo
   - _self_
