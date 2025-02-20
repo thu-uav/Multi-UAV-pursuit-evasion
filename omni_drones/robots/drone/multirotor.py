@@ -244,7 +244,11 @@ class MultirotorBase(RobotBase):
         self.base_link.set_masses(self.masses)
         # self.gravity = self.masses * 9.81
         self.gravity = self._view.get_body_masses().sum(-1).unsqueeze(-1) * 9.81
-        self.inertias = self.base_link.get_inertias().reshape(*self.shape, 3, 3).diagonal(0, -2, -1)
+        inertias = self.base_link.get_inertias().reshape(*self.shape, 3, 3)
+        inertias[:,:, 0, 0] = self.inertia_xx
+        inertias[:,:, 1, 1] = self.inertia_yy
+        inertias[:,:, 2, 2] = self.inertia_zz
+        self.base_link.set_inertias(inertias.reshape(*self.shape, -1))
         # default/initial parameters
         self.MASS_0 = self.masses[0].clone()
         self.INERTIA_0 = (
