@@ -25,8 +25,8 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: ours_4to5_originspace_catch60
-  # run_name: debug
+  run_name: ours_wogen_4to5_originspace_catch60_entropy0
+  # run_name: wall
   entity: chenjy
   project: RAL
   # mode: disabled
@@ -36,8 +36,8 @@ wandb:
   tags:
 
 defaults:
-  # - task: HideAndSeek # evaluation and baseline
-  - task: HideAndSeek_envgen # adaptive env generator
+  - task: HideAndSeek # evaluation and baseline
+  # - task: HideAndSeek_envgen # adaptive env generator
   # - task: HideAndSeek_deploy # two-stage reward refinement 
   - algo: mappo
   - _self_
