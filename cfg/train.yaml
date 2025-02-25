@@ -6,6 +6,7 @@ use_local_usd: false
 sim: ${task.sim}
 env: ${task.env}
 
+# model_dir: /home/jiayu/Multi-UAV-pursuit-evasion/scripts/outputs/ours_0_best.pt
 model_dir: null
 load_history_dir: null
 
@@ -25,7 +26,7 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: ours_wogen_4to5_originspace_catch60_entropy0
+  run_name: best_smoothness60_load
   # run_name: wall
   entity: chenjy
   project: RAL

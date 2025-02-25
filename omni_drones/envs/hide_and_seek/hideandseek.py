@@ -267,6 +267,7 @@ class HideAndSeek(IsaacEnv):
         self.collision_coef = self.cfg.task.collision_coef
         self.speed_coef = self.cfg.task.speed_coef
         self.dist_reward_coef = self.cfg.task.dist_reward_coef
+        self.smoothness_coef = self.cfg.task.smoothness_coef
         self.use_eval = self.cfg.task.use_eval
         self.use_partial_obs = self.cfg.task.use_partial_obs
         self.capture = torch.zeros(self.num_envs, 3, device=self.device)
@@ -943,10 +944,6 @@ class HideAndSeek(IsaacEnv):
         # [num_envs, num_agents]
         target_dist = torch.norm(target_pos - drone_pos, dim=-1)
 
-        # # choice 1, share distance reward
-        # min_dist = torch.min(target_dist, dim=-1).values.unsqueeze(-1)
-        # active_distance_reward = (min_dist.expand_as(target_dist) > self.catch_radius).float()
-        # judge_target_dist = min_dist.expand_as(target_dist)
         # choice 2, individual distance reward
         active_distance_reward = (target_dist > self.catch_radius).float()
         judge_target_dist = target_dist
@@ -1008,6 +1005,10 @@ class HideAndSeek(IsaacEnv):
         self.stats['collision_wall'].add_(collision_wall.mean(-1).unsqueeze(-1))
         self.stats['collision_reward'].add_(collision_reward.mean(-1).unsqueeze(-1))
         
+        # smoothness
+        smoothness_reward = self.smoothness_coef * torch.exp(-self.action_error_order1)
+        self.stats['smoothness_reward'].add_(smoothness_reward.mean(-1).unsqueeze(-1))
+
         self.stats["smoothness_mean"].add_(self.drone.throttle_difference.mean(-1).unsqueeze(-1))
         self.stats["smoothness_max"].set_(torch.max(self.drone.throttle_difference.max(-1).values.unsqueeze(-1), self.stats["smoothness_max"]))
         
@@ -1017,6 +1018,7 @@ class HideAndSeek(IsaacEnv):
             + catch_reward
             + collision_reward
             + speed_reward
+            + smoothness_reward
         )
 
         done  = (
