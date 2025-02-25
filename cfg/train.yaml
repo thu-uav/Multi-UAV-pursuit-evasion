@@ -26,12 +26,12 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: best_smoothness60_load
-  # run_name: wall
+  # run_name: best_smoothness60_load
+  run_name: debug
   entity: chenjy
   project: RAL
-  # mode: disabled
-  mode: online # set to 'disabled' when debugging locally, online
+  mode: disabled
+  # mode: online # set to 'disabled' when debugging locally, online
   run_id: 
   monitor_gym: True
   tags:

@@ -413,7 +413,7 @@ class PIDRateController(Transform):
         self.max_thrust = self.controller.max_thrusts.sum(-1)
         self.target_clip = self.controller.target_clip
         self.max_thrust_ratio = self.controller.max_thrust_ratio
-        self.fixed_yaw = self.controller.fixed_yaw
+        self.min_thrust_ratio = self.controller.min_thrust_ratio
         # self.tanh = TanhTransform()
     
     def transform_input_spec(self, input_spec: TensorSpec) -> TensorSpec:
@@ -427,20 +427,19 @@ class PIDRateController(Transform):
         action = tensordict[self.action_key]
 
         action = torch.tanh(action)
+        # action: [-1, 1]
         target_rate, target_thrust = action.split([3, 1], -1)
-        # target_rate: [-1, 1], target_thrust: [0, max_thrust_ratio]
-        target_thrust = torch.clamp((target_thrust + 1) / 2, min = 0.0, max = self.max_thrust_ratio)
-        if self.fixed_yaw:
-            target_rate[..., 2] = 0.0
 
         # raw action error
         ctbr_action = torch.concat([target_rate, target_thrust], dim=-1)
         prev_ctbr_action = tensordict[("info", "prev_action")]
-
+        
         action_error = torch.norm(ctbr_action - prev_ctbr_action, dim = -1)
         tensordict.set(("stats", "action_error_order1"), action_error)
-        # update prev_action = current ctbr_action
-        tensordict.set(("info", "prev_action"), ctbr_action)
+        tensordict.set(("info", "prev_action"), ctbr_action)       
+
+        # target_rate: [-1, 1], target_thrust: [min_thrust_ratio, max_thrust_ratio]
+        target_thrust = torch.clamp((target_thrust + 1) / 2, min = self.min_thrust_ratio, max = self.max_thrust_ratio)
         
         # scale
         target_rate = target_rate * 180.0 * self.target_clip
@@ -452,6 +451,7 @@ class PIDRateController(Transform):
             target_thrust=target_thrust,
             reset_pid=tensordict['done'].expand(-1, drone_state.shape[1]) # num_drones: drone_state.shape[1]
         )
+
         torch.nan_to_num_(cmds, 0.)
         tensordict.set(self.action_key, cmds)
         tensordict.set('ctbr', ctbr)

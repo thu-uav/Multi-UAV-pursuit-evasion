@@ -432,6 +432,7 @@ class RateController(nn.Module):
         cmd = cmd.reshape(*batch_shape, -1)
         return cmd
 
+
 class PIDRateController(nn.Module):
     def __init__(self, dt, g, uav_params) -> None:
         super().__init__()
@@ -455,8 +456,9 @@ class PIDRateController(nn.Module):
         
         self.target_clip = uav_params['target_clip']
         self.max_thrust_ratio = uav_params['max_thrust_ratio']
+        self.min_thrust_ratio = uav_params['min_thrust_ratio']
         self.fixed_yaw = uav_params['fixed_yaw']
-        
+                
         self.init_flag = True # init last_body_rate and inte
 
     def set_byTunablePara(
