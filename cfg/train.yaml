@@ -6,8 +6,9 @@ use_local_usd: false
 sim: ${task.sim}
 env: ${task.env}
 
-# model_dir: /home/jiayu/Multi-UAV-pursuit-evasion/scripts/outputs/ours_0_best.pt
-model_dir: null
+model_dir: /home/jiayu/Multi-UAV-pursuit-evasion/scripts/outputs/final_model/ours_0_best.pt
+# model_dir: /home/jiayu/Multi-UAV-pursuit-evasion/scripts/outputs/final_model/ours_seed1.pt
+# model_dir: /home/jiayu/Multi-UAV-pursuit-evasion/scripts/outputs/final_model/ours_seed2.pt
 load_history_dir: null
 
 total_frames: 30000_000_000 #1000_000_000
@@ -26,12 +27,12 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  # run_name: best_smoothness60_load
-  run_name: debug
+  run_name: ours_empty_seed0
+  # run_name: ours_woEP_passage_seed2
   entity: chenjy
   project: RAL
-  mode: disabled
-  # mode: online # set to 'disabled' when debugging locally, online
+  # mode: disabled
+  mode: online # set to 'disabled' when debugging locally, online
   run_id: 
   monitor_gym: True
   tags:
