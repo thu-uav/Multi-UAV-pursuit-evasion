@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-# 🔥 We have recently updated the project repository to fix some known bugs. You can pull the version under the ''master'' branch to get the update.
+## 🔥 We have recently updated the project repository to fix some known bugs. You can pull the version under the ``master`` branch to get the update.
 
 Jiayu Chen, Chao Yu, Guosheng Li, Wenhao Tang, Xinyi Yang, Botian Xu, Huazhong Yang, Yu Wang
 
