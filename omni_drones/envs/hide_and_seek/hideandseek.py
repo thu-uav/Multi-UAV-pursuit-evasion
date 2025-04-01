@@ -1049,7 +1049,6 @@ class HideAndSeek(IsaacEnv):
         )
 
         if torch.any(done):
-            breakpoint()
             if self.stats["success"].mean() >= 0.98:
                 self.v_prey += 0.05
                 self.v_prey = min(1.3, self.v_prey)

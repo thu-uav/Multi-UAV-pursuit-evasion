@@ -20,6 +20,5 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from .single import Hover
 from .hide_and_seek import HideAndSeek, HideAndSeek_envgen, HideAndSeek_deploy
 from .isaac_env import IsaacEnv

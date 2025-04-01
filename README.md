@@ -84,7 +84,7 @@ pip install dgl -f https://data.dgl.ai/wheels/torch-1.13/cu122/repo.html
 ```
 # at Multi-UAV-pursuit-evasion/
 cd scripts
-python train.py headless=true wandb.mode=disabled total_frames=50000 task=Hover
+python train.py headless=true wandb.mode=disabled total_frames=50000 task=HideAndSeek
 ```
 
 #### 5. Working with VSCode
