@@ -522,6 +522,36 @@ class HideAndSeek(IsaacEnv):
                                     [0, 3 * self.cylinder_size, 0.5 * self.cylinder_height],
                                     # [3 * self.cylinder_size, 0, 0.5 * self.cylinder_height],
                                 ], device=self.device)
+            elif self.scenario_flag == 'random_deploy':
+                drone_pos = torch.tensor([
+                                    [0.6000,  -0.1000, 0.5],
+                                    [0.4000,  0.0000, 0.5],
+                                    [0.4000, -0.4000, 0.5],
+                                    [0.8000,  0.2000, 0.5],
+                                ], device=self.device)[:self.num_agents]
+                target_pos = torch.tensor([
+                                    [-0.8000,  0.0000, 0.5],
+                                ], device=self.device)
+            elif self.scenario_flag == 'passage_deploy':
+                drone_pos = torch.tensor([
+                                    [0.5000,  0.6000, 0.5],
+                                    [0.6000,  0.0000, 0.5],
+                                    [0.5000, -0.6000, 0.5],
+                                    [0.8000,  0.2000, 0.5],
+                                ], device=self.device)[:self.num_agents]
+                target_pos = torch.tensor([
+                                    [0,  0.6000, 0.5],
+                                ], device=self.device)
+            elif self.scenario_flag == 'narrow_gap_deploy':
+                drone_pos = torch.tensor([
+                                    [0.6000,  0.0000, 0.5],
+                                    [0.0000,  0.0000, 0.5],
+                                    [0.0000, -0.6000, 0.5],
+                                    [0.8000,  0.2000, 0.5],
+                                ], device=self.device)[:self.num_agents]
+                target_pos = torch.tensor([
+                                    [0.0000,  0.6000, 0.5],
+                                ], device=self.device)
 
         if not self.use_random_cylinder:
             self.active_cylinders = torch.ones(self.num_envs, 1, device=self.device) * num_fixed_cylinders
