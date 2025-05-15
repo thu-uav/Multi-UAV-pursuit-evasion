@@ -7,6 +7,7 @@ sim: ${task.sim}
 env: ${task.env}
 
 model_dir: /home/jiayu/Multi-UAV-pursuit-evasion/scripts/ours_0_best.pt
+# model_dir: /home/jiayu/Multi-UAV-pursuit-evasion/scripts/ours_empty_seed1.pt
 load_history_dir: null
 
 total_frames: 30000_000_000 #1000_000_000
@@ -25,8 +26,8 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: smoothness40_best
-  # run_name: smoothness40_final_evalwall
+  # run_name: smoothness20_best
+  run_name: wall_eval
   entity: chenjy
   project: RAL
   # mode: disabled
@@ -36,8 +37,8 @@ wandb:
   tags:
 
 defaults:
-  # - task: HideAndSeek # evaluation and baseline
+  - task: HideAndSeek # evaluation and baseline
   # - task: HideAndSeek_envgen # adaptive env generator
-  - task: HideAndSeek_deploy # two-stage reward refinement 
+  # - task: HideAndSeek_deploy # two-stage reward refinement 
   - algo: mappo
   - _self_

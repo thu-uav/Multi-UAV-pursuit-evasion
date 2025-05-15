@@ -465,9 +465,9 @@ class HideAndSeek(IsaacEnv):
         # init
         drone_pos = torch.tensor([
                             [0.6000,  0.0000, 0.5],
-                            [0.8000,  0.0000, 0.5],
-                            [0.8000, -0.2000, 0.5],
                             [0.8000,  0.2000, 0.5],
+                            [0.8000, -0.2000, 0.5],
+                            [0.8000,  0.0000, 0.5],
                         ], device=self.device)[:self.num_agents]
         target_pos = torch.tensor([
                             [-0.8000,  0.0000, 0.5],
@@ -634,12 +634,12 @@ class HideAndSeek(IsaacEnv):
             if self.scenario_flag == 'empty':
                 drone_pos = torch.tensor([
                                     [0.6000,  0.0000, 0.5],
-                                    [0.8000,  0.0000, 0.5],
+                                    [0.8000,  0.2000, 0.5],
                                     [0.8000, -0.2000, 0.5],
                                     [0.8000,  0.2000, 0.5],
                                 ], device=self.device)[:self.num_agents]
                 target_pos = torch.tensor([
-                                    [-0.8000,  0.0000, 0.5],
+                                    [0.0000,  0.0000, 0.5],
                                 ], device=self.device)
             elif self.scenario_flag == 'wall':
                 drone_pos = torch.tensor([
@@ -701,6 +701,16 @@ class HideAndSeek(IsaacEnv):
                 target_pos = torch.tensor([
                                     [0,  0.6000, 0.5],
                                 ], device=self.device)
+            elif self.scenario_flag == 'passage_debug':
+                drone_pos = torch.tensor([
+                                    [0.6000,  0.0000, 0.5],
+                                    [0.8000,  0.2000, 0.5],
+                                    [0.0000,  0.8000, 0.5],
+                                    [0.8000,  0.2000, 0.5],
+                                ], device=self.device)[:self.num_agents]
+                target_pos = torch.tensor([
+                                    [0,  0.0000, 0.5],
+                                ], device=self.device)
             elif self.scenario_flag == 'passage_deploy':
                 drone_pos = torch.tensor([
                                     [0.5000,  0.6000, 0.5],
@@ -720,6 +730,16 @@ class HideAndSeek(IsaacEnv):
                                 ], device=self.device)[:self.num_agents]
                 target_pos = torch.tensor([
                                     [0.0000,  0.6000, 0.5],
+                                ], device=self.device)
+            else:
+                drone_pos = torch.tensor([
+                                    [0.6000,  0.0000, 0.5],
+                                    [0.8000,  0.2000, 0.5],
+                                    [0.8000, -0.2000, 0.5],
+                                    [0.8000,  0.0000, 0.5],
+                                ], device=self.device)[:self.num_agents]
+                target_pos = torch.tensor([
+                                    [-0.8000,  0.0000, 0.5],
                                 ], device=self.device)
         
         if self.use_random_cylinder:
@@ -783,6 +803,10 @@ class HideAndSeek(IsaacEnv):
         # target_vel[...,:3] = self.v_prey * forces_target / (torch.norm(forces_target, dim=-1).unsqueeze(1) + 1e-5)
         
         self.target.set_velocities(target_vel.type(torch.float32), self.env_ids)
+        
+        if self.use_eval and self._should_render(0):
+            # self._draw_evader_traj()
+            self._draw_pred_traj()
      
     def _compute_state_and_obs(self):
         self.drone_states = self.drone.get_state()
@@ -1207,7 +1231,40 @@ class HideAndSeek(IsaacEnv):
             _carb_float3_add(p, self.central_env_pos) for p in point_list2
         ]
         self.draw.draw_lines(point_list1, point_list2, colors, sizes)   
-    
+
+    def _draw_evader_traj(self):
+        evader_pos, _ = self.get_env_poses(self.target.get_world_poses())
+        evader_vel = self.target.get_velocities()[..., :3]
+        point_list1, point_list2, colors, sizes = draw_traj(
+            evader_pos[self.central_env_idx, :], evader_vel[self.central_env_idx, :], dt=0.02, size=4.0
+        )
+        point_list1 = [
+            _carb_float3_add(p, self.central_env_pos) for p in point_list1
+        ]
+        point_list2 = [
+            _carb_float3_add(p, self.central_env_pos) for p in point_list2
+        ]
+        self.draw.draw_lines(point_list1, point_list2, colors, sizes)  
+
+    def _draw_pred_traj(self):
+        evader_vel = self.target.get_velocities()[..., :3]
+        point_list1, point_list2, colors, sizes = draw_traj(
+            self.target_pos_predicted[self.central_env_idx, :], evader_vel[self.central_env_idx, :], dt=0.02, size=4.0
+        )
+        for idx in range(len(colors)):
+            color = list(colors[idx])
+            color[0] = 0.8
+            color[1] = 0.8
+            color[2] = 0.8
+            colors[idx] = tuple(color)
+        point_list1 = [
+            _carb_float3_add(p, self.central_env_pos) for p in point_list1
+        ]
+        point_list2 = [
+            _carb_float3_add(p, self.central_env_pos) for p in point_list2
+        ]
+        self.draw.draw_lines(point_list1, point_list2, colors, sizes) 
+
     def _draw_detection(self):
         self.draw.clear_points()
 
