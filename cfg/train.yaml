@@ -1,12 +1,12 @@
 # hydra.job.chdir: false
 
 headless: true
-use_local_usd: true
+use_local_usd: false
 
 sim: ${task.sim}
 env: ${task.env}
 
-model_dir: null
+model_dir: /home/jiayu/Multi-UAV-pursuit-evasion/scripts/ours_0_best.pt
 load_history_dir: null
 
 total_frames: 30000_000_000 #1000_000_000
@@ -25,19 +25,19 @@ viewer:
 
 wandb:
   group: ${oc.select:..task.name}
-  run_name: debug
+  run_name: smoothness40_best
   # run_name: smoothness40_final_evalwall
   entity: chenjy
-  project: myproject
-  mode: disabled
-  # mode: online # set to 'disabled' when debugging locally, online
+  project: RAL
+  # mode: disabled
+  mode: online # set to 'disabled' when debugging locally, online
   run_id: 
   monitor_gym: True
   tags:
 
 defaults:
-  - task: HideAndSeek # evaluation and baseline
+  # - task: HideAndSeek # evaluation and baseline
   # - task: HideAndSeek_envgen # adaptive env generator
-  # - task: HideAndSeek_deploy # two-stage reward refinement 
+  - task: HideAndSeek_deploy # two-stage reward refinement 
   - algo: mappo
   - _self_

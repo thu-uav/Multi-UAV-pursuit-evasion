@@ -480,9 +480,9 @@ class HideAndSeek(IsaacEnv):
             cylinder_pos_z[self.inactive_mask] = self.invalid_z
             all_cylinders_pos = torch.concat([cylinders_pos_xy, cylinder_pos_z], dim=-1).squeeze(0)
         else:
-            if self.scenario_flag == 'empty':
+            if 'empty' in self.scenario_flag:
                 num_fixed_cylinders = 0
-            elif self.scenario_flag == 'passage':
+            elif 'passage' in self.scenario_flag:
                 num_fixed_cylinders = 6
                 all_cylinders_pos[:num_fixed_cylinders] = torch.tensor([
                                     [0.0, 3 * self.cylinder_size, 0.5 * self.cylinder_height],
@@ -493,7 +493,7 @@ class HideAndSeek(IsaacEnv):
                                     [0.0, -2 * self.cylinder_size, 0.5 * self.cylinder_height],
                                     # [-2 * self.cylinder_size, -4 * self.cylinder_size, 0.5 * self.cylinder_height],
                                 ], device=self.device)
-            elif self.scenario_flag == 'wall':
+            elif 'wall' in self.scenario_flag:
                 num_fixed_cylinders = 4
                 all_cylinders_pos[:num_fixed_cylinders] = torch.tensor([
                                     # [0.0, 0.0, 0.5 * self.cylinder_height],
@@ -502,7 +502,7 @@ class HideAndSeek(IsaacEnv):
                                     [0.0, 4.5 * self.cylinder_size, 0.5 * self.cylinder_height],
                                     [0.0, -4.5 * self.cylinder_size, 0.5 * self.cylinder_height],
                                 ], device=self.device)
-            elif self.scenario_flag == 'random':
+            elif 'random' in self.scenario_flag:
                 num_fixed_cylinders = 6
                 all_cylinders_pos[:num_fixed_cylinders] = torch.tensor([
                                     [  0.6000,   0.4000,   0.6000],
@@ -512,7 +512,7 @@ class HideAndSeek(IsaacEnv):
                                     [ -0.2000,  -0.4000,   0.6000],
                                     [  0.0000,  -0.2000,   0.6000],
                             ], device=self.device)
-            elif self.scenario_flag == 'narrow_gap':
+            elif 'narrow_gap' in self.scenario_flag:
                 num_fixed_cylinders = 5
                 all_cylinders_pos[:num_fixed_cylinders] = torch.tensor([
                                     [3 * self.cylinder_size, -3 * self.cylinder_size, 0.5 * self.cylinder_height],
@@ -521,36 +521,6 @@ class HideAndSeek(IsaacEnv):
                                     [-3 * self.cylinder_size, -3 * self.cylinder_size, 0.5 * self.cylinder_height],
                                     [0, 3 * self.cylinder_size, 0.5 * self.cylinder_height],
                                     # [3 * self.cylinder_size, 0, 0.5 * self.cylinder_height],
-                                ], device=self.device)
-            elif self.scenario_flag == 'random_deploy':
-                drone_pos = torch.tensor([
-                                    [0.6000,  -0.1000, 0.5],
-                                    [0.4000,  0.0000, 0.5],
-                                    [0.4000, -0.4000, 0.5],
-                                    [0.8000,  0.2000, 0.5],
-                                ], device=self.device)[:self.num_agents]
-                target_pos = torch.tensor([
-                                    [-0.8000,  0.0000, 0.5],
-                                ], device=self.device)
-            elif self.scenario_flag == 'passage_deploy':
-                drone_pos = torch.tensor([
-                                    [0.5000,  0.6000, 0.5],
-                                    [0.6000,  0.0000, 0.5],
-                                    [0.5000, -0.6000, 0.5],
-                                    [0.8000,  0.2000, 0.5],
-                                ], device=self.device)[:self.num_agents]
-                target_pos = torch.tensor([
-                                    [0,  0.6000, 0.5],
-                                ], device=self.device)
-            elif self.scenario_flag == 'narrow_gap_deploy':
-                drone_pos = torch.tensor([
-                                    [0.6000,  0.0000, 0.5],
-                                    [0.0000,  0.0000, 0.5],
-                                    [0.0000, -0.6000, 0.5],
-                                    [0.8000,  0.2000, 0.5],
-                                ], device=self.device)[:self.num_agents]
-                target_pos = torch.tensor([
-                                    [0.0000,  0.6000, 0.5],
                                 ], device=self.device)
 
         if not self.use_random_cylinder:
