@@ -16,8 +16,12 @@ time_encoding: true
 action_transform: PIDrate
 
 # exp
-max_agents: 3
-num_agents: 3
+max_agents: 5
+num_agents: 5
+
+# prey settings
+max_prey: 5
+num_prey: 5
 
 # flag
 use_partial_obs: 1

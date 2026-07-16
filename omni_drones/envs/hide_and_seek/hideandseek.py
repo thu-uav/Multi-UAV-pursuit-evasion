@@ -784,6 +784,44 @@ class HideAndSeek(IsaacEnv):
         
         self.target.set_velocities(target_vel.type(torch.float32), self.env_ids)
      
+    def _compute_task_assignment(self, drone_pos, target_pos):
+        dist_matrix = torch.cdist(drone_pos, target_pos)
+        
+        target_assignments = torch.zeros(self.num_envs, self.num_agents, self.num_prey, device=self.device)
+        
+        for env_idx in range(self.num_envs):
+            dist_mat = dist_matrix[env_idx]
+            assigned_drones = set()
+            assigned_targets = set()
+            
+            captured_targets = set()
+            if hasattr(self, 'capture'):
+                for t in range(self.num_prey):
+                    if self.capture[env_idx, t]:
+                        captured_targets.add(t)
+            
+            available_targets = set(range(self.num_prey)) - captured_targets
+            
+            for _ in range(min(self.num_agents, len(available_targets))):
+                min_val = float('inf')
+                min_drone = -1
+                min_target = -1
+                
+                for d in range(self.num_agents):
+                    for t in available_targets:
+                        if d not in assigned_drones and t not in assigned_targets:
+                            if dist_mat[d, t] < min_val:
+                                min_val = dist_mat[d, t]
+                                min_drone = d
+                                min_target = t
+                
+                if min_drone != -1 and min_target != -1:
+                    target_assignments[env_idx, min_drone, min_target] = 1.0
+                    assigned_drones.add(min_drone)
+                    assigned_targets.add(min_target)
+        
+        self.target_assignments = target_assignments.sum(dim=1)
+
     def _compute_state_and_obs(self):
         self.drone_states = self.drone.get_state()
         self.info["drone_state"][:] = self.drone_states[..., :13]
