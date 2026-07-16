@@ -452,7 +452,8 @@ class HideAndSeek(IsaacEnv):
         self.observation_spec["info"] = info_spec
         self.stats = stats_spec.zero()
         self.info = info_spec.zero()
-        
+        self._prey_captured = torch.zeros(self.num_envs, self.num_prey, dtype=torch.bool, device=self.device)
+
     def _design_scene(self): # for render
         self.use_local_usd = self.cfg.use_local_usd
         self.num_agents = self.cfg.task.num_agents
@@ -777,6 +778,7 @@ class HideAndSeek(IsaacEnv):
         # reset stats
         self.stats[env_ids] = 0.
         self.stats['first_capture_step'].set_(torch.ones_like(self.stats['first_capture_step']) * self.max_episode_length)
+        self._prey_captured[env_ids] = False
 
         # init prev_actions: hover
         cmd_init = 2.0 * (self.drone.throttle[env_ids]) ** 2 - 1.0
@@ -1047,19 +1049,21 @@ class HideAndSeek(IsaacEnv):
         self.stats['sum_detect_step'] += 1.0 * detect_flag.unsqueeze(1)
         self.stats['detect_reward'].add_(detect_reward.mean(-1).unsqueeze(-1))
 
-        # capture: [E, D, P]
+        # capture: [E, D, P] — cumulative: all prey must be captured for success & reward
         self.capture_matrix = (target_dist < self.catch_radius)  # [E, D, P]
         masked_capture = self.capture_matrix * (~ self.blocked).float()  # [E, D, P]
-        broadcast_capture = torch.any(masked_capture, dim=1)  # [E, P] — any drone captures prey p
-        catch_reward_per_drone = self.catch_reward_coef * broadcast_capture.unsqueeze(1).expand(-1, self.num_agents, -1)  # [E, D, P]
-        catch_reward = catch_reward_per_drone.sum(dim=-1)  # [E, D] — sum over prey
+        broadcast_capture = torch.any(masked_capture, dim=1)  # [E, P] — per-step per-prey
+        # Cumulative tracking over episode
+        self._prey_captured = self._prey_captured | broadcast_capture  # [E, P]
+        all_captured = self._prey_captured.all(dim=-1)  # [E] — all prey caught this episode
+        catch_reward = self.catch_reward_coef * all_captured.unsqueeze(-1).expand(-1, self.num_agents)  # [E, D]
 
         # track per-prey capture
-        self.capture = broadcast_capture  # [E, P]
-        capture_flag = torch.any(broadcast_capture, dim=-1)  # [E]
+        self.capture = broadcast_capture  # [E, P] — per-step
+        capture_flag = all_captured  # [E]
         # blocked: [E, D, P] → any blocked for all drones to any prey
         self.stats["blocked"].add_(torch.all(self.blocked, dim=1).any(dim=-1).unsqueeze(-1))  # [E, 1]
-        self.stats["success"] = torch.logical_or(capture_flag.unsqueeze(1), self.stats["success"]).float()
+        self.stats["success"] = capture_flag.unsqueeze(1).float()
         current_capture_step = capture_flag.float() * self.progress_buf + (~capture_flag).float() * self.max_episode_length
         self.stats['first_capture_step'] = torch.min(self.stats['first_capture_step'], current_capture_step.unsqueeze(1))
         self.stats['catch_reward'].add_(catch_reward.mean(-1).unsqueeze(-1))
