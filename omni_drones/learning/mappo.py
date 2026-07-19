@@ -412,6 +412,9 @@ class MAPPOPolicy(object):
             TP_done = tensordict['next']['agents']['TP']['TP_done']
             window_size = self.TP_net.future_predcition_step
             window_step = self.TP_net.window_step
+            # flatten prey dim into pos dim for multi-prey: (batch, time, P, 3) -> (batch, time, P*3)
+            if TP_groundtruth.dim() == 4:
+                TP_groundtruth = TP_groundtruth.reshape(*TP_groundtruth.shape[:-2], -1)
             # use the future groundtruth
             windows = TP_groundtruth.unfold(dimension=1, size=window_size + 1, step=window_step).transpose(2, 3)[:, :, 1:]
             batch, _, future_step, pos_dim = windows.shape
